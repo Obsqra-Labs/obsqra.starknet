@@ -2,18 +2,18 @@
 mod tests {
     use obsqra_contracts::dao_constraint_manager::{IDAOConstraintManagerDispatcher, IDAOConstraintManagerDispatcherTrait};
     use starknet::ContractAddress;
-    use snforge_std::{declare, ContractClass, deploy, start_cheat_caller_address, stop_cheat_caller_address};
+    use snforge_std::{declare, deploy, start_cheat_caller_address, stop_cheat_caller_address};
+    use core::traits::Into;
     use core::result::ResultTrait;
     
     fn deploy_contract() -> ContractAddress {
         let declared = declare("DAOConstraintManager");
-        let owner: ContractAddress = starknet::contract_address_const::<0x123>();
         let deploy_result: Result<(ContractAddress, Span<felt252>), felt252> = deploy(@declared, @array![
-            owner.into(),
-            6000.into(),  // max_single (60%)
-            3.into(),     // min_diversification (3 protocols)
-            5000.into(),  // max_volatility
-            1000000.into() // min_liquidity
+            0x123.into(),      // owner
+            6000.into(),       // max_single (60%)
+            3.into(),          // min_diversification (3 protocols)
+            5000.into(),       // max_volatility
+            1000000.into()     // min_liquidity
         ]);
         let (contract_address, _) = deploy_result.unwrap();
         contract_address
@@ -37,7 +37,7 @@ mod tests {
         let manager = deploy_contract();
         let dispatcher = IDAOConstraintManagerDispatcher { contract_address: manager };
         
-        let owner: ContractAddress = starknet::contract_address_const::<0x123>();
+        let owner: ContractAddress = 0x123.into();
         start_cheat_caller_address(manager, owner);
         
         // Update constraints
@@ -59,13 +59,15 @@ mod tests {
         let manager = deploy_contract();
         let dispatcher = IDAOConstraintManagerDispatcher { contract_address: manager };
         
-        let unauthorized: ContractAddress = starknet::contract_address_const::<0x999>();
+        let unauthorized: ContractAddress = 0x999.into();
         start_cheat_caller_address(manager, unauthorized);
         
-        // Should fail - unauthorized
+        // Should panic with 'Unauthorized' - no cleanup after this line
+        // (panic will terminate test execution immediately)
         dispatcher.set_constraints(5000, 2, 4000, 2000000);
         
-        stop_cheat_caller_address(manager);
+        // NOTE: No stop_cheat_caller_address here - it would be unreachable
+        // Test environment automatically cleans up on panic
     }
     
     #[test]
@@ -125,7 +127,7 @@ mod tests {
         let manager = deploy_contract();
         let dispatcher = IDAOConstraintManagerDispatcher { contract_address: manager };
         
-        let owner: ContractAddress = starknet::contract_address_const::<0x123>();
+        let owner: ContractAddress = 0x123.into();
         start_cheat_caller_address(manager, owner);
         
         // Change constraints to be more lenient

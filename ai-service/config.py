@@ -8,8 +8,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Network configuration
-STARKNET_NETWORK = os.getenv('STARKNET_NETWORK', 'testnet')
-STARKNET_RPC_URL = os.getenv('STARKNET_RPC_URL', 'https://starknet-testnet.public.blastapi.io')
+STARKNET_NETWORK = os.getenv('STARKNET_NETWORK', 'sepolia')
+STARKNET_RPC_URL = os.getenv('STARKNET_RPC_URL', 'https://starknet-sepolia.public.blastapi.io/rpc/v0_7')
 
 # Contract addresses
 RISK_ENGINE_ADDRESS = os.getenv('RISK_ENGINE_ADDRESS', '')

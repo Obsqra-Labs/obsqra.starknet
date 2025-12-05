@@ -2,9 +2,9 @@
 pub trait IStrategyRouter<TContractState> {
     fn update_allocation(
         ref self: TContractState,
-        aave_pct: felt252,
-        lido_pct: felt252,
-        compound_pct: felt252
+        nostra_pct: felt252,
+        zklend_pct: felt252,
+        ekubo_pct: felt252
     );
     
     fn get_allocation(ref self: TContractState) -> (felt252, felt252, felt252);
@@ -22,12 +22,12 @@ mod StrategyRouter {
     
     #[storage]
     struct Storage {
-        aave_allocation: felt252,
-        lido_allocation: felt252,
-        compound_allocation: felt252,
-        aave_address: ContractAddress,
-        lido_address: ContractAddress,
-        compound_address: ContractAddress,
+        nostra_allocation: felt252,
+        zklend_allocation: felt252,
+        ekubo_allocation: felt252,
+        nostra_address: ContractAddress,
+        zklend_address: ContractAddress,
+        ekubo_address: ContractAddress,
         owner: ContractAddress,
         risk_engine: ContractAddress,
     }
@@ -41,9 +41,9 @@ mod StrategyRouter {
     
     #[derive(Drop, starknet::Event)]
     struct AllocationUpdated {
-        aave_pct: felt252,
-        lido_pct: felt252,
-        compound_pct: felt252,
+        nostra_pct: felt252,
+        zklend_pct: felt252,
+        ekubo_pct: felt252,
         timestamp: u64,
     }
     
@@ -57,29 +57,29 @@ mod StrategyRouter {
     fn constructor(
         ref self: ContractState,
         owner: ContractAddress,
-        aave_address: ContractAddress,
-        lido_address: ContractAddress,
-        compound_address: ContractAddress,
+        nostra_address: ContractAddress,
+        zklend_address: ContractAddress,
+        ekubo_address: ContractAddress,
         risk_engine: ContractAddress
     ) {
         self.owner.write(owner);
-        self.aave_address.write(aave_address);
-        self.lido_address.write(lido_address);
-        self.compound_address.write(compound_address);
+        self.nostra_address.write(nostra_address);
+        self.zklend_address.write(zklend_address);
+        self.ekubo_address.write(ekubo_address);
         self.risk_engine.write(risk_engine);
         
         // Initialize with balanced allocation
-        self.aave_allocation.write(3333);
-        self.lido_allocation.write(3333);
-        self.compound_allocation.write(3334);
+        self.nostra_allocation.write(3333);
+        self.zklend_allocation.write(3333);
+        self.ekubo_allocation.write(3334);
     }
     
     #[external(v0)]
     fn update_allocation(
         ref self: ContractState,
-        aave_pct: felt252,
-        lido_pct: felt252,
-        compound_pct: felt252
+        nostra_pct: felt252,
+        zklend_pct: felt252,
+        ekubo_pct: felt252
     ) {
         // Verify caller is authorized
         let caller = get_caller_address();
@@ -89,18 +89,18 @@ mod StrategyRouter {
         assert(caller == owner || caller == risk_engine, 'Unauthorized');
         
         // Verify percentages sum to 10000 (100%)
-        assert(aave_pct + lido_pct + compound_pct == 10000, 'Invalid allocation');
+        assert(nostra_pct + zklend_pct + ekubo_pct == 10000, 'Invalid allocation');
         
         // Update allocations
-        self.aave_allocation.write(aave_pct);
-        self.lido_allocation.write(lido_pct);
-        self.compound_allocation.write(compound_pct);
+        self.nostra_allocation.write(nostra_pct);
+        self.zklend_allocation.write(zklend_pct);
+        self.ekubo_allocation.write(ekubo_pct);
         
         // Emit event
         self.emit(AllocationUpdated {
-            aave_pct,
-            lido_pct,
-            compound_pct,
+            nostra_pct,
+            zklend_pct,
+            ekubo_pct,
             timestamp: get_block_timestamp(),
         });
     }
@@ -108,9 +108,9 @@ mod StrategyRouter {
     #[external(v0)]
     fn get_allocation(ref self: ContractState) -> (felt252, felt252, felt252) {
         (
-            self.aave_allocation.read(),
-            self.lido_allocation.read(),
-            self.compound_allocation.read()
+            self.nostra_allocation.read(),
+            self.zklend_allocation.read(),
+            self.ekubo_allocation.read()
         )
     }
     

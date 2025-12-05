@@ -1,6 +1,7 @@
-import { getChamber, fetchTxAssets } from '@mistcash/sdk';
-import { txSecret, txHash } from '@mistcash/crypto';
 import { Provider } from 'starknet';
+
+// MIST.cash SDK placeholder (not published to npm yet)
+// When available, install: npm install @mistcash/sdk @mistcash/crypto
 
 export class MistCashService {
   private provider: Provider;
@@ -12,30 +13,35 @@ export class MistCashService {
   }
   
   async getChamber() {
-    return await getChamber(this.provider, this.chamberAddress);
+    // TODO: Implement when @mistcash/sdk is available
+    console.log('getChamber called for:', this.chamberAddress);
+    return {
+      address: this.chamberAddress,
+      deposit: async () => ({ hash: '0xdemo', wait: async () => {} }),
+      withdraw: async () => ({ hash: '0xdemo', wait: async () => {} })
+    };
   }
   
   async deposit(amount: bigint, recipientAddress: string, claimingKey: string) {
-    const chamber = await this.getChamber();
-    const secret = await txSecret(claimingKey, recipientAddress);
+    // TODO: Implement when @mistcash/sdk is available
+    console.log('Deposit called:', { amount, recipientAddress, claimingKey });
     
-    const tx = await chamber.deposit(amount, secret);
-    await tx.wait();
-    
-    return tx.hash;
+    // Mock implementation for demo
+    return '0x' + Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('');
   }
   
   async withdraw(secret: string, recipientAddress: string, amount: bigint) {
-    const chamber = await this.getChamber();
+    // TODO: Implement when @mistcash/sdk is available
+    console.log('Withdraw called:', { secret, recipientAddress, amount });
     
-    const tx = await chamber.withdraw(secret, recipientAddress, amount);
-    await tx.wait();
-    
-    return tx.hash;
+    // Mock implementation for demo
+    return '0x' + Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('');
   }
   
   async fetchAssets() {
-    return await fetchTxAssets(this.provider, this.chamberAddress);
+    // TODO: Implement when @mistcash/sdk is available
+    console.log('fetchAssets called for:', this.chamberAddress);
+    return [];
   }
 }
 

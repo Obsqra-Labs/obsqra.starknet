@@ -1,7 +1,5 @@
-'use client';
-
-import { StarknetProvider } from '@/providers/StarknetProvider';
 import './globals.css';
+import { StarknetProvider } from '@/providers/StarknetProvider';
 
 export default function RootLayout({
   children,

@@ -11,19 +11,19 @@ pub trait IRiskEngine<TContractState> {
     
     fn calculate_allocation(
         ref self: TContractState,
-        aave_risk: felt252,
-        lido_risk: felt252,
-        compound_risk: felt252,
-        aave_apy: felt252,
-        lido_apy: felt252,
-        compound_apy: felt252
+        nostra_risk: felt252,
+        zklend_risk: felt252,
+        ekubo_risk: felt252,
+        nostra_apy: felt252,
+        zklend_apy: felt252,
+        ekubo_apy: felt252
     ) -> (felt252, felt252, felt252);
     
     fn verify_constraints(
         ref self: TContractState,
-        aave_pct: felt252,
-        lido_pct: felt252,
-        compound_pct: felt252,
+        nostra_pct: felt252,
+        zklend_pct: felt252,
+        ekubo_pct: felt252,
         max_single: felt252,
         min_diversification: felt252
     ) -> bool;
@@ -134,60 +134,60 @@ mod RiskEngine {
     #[external(v0)]
     fn calculate_allocation(
         ref self: ContractState,
-        aave_risk: felt252,
-        lido_risk: felt252,
-        compound_risk: felt252,
-        aave_apy: felt252,
-        lido_apy: felt252,
-        compound_apy: felt252
+        nostra_risk: felt252,
+        zklend_risk: felt252,
+        ekubo_risk: felt252,
+        nostra_apy: felt252,
+        zklend_apy: felt252,
+        ekubo_apy: felt252
     ) -> (felt252, felt252, felt252) {
         // Risk-adjusted score = (APY * 10000) / (Risk + 1)
-        let divisor_aave = aave_risk + 1;
-        let divisor_lido = lido_risk + 1;
-        let divisor_compound = compound_risk + 1;
+        let divisor_nostra = nostra_risk + 1;
+        let divisor_zklend = zklend_risk + 1;
+        let divisor_ekubo = ekubo_risk + 1;
         
         // Calculate scores with scaling
-        let aave_product = aave_apy * 10000;
-        let aave_score = felt252_div(aave_product, divisor_aave);
+        let nostra_product = nostra_apy * 10000;
+        let nostra_score = felt252_div(nostra_product, divisor_nostra);
         
-        let lido_product = lido_apy * 10000;
-        let lido_score = felt252_div(lido_product, divisor_lido);
+        let zklend_product = zklend_apy * 10000;
+        let zklend_score = felt252_div(zklend_product, divisor_zklend);
         
-        let compound_product = compound_apy * 10000;
-        let compound_score = felt252_div(compound_product, divisor_compound);
+        let ekubo_product = ekubo_apy * 10000;
+        let ekubo_score = felt252_div(ekubo_product, divisor_ekubo);
         
-        let total_score = aave_score + lido_score + compound_score;
+        let total_score = nostra_score + zklend_score + ekubo_score;
         
         // Calculate percentages (basis points, 10000 = 100%)
-        let aave_pct_product = aave_score * 10000;
-        let aave_pct = felt252_div(aave_pct_product, total_score);
+        let nostra_pct_product = nostra_score * 10000;
+        let nostra_pct = felt252_div(nostra_pct_product, total_score);
         
-        let lido_pct_product = lido_score * 10000;
-        let lido_pct = felt252_div(lido_pct_product, total_score);
+        let zklend_pct_product = zklend_score * 10000;
+        let zklend_pct = felt252_div(zklend_pct_product, total_score);
         
-        let compound_pct = 10000 - aave_pct - lido_pct;
+        let ekubo_pct = 10000 - nostra_pct - zklend_pct;
         
-        (aave_pct, lido_pct, compound_pct)
+        (nostra_pct, zklend_pct, ekubo_pct)
     }
     
     #[external(v0)]
     fn verify_constraints(
         ref self: ContractState,
-        aave_pct: felt252,
-        lido_pct: felt252,
-        compound_pct: felt252,
+        nostra_pct: felt252,
+        zklend_pct: felt252,
+        ekubo_pct: felt252,
         max_single: felt252,
         min_diversification: felt252
     ) -> bool {
         // Find maximum allocation using u256 comparisons
-        let aave_u256: u256 = aave_pct.into();
-        let lido_u256: u256 = lido_pct.into();
-        let compound_u256: u256 = compound_pct.into();
+        let nostra_u256: u256 = nostra_pct.into();
+        let zklend_u256: u256 = zklend_pct.into();
+        let ekubo_u256: u256 = ekubo_pct.into();
         
-        let max_alloc = if aave_u256 > lido_u256 {
-            if aave_u256 > compound_u256 { aave_pct } else { compound_pct }
+        let max_alloc = if nostra_u256 > zklend_u256 {
+            if nostra_u256 > ekubo_u256 { nostra_pct } else { ekubo_pct }
         } else {
-            if lido_u256 > compound_u256 { lido_pct } else { compound_pct }
+            if zklend_u256 > ekubo_u256 { zklend_pct } else { ekubo_pct }
         };
         
         // Check max single protocol constraint
@@ -200,13 +200,13 @@ mod RiskEngine {
         // Check diversification (count protocols with >=10% = 1000 basis points)
         let threshold_u256: u256 = 1000_u256;
         let mut diversification_count = 0;
-        if aave_u256 >= threshold_u256 {
+        if nostra_u256 >= threshold_u256 {
             diversification_count += 1;
         };
-        if lido_u256 >= threshold_u256 {
+        if zklend_u256 >= threshold_u256 {
             diversification_count += 1;
         };
-        if compound_u256 >= threshold_u256 {
+        if ekubo_u256 >= threshold_u256 {
             diversification_count += 1;
         };
         

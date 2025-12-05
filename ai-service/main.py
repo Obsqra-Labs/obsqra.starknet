@@ -97,5 +97,6 @@ async def accrue_yields():
 
 if __name__ == '__main__':
     import uvicorn
-    uvicorn.run(app, host='0.0.0.0', port=8000)
+    from config import AI_SERVICE_PORT
+    uvicorn.run(app, host='0.0.0.0', port=AI_SERVICE_PORT)
 

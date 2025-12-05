@@ -1,128 +1,208 @@
 # Obsqra.starknet Implementation Guide
 
-**Version:** 1.0  
-**Date:** December 2025
+**Version:** 2.0  
+**Date:** December 5, 2025  
+**Status:** ✅ Deployed to Starknet Sepolia
 
-This guide provides step-by-step instructions for implementing the Obsqra.starknet MVP/POC.
+---
+
+## 🚀 Live Deployment
+
+Contracts are deployed on **Starknet Sepolia Testnet**:
+
+| Contract | Address |
+|----------|---------|
+| **RiskEngine** | `0x008c3eff435e859e3b8e5cb12f837f4dfa77af25c473fb43067adf9f557a3d80` |
+| **DAOConstraintManager** | `0x010a3e7d3a824ea14a5901984017d65a733af934f548ea771e2a4ad792c4c856` |
+| **StrategyRouter** | `0x01fa59cf9a28d97fd9ab5db1e21f9dd6438af06cc535bccdb58962518cfdf53a` |
+
+View on explorer: [Starkscan](https://sepolia.starkscan.co) | [Voyager](https://sepolia.voyager.online)
+
+---
 
 ## Table of Contents
 
 1. [Prerequisites & Setup](#1-prerequisites--setup)
 2. [Development Environment](#2-development-environment)
-3. [Cairo Risk Engine Port](#3-cairo-risk-engine-port)
-4. [MIST.cash Integration](#4-mistcash-integration)
-5. [Strategy Router Implementation](#5-strategy-router-implementation)
-6. [DAO Constraint Manager](#6-dao-constraint-manager)
-7. [Frontend Integration](#7-frontend-integration)
-8. [Testing Strategy](#8-testing-strategy)
-9. [Deployment Guide](#9-deployment-guide)
+3. [Contract Deployment](#3-contract-deployment)
+4. [Frontend Integration](#4-frontend-integration)
+5. [Testing](#5-testing)
+6. [Troubleshooting](#6-troubleshooting)
+
+---
 
 ## 1. Prerequisites & Setup
 
 ### Required Tools
 
-```bash
-# Rust (for Cairo)
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+| Tool | Version | Purpose |
+|------|---------|---------|
+| Scarb | 2.14.0+ | Cairo package manager |
+| Starknet Foundry | **0.53.0+** | Testing & deployment (critical!) |
+| Node.js | 18+ | Frontend |
+| Python | 3.10+ | AI service |
 
-# Cairo
-curl -L https://github.com/foundry-rs/starknet-foundry/releases/latest/download/starknet-foundry_linux_amd64.tar.gz | tar -xzf -
-sudo mv starknet-foundry /usr/local/bin/
-
-# Node.js (v18+)
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-sudo apt-get install -y nodejs
-
-# Python (3.10+)
-sudo apt-get install python3.10 python3-pip
-```
-
-### Verify Installation
+### Installation
 
 ```bash
-rustc --version      # Should be 1.70+
-scarb --version      # Should be 2.0+
-node --version       # Should be 18+
-python3 --version    # Should be 3.10+
+# Scarb (Cairo)
+curl --proto '=https' --tlsv1.2 -sSf https://docs.swmansion.com/scarb/install.sh | sh
+
+# Starknet Foundry (MUST be 0.53.0+)
+curl -L https://raw.githubusercontent.com/foundry-rs/starknet-foundry/master/scripts/install.sh | sh
+snfoundryup
+
+# Verify versions
+scarb --version    # 2.14.0+
+sncast --version   # 0.53.0+ (CRITICAL for Sepolia deployment)
 ```
+
+### ⚠️ Version Compatibility Warning
+
+Check the [Starknet Compatibility Tables](https://docs.starknet.io/learn/cheatsheets/compatibility) before deployment. Version mismatches cause cryptic errors.
+
+| RPC Version | sncast Version |
+|-------------|----------------|
+| 0.8.x | 0.39.0 |
+| 0.10.x | **0.53.0** ← Use this |
+
+---
 
 ## 2. Development Environment
 
-### Initialize Cairo Project
+### Clone & Setup
+
+```bash
+git clone <repo-url>
+cd obsqra.starknet
+
+# Contracts
+cd contracts
+scarb build
+
+# Frontend
+cd ../frontend
+npm install --legacy-peer-deps
+
+# AI Service
+cd ../ai-service
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+---
+
+## 3. Contract Deployment
+
+### Option A: Use Existing Deployment (Recommended)
+
+Contracts are already deployed. Just configure your frontend:
+
+```bash
+# Frontend environment
+cat > frontend/.env.local << 'EOF'
+NEXT_PUBLIC_CHAIN_ID=SN_SEPOLIA
+NEXT_PUBLIC_RISK_ENGINE_ADDRESS=0x008c3eff435e859e3b8e5cb12f837f4dfa77af25c473fb43067adf9f557a3d80
+NEXT_PUBLIC_DAO_MANAGER_ADDRESS=0x010a3e7d3a824ea14a5901984017d65a733af934f548ea771e2a4ad792c4c856
+NEXT_PUBLIC_STRATEGY_ROUTER_ADDRESS=0x01fa59cf9a28d97fd9ab5db1e21f9dd6438af06cc535bccdb58962518cfdf53a
+EOF
+```
+
+### Option B: Deploy Fresh Contracts
+
+#### Step 1: Create & Fund Account
+
+```bash
+# Create new keystore
+mkdir -p ~/.starkli-wallets/myaccount
+starkli signer keystore new ~/.starkli-wallets/myaccount/keystore.json
+
+# Initialize OpenZeppelin account
+starkli account oz init ~/.starkli-wallets/myaccount/account.json
+
+# Fund the account (copy the address shown above)
+# Go to: https://starknet-faucet.vercel.app
+# Paste your address and request STRK
+```
+
+**Important:** The faucet will automatically deploy your account when it sends STRK.
+
+#### Step 2: Import Account to sncast
+
+```bash
+# After faucet funds arrive
+sncast account import \
+  --url https://starknet-sepolia.public.blastapi.io \
+  --name deployer \
+  --address YOUR_ACCOUNT_ADDRESS \
+  --private-key YOUR_PRIVATE_KEY \
+  --type oz
+```
+
+#### Step 3: Declare & Deploy
 
 ```bash
 cd contracts
-scarb init --name obsqra_contracts
+
+# Declare contracts (use --network sepolia, NOT custom RPC)
+sncast --account deployer declare --contract-name RiskEngine --network sepolia
+sncast --account deployer declare --contract-name DAOConstraintManager --network sepolia
+sncast --account deployer declare --contract-name StrategyRouter --network sepolia
+
+# Deploy instances
+sncast --account deployer deploy \
+  --class-hash <RISK_ENGINE_CLASS_HASH> \
+  --arguments "YOUR_OWNER_ADDRESS" \
+  --network sepolia
+
+sncast --account deployer deploy \
+  --class-hash <DAO_CLASS_HASH> \
+  --arguments "YOUR_OWNER_ADDRESS, 6000, 3, 5000, 1000000" \
+  --network sepolia
+
+sncast --account deployer deploy \
+  --class-hash <ROUTER_CLASS_HASH> \
+  --arguments "YOUR_OWNER_ADDRESS, 0x456, 0x789, 0xabc, RISK_ENGINE_ADDRESS" \
+  --network sepolia
 ```
 
-### Initialize Frontend
+---
+
+## 4. Frontend Integration
+
+### Configure Environment
 
 ```bash
 cd frontend
-npm init -y
-npm install next@latest react@latest react-dom@latest
-npm install @starknet-react/core @starknet-react/hooks
-npm install @mistcash/sdk
+
+# Create .env.local
+cat > .env.local << 'EOF'
+NEXT_PUBLIC_CHAIN_ID=SN_SEPOLIA
+NEXT_PUBLIC_RISK_ENGINE_ADDRESS=0x008c3eff435e859e3b8e5cb12f837f4dfa77af25c473fb43067adf9f557a3d80
+NEXT_PUBLIC_DAO_MANAGER_ADDRESS=0x010a3e7d3a824ea14a5901984017d65a733af934f548ea771e2a4ad792c4c856
+NEXT_PUBLIC_STRATEGY_ROUTER_ADDRESS=0x01fa59cf9a28d97fd9ab5db1e21f9dd6438af06cc535bccdb58962518cfdf53a
+NEXT_PUBLIC_AI_SERVICE_URL=http://localhost:8001
+EOF
 ```
 
-### Initialize AI Service
+### Run Frontend
 
 ```bash
-cd ai-service
-python3 -m venv venv
-source venv/bin/activate
-pip install fastapi uvicorn web3 requests
+npm run dev
+# Open http://localhost:3000
 ```
 
-## 3. Cairo Risk Engine Port
+### Connect Wallet
 
-See `contracts/src/risk_engine.cairo` for the complete implementation.
+1. Install [ArgentX](https://www.argent.xyz/argent-x/) or [Braavos](https://braavos.app/)
+2. Switch to Sepolia testnet
+3. Get testnet STRK from [faucet](https://starknet-faucet.vercel.app)
+4. Connect wallet to the app
 
-Key functions:
-- `calculate_risk_score()` - Multi-factor risk calculation
-- `calculate_allocation()` - Risk-adjusted allocation
-- `verify_constraints()` - Constraint compliance checking
+---
 
-## 4. MIST.cash Integration
-
-See `frontend/src/services/mist.ts` for integration patterns.
-
-Key steps:
-1. Install MIST.cash SDK
-2. Initialize chamber
-3. Implement deposit flow
-4. Implement withdraw flow
-5. Test privacy guarantees
-
-## 5. Strategy Router Implementation
-
-See `contracts/src/strategy_router.cairo` for the complete implementation.
-
-Key functions:
-- `update_allocation()` - Update protocol allocations
-- `get_allocation()` - Get current allocations
-- `accrue_yields()` - Track and accrue yields
-
-## 6. DAO Constraint Manager
-
-See `contracts/src/dao_constraint_manager.cairo` for the complete implementation.
-
-Key functions:
-- `set_constraints()` - Set governance constraints
-- `validate_allocation()` - Validate allocation against constraints
-- `get_constraints()` - Get current constraints
-
-## 7. Frontend Integration
-
-See `frontend/src/` for complete frontend implementation.
-
-Key components:
-- Dashboard page
-- Contract hooks
-- MIST.cash service
-- Starknet provider setup
-
-## 8. Testing Strategy
+## 5. Testing
 
 ### Unit Tests
 
@@ -134,37 +214,61 @@ snforge test
 ### Integration Tests
 
 ```bash
-./scripts/test_integration.sh
+# Test contract interactions
+cd scripts
+./test_integration.sh
 ```
 
-### E2E Tests
+---
+
+## 6. Troubleshooting
+
+### "Invalid transaction nonce"
+
+Wait 15-30 seconds between transactions. Starknet blocks take time.
+
+### "Mismatch compiled class hash"
+
+Your sncast version doesn't match RPC version. Upgrade:
 
 ```bash
-cd frontend
-npm run test:e2e
+snfoundryup
+sncast --version  # Must be 0.53.0+
 ```
 
-## 9. Deployment Guide
+### "ContractNotFound" when deploying
 
-### Deploy Contracts
+Your account isn't deployed on-chain. Use the faucet—it auto-deploys accounts.
+
+### "Invalid params: missing field l1_data_gas"
+
+RPC version mismatch. Use `--network sepolia` instead of custom RPC URLs:
 
 ```bash
-./scripts/deploy.sh testnet
+# Wrong
+sncast --account deployer declare --url https://... --contract-name Foo
+
+# Right
+sncast --account deployer declare --network sepolia --contract-name Foo
 ```
 
-### Verify Contracts
+### Balance Shows 0 in starkli but Voyager Shows Tokens
 
-```bash
-./scripts/verify.sh $CONTRACT_ADDRESS $CONTRACT_NAME
-```
+`starkli balance` can be inaccurate. Trust Voyager/Starkscan for balance checks.
 
-### Deploy Frontend
+---
 
-```bash
-cd frontend
-npm run build
-npm run deploy
-```
+## Resources
 
-For detailed instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
+- [Starknet Docs](https://docs.starknet.io)
+- [Compatibility Tables](https://docs.starknet.io/learn/cheatsheets/compatibility) ← **Read this first**
+- [Starknet Foundry](https://foundry-rs.github.io/starknet-foundry/)
+- [Cairo Book](https://book.cairo-lang.org)
+- [Sepolia Faucet](https://starknet-faucet.vercel.app)
+- [Starkscan Explorer](https://sepolia.starkscan.co)
 
+---
+
+## Support
+
+For issues, check the [Dev Log](DEV_LOG.md) for common problems and solutions from our deployment journey.

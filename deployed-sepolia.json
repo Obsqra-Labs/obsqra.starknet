@@ -1,0 +1,15 @@
+{
+  "network": "sepolia",
+  "rpc": "https://starknet-sepolia.public.blastapi.io",
+  "deployer": "0x6b407e0b8cf645a32fd2ccef47c74c9fb7f44c3cd09041ea263a945ce29442b",
+  "contracts": {
+    "riskEngine": "",
+    "daoConstraintManager": "",
+    "strategyRouter": ""
+  },
+  "classHashes": {
+    "riskEngine": "",
+    "daoConstraintManager": "",
+    "strategyRouter": ""
+  }
+}

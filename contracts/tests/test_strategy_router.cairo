@@ -2,22 +2,18 @@
 mod tests {
     use obsqra_contracts::strategy_router::{IStrategyRouterDispatcher, IStrategyRouterDispatcherTrait};
     use starknet::ContractAddress;
-    use snforge_std::{declare, ContractClass, deploy, start_cheat_caller_address, stop_cheat_caller_address};
+    use snforge_std::{declare, deploy, start_cheat_caller_address, stop_cheat_caller_address};
+    use core::traits::Into;
     use core::result::ResultTrait;
     
     fn deploy_contract() -> ContractAddress {
         let declared = declare("StrategyRouter");
-        let owner: ContractAddress = starknet::contract_address_const::<0x123>();
-        let aave: ContractAddress = starknet::contract_address_const::<0x456>();
-        let lido: ContractAddress = starknet::contract_address_const::<0x789>();
-        let compound: ContractAddress = starknet::contract_address_const::<0xabc>();
-        let risk_engine: ContractAddress = starknet::contract_address_const::<0xdef>();
         let deploy_result: Result<(ContractAddress, Span<felt252>), felt252> = deploy(@declared, @array![
-            owner.into(),
-            aave.into(),
-            lido.into(),
-            compound.into(),
-            risk_engine.into()
+            0x123.into(),  // owner
+            0x456.into(),  // aave
+            0x789.into(),  // lido
+            0xabc.into(),  // compound
+            0xdef.into()   // risk_engine
         ]);
         let (contract_address, _) = deploy_result.unwrap();
         contract_address
@@ -44,7 +40,7 @@ mod tests {
         let router = deploy_contract();
         let dispatcher = IStrategyRouterDispatcher { contract_address: router };
         
-        let owner: ContractAddress = starknet::contract_address_const::<0x123>();
+        let owner: ContractAddress = 0x123.into();
         start_cheat_caller_address(router, owner);
         
         // Update allocation
@@ -65,7 +61,7 @@ mod tests {
         let router = deploy_contract();
         let dispatcher = IStrategyRouterDispatcher { contract_address: router };
         
-        let risk_engine: ContractAddress = starknet::contract_address_const::<0xdef>();
+        let risk_engine: ContractAddress = 0xdef.into();
         start_cheat_caller_address(router, risk_engine);
         
         // Risk engine should be able to update allocation
@@ -85,13 +81,15 @@ mod tests {
         let router = deploy_contract();
         let dispatcher = IStrategyRouterDispatcher { contract_address: router };
         
-        let unauthorized: ContractAddress = starknet::contract_address_const::<0x999>();
+        let unauthorized: ContractAddress = 0x999.into();
         start_cheat_caller_address(router, unauthorized);
         
-        // Should fail - unauthorized caller
+        // Should panic with 'Unauthorized' - no cleanup after this line
+        // (panic will terminate test execution immediately)
         dispatcher.update_allocation(4000, 3500, 2500);
         
-        stop_cheat_caller_address(router);
+        // NOTE: No stop_cheat_caller_address here - it would be unreachable
+        // Test environment automatically cleans up on panic
     }
     
     #[test]
@@ -100,13 +98,15 @@ mod tests {
         let router = deploy_contract();
         let dispatcher = IStrategyRouterDispatcher { contract_address: router };
         
-        let owner: ContractAddress = starknet::contract_address_const::<0x123>();
+        let owner: ContractAddress = 0x123.into();
         start_cheat_caller_address(router, owner);
         
-        // Should fail - doesn't sum to 10000
-        dispatcher.update_allocation(4000, 3500, 2000); // Sum = 9500
+        // Should panic with 'Invalid allocation' - no cleanup after this line
+        // (panic will terminate test execution immediately)
+        dispatcher.update_allocation(4000, 3500, 2000); // Sum = 9500, expects 10000
         
-        stop_cheat_caller_address(router);
+        // NOTE: No stop_cheat_caller_address here - it would be unreachable
+        // Test environment automatically cleans up on panic
     }
     
     #[test]
@@ -114,7 +114,7 @@ mod tests {
         let router = deploy_contract();
         let dispatcher = IStrategyRouterDispatcher { contract_address: router };
         
-        let owner: ContractAddress = starknet::contract_address_const::<0x123>();
+        let owner: ContractAddress = 0x123.into();
         start_cheat_caller_address(router, owner);
         
         // Edge case: All in one protocol (if max allows)

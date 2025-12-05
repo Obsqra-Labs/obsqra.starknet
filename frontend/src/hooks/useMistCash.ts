@@ -1,21 +1,28 @@
-import { useAccount, useProvider } from '@starknet-react/core';
+'use client';
+
 import { useMemo } from 'react';
+import { useAccount, useProvider } from '@starknet-react/core';
 import { MistCashService } from '@/services/mist';
 
-const MIST_CHAMBER_ADDRESS = process.env.NEXT_PUBLIC_MIST_CHAMBER_ADDRESS || '';
-
+/**
+ * Hook to interact with MIST.cash privacy protocol
+ */
 export function useMistCash() {
-  const { account } = useAccount();
+  const { account, address, status } = useAccount();
   const { provider } = useProvider();
-  
+
+  const chamberAddress = process.env.NEXT_PUBLIC_MIST_CHAMBER_ADDRESS || '';
+
   const mistService = useMemo(() => {
-    if (!provider || !account) return null;
-    return new MistCashService(provider, MIST_CHAMBER_ADDRESS);
-  }, [provider, account]);
-  
+    if (!provider || !chamberAddress) return null;
+    return new MistCashService(provider, chamberAddress);
+  }, [provider, chamberAddress]);
+
+  const isConnected = status === 'connected' && !!account && !!address;
+
   return {
     mistService,
-    isConnected: !!account,
+    isConnected,
+    chamberAddress,
   };
 }
-
