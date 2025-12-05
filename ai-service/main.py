@@ -6,8 +6,10 @@ Off-chain service for monitoring protocols and triggering rebalances.
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 import time
 import logging
+import asyncio
 
 logging.basicConfig(
     level=logging.INFO,
@@ -21,6 +23,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Obsqra.starknet AI Service")
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get('/health')
@@ -40,11 +51,22 @@ async def health_check():
 @app.post('/trigger-rebalance')
 async def trigger_rebalance():
     """Trigger AI rebalancing"""
-    # TODO: Implement rebalancing logic
-    return JSONResponse({
-        'status': 'success',
-        'message': 'Rebalancing triggered'
-    })
+    try:
+        from monitor import ProtocolMonitor
+        monitor = ProtocolMonitor()
+        allocation = await monitor.trigger_rebalance()
+        
+        return JSONResponse({
+            'status': 'success',
+            'message': 'Rebalancing triggered',
+            'allocation': allocation
+        })
+    except Exception as e:
+        logger.error(f"Rebalance error: {e}")
+        return JSONResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status_code=500)
 
 
 @app.post('/accrue-yields')
