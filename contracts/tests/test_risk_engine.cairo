@@ -1,4 +1,4 @@
-use snforge_std::{declare_contract, ContractClass, ContractClassTrait, DeclareResultTrait, deploy, start_cheat_caller_address, stop_cheat_caller_address};
+use snforge_std::{declare_contract, ContractClass, deploy, start_cheat_caller_address, stop_cheat_caller_address};
 use starknet::ContractAddress;
 use core::traits::Into;
 use core::result::ResultTrait;
