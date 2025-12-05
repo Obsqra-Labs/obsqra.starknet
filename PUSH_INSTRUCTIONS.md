@@ -4,7 +4,7 @@
 
 The repository `obsqra_labs/obsqra.starknet` is ready to push!
 
-## 🚀 Push Options
+## Push Options
 
 ### Option 1: HTTPS (Recommended)
 ```bash
@@ -50,5 +50,5 @@ If you need to create a personal access token:
 - Remote configured ✅
 - Ready to push ✅
 
-**Just run `git push -u origin main` when ready!** 🚀
+**Just run `git push -u origin main` when ready!**
 

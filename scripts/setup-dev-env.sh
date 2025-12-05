@@ -11,7 +11,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}🚀 Setting up Obsqra.starknet development environment${NC}"
+echo -e "${BLUE}Setting up Obsqra.starknet development environment${NC}"
 echo ""
 
 # Check if we're in the right directory

@@ -59,5 +59,5 @@ snforge test
 3. Configure environment variables
 4. Deploy and test!
 
-**You're all set! 🚀**
+**You're all set!**
 

@@ -7,7 +7,7 @@
 3. **Frontend** - Structure complete, installing dependencies...
 4. **AI Service** - Code complete, installing dependencies...
 
-## 🚀 Run These Commands
+## Run These Commands
 
 ### Contracts (Already Working!)
 ```bash

@@ -6,7 +6,7 @@
 - **Git remote configured** ✅  
 - **Dependencies installing** ⏳
 
-## 🚀 To Push to GitHub
+## To Push to GitHub
 
 ### Step 1: Create Repository
 
@@ -56,5 +56,5 @@ tail -f /tmp/pip_install.log
 - ✅ Complete project structure
 - ✅ All configuration files
 
-**Everything is ready to push!** 🚀
+**Everything is ready to push!**
 
