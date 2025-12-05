@@ -2,7 +2,7 @@
 
 **Verifiable AI Infrastructure for Private DeFi on Starknet**
 
-> 🚀 **LIVE ON STARKNET SEPOLIA** - Contracts deployed December 5, 2025
+**LIVE ON STARKNET SEPOLIA** - Contracts deployed December 5, 2025
 
 ## 🌐 Deployed Contracts (Sepolia Testnet)
 
