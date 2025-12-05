@@ -2,7 +2,7 @@
 mod tests {
     use obsqra_contracts::strategy_router::{IStrategyRouterDispatcher, IStrategyRouterDispatcherTrait};
     use starknet::ContractAddress;
-    use snforge_std::{declare, ContractClassTrait, DeclareResultTrait, deploy, start_cheat_caller_address, stop_cheat_caller_address};
+    use snforge_std::{declare, deploy, start_cheat_caller_address, stop_cheat_caller_address};
     
     fn deploy_contract() -> ContractAddress {
         let declared = declare("StrategyRouter").unwrap();
