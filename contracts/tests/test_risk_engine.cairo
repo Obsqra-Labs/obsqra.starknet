@@ -1,7 +1,7 @@
 use snforge_std::{declare, ContractClassTrait, DeclareResultTrait, deploy, start_cheat_caller_address, stop_cheat_caller_address};
 use starknet::ContractAddress;
 use core::traits::Into;
-use obsqra_contracts::risk_engine::IRiskEngineDispatcher;
+use obsqra_contracts::risk_engine::{IRiskEngineDispatcher, IRiskEngineDispatcherTrait};
 
 // Helper for comparisons using u256
 fn felt252_ge(lhs: felt252, rhs: felt252) -> bool {
