@@ -1,0 +1,74 @@
+# Dependencies
+node_modules/
+venv/
+__pycache__/
+*.pyc
+
+# Build outputs
+.next/
+out/
+build/
+dist/
+target/
+cache/
+
+# Cairo/Scarb
+contracts/target/
+contracts/cache/
+contracts/broadcast/
+*.sierra.json
+*.casm.json
+
+# Foundry/Starknet
+snforge_cache/
+snforge_output/
+
+# Logs
+*.log
+/tmp/
+nohup.out
+
+# Environment variables (NEVER commit!)
+.env
+.env.local
+.env.production
+.env*.local
+
+# Keys & Secrets (CRITICAL - DO NOT COMMIT!)
+*.key
+*.pem
+keys/
+secrets/
+private_keys/
+.secret
+
+# Deployment artifacts
+deployments/
+deploy-*.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# AI service
+ai-service/__pycache__/
+ai-service/venv/
+
+# Starknet specific
+.starknet/
+starknet_artifacts/
+
