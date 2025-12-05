@@ -32,12 +32,12 @@ mod tests {
         let (aave, lido, compound) = dispatcher.get_allocation();
         
         // Should be initialized to balanced allocation (33.33%, 33.33%, 33.34%)
-        assert(aave == 3333, 'Aave should be 3333 (33.33%)');
-        assert(lido == 3333, 'Lido should be 3333 (33.33%)');
-        assert(compound == 3334, 'Compound should be 3334 (33.34%)');
+        assert(aave == 3333, 'Error');
+        assert(lido == 3333, 'Error');
+        assert(compound == 3334, 'Error');
         
         // Verify sum is 10000
-        assert(aave + lido + compound == 10000, 'Sum should be 10000');
+        assert(aave + lido + compound == 10000, 'Error');
     }
     
     #[test]
@@ -55,10 +55,10 @@ mod tests {
         
         // Verify update
         let (aave, lido, compound) = dispatcher.get_allocation();
-        assert(aave == 4000, 'Aave should be 40%');
-        assert(lido == 3500, 'Lido should be 35%');
-        assert(compound == 2500, 'Compound should be 25%');
-        assert(aave + lido + compound == 10000, 'Sum should be 10000');
+        assert(aave == 4000, 'Error');
+        assert(lido == 3500, 'Error');
+        assert(compound == 2500, 'Error');
+        assert(aave + lido + compound == 10000, 'Error');
     }
     
     #[test]
@@ -75,9 +75,9 @@ mod tests {
         stop_cheat_caller_address(router);
         
         let (aave, lido, compound) = dispatcher.get_allocation();
-        assert(aave == 5000, 'Aave should be 50%');
-        assert(lido == 3000, 'Lido should be 30%');
-        assert(compound == 2000, 'Compound should be 20%');
+        assert(aave == 5000, 'Error');
+        assert(lido == 3000, 'Error');
+        assert(compound == 2000, 'Error');
     }
     
     #[test]
@@ -121,14 +121,14 @@ mod tests {
         // Edge case: All in one protocol (if max allows)
         dispatcher.update_allocation(10000, 0, 0);
         let (aave, lido, compound) = dispatcher.get_allocation();
-        assert(aave == 10000, 'Can allocate 100% to one protocol');
-        assert(lido == 0, 'Lido should be 0%');
-        assert(compound == 0, 'Compound should be 0%');
+        assert(aave == 10000, 'Error');
+        assert(lido == 0, 'Error');
+        assert(compound == 0, 'Error');
         
         // Edge case: Equal split
         dispatcher.update_allocation(3333, 3333, 3334);
         let (aave2, lido2, compound2) = dispatcher.get_allocation();
-        assert(aave2 == 3333 && lido2 == 3333 && compound2 == 3334, 'Equal split should work');
+        assert(aave2 == 3333 && lido2 == 3333 && compound2 == 3334, 'Error');
         
         stop_cheat_caller_address(router);
     }
@@ -143,6 +143,6 @@ mod tests {
         
         // Verify allocation unchanged
         let (aave, lido, compound) = dispatcher.get_allocation();
-        assert(aave == 3333, 'Allocation should be unchanged');
+        assert(aave == 3333, 'Error');
     }
 }

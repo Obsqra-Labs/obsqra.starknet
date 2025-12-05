@@ -22,7 +22,7 @@ mod tests {
     );
     
     // Should be low risk (5-30 range expected)
-    assert(risk >= 5 && risk <= 30, 'Low risk score');
+    assert(risk >= 5 && risk <= 30, 'Error');
 }
 
 #[test]
@@ -43,7 +43,7 @@ fn test_calculate_risk_score_high_risk() {
     );
     
     // Should be high risk (70-95 range expected)
-    assert(risk >= 70 && risk <= 95, 'High risk score');
+    assert(risk >= 70 && risk <= 95, 'Error');
 }
 
 #[test]
@@ -66,11 +66,11 @@ fn test_calculate_allocation_balanced() {
     );
     
     // Verify percentages sum to 10000 (100%)
-    assert(aave_pct + lido_pct + compound_pct == 10000, 'Percentages must sum to 100%');
+    assert(aave_pct + lido_pct + compound_pct == 10000, 'Error');
     
     // Lido should have highest allocation (highest APY, similar risk)
-    assert(lido_pct > aave_pct, 'Lido should have higher allocation than Aave');
-    assert(lido_pct > compound_pct, 'Lido should have higher allocation than Compound');
+    assert(lido_pct > aave_pct, 'Error');
+    assert(lido_pct > compound_pct, 'Error');
 }
 
 #[test]
@@ -91,7 +91,7 @@ fn test_verify_constraints_valid() {
         max_single, min_diversification
     );
     
-    assert(valid == true, 'Valid allocation should pass constraints');
+    assert(valid == true, 'Error');
 }
 
 #[test]
@@ -112,6 +112,6 @@ fn test_verify_constraints_invalid_max_single() {
         max_single, min_diversification
     );
     
-    assert(valid == false, 'Exceeding max single should fail');
+    assert(valid == false, 'Error');
     }
 }

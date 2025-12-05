@@ -26,10 +26,10 @@ mod tests {
         
         let (max_single, min_div, max_vol, min_liq) = dispatcher.get_constraints();
         
-        assert(max_single == 6000, 'Max single should be 60%');
-        assert(min_div == 3, 'Min diversification should be 3');
-        assert(max_vol == 5000, 'Max volatility should be 5000');
-        assert(min_liq == 1000000, 'Min liquidity should be 1000000');
+        assert(max_single == 6000, 'Error');
+        assert(min_div == 3, 'Error');
+        assert(max_vol == 5000, 'Error');
+        assert(min_liq == 1000000, 'Error');
     }
     
     #[test]
@@ -47,10 +47,10 @@ mod tests {
         
         // Verify update
         let (max_single, min_div, max_vol, min_liq) = dispatcher.get_constraints();
-        assert(max_single == 5000, 'Max single should be updated to 50%');
-        assert(min_div == 2, 'Min diversification should be updated to 2');
-        assert(max_vol == 4000, 'Max volatility should be updated');
-        assert(min_liq == 2000000, 'Min liquidity should be updated');
+        assert(max_single == 5000, 'Error');
+        assert(min_div == 2, 'Error');
+        assert(max_vol == 4000, 'Error');
+        assert(min_liq == 2000000, 'Error');
     }
     
     #[test]
@@ -75,7 +75,7 @@ mod tests {
         
         // Valid: well-diversified, within max
         let valid = dispatcher.validate_allocation(4000, 3500, 2500);
-        assert(valid == true, 'Valid allocation should pass');
+        assert(valid == true, 'Error');
     }
     
     #[test]
@@ -85,7 +85,7 @@ mod tests {
         
         // Invalid: exceeds max single (70% > 60%)
         let invalid = dispatcher.validate_allocation(7000, 2000, 1000);
-        assert(invalid == false, 'Exceeding max single should fail');
+        assert(invalid == false, 'Error');
     }
     
     #[test]
@@ -95,7 +95,7 @@ mod tests {
         
         // Invalid: only 2 protocols >10% (need 3)
         let invalid = dispatcher.validate_allocation(8000, 1500, 500);
-        assert(invalid == false, 'Insufficient diversification should fail');
+        assert(invalid == false, 'Error');
     }
     
     #[test]
@@ -105,19 +105,19 @@ mod tests {
         
         // Edge case: Exactly at max single
         let valid_at_max = dispatcher.validate_allocation(6000, 2500, 1500);
-        assert(valid_at_max == true, 'Exactly at max should be valid');
+        assert(valid_at_max == true, 'Error');
         
         // Edge case: Just over max
         let invalid_over_max = dispatcher.validate_allocation(6001, 2500, 1499);
-        assert(invalid_over_max == false, 'Just over max should fail');
+        assert(invalid_over_max == false, 'Error');
         
         // Edge case: Exactly at diversification threshold
         let valid_at_threshold = dispatcher.validate_allocation(4000, 3000, 1000);
-        assert(valid_at_threshold == true, 'Exactly at threshold should be valid');
+        assert(valid_at_threshold == true, 'Error');
         
         // Edge case: Just below threshold
         let invalid_below_threshold = dispatcher.validate_allocation(4000, 3000, 999);
-        assert(invalid_below_threshold == false, 'Just below threshold should fail');
+        assert(invalid_below_threshold == false, 'Error');
     }
     
     #[test]
@@ -135,7 +135,7 @@ mod tests {
         
         // Now this should pass (only need 2 protocols >10%)
         let valid = dispatcher.validate_allocation(5000, 4000, 1000);
-        assert(valid == true, 'Should pass with relaxed constraints');
+        assert(valid == true, 'Error');
         
         start_cheat_caller_address(manager, owner);
         
@@ -146,6 +146,6 @@ mod tests {
         
         // This should fail (max single is now 40%, we have 50%)
         let invalid = dispatcher.validate_allocation(5000, 3000, 2000);
-        assert(invalid == false, 'Should fail with stricter constraints');
+        assert(invalid == false, 'Error');
     }
 }
