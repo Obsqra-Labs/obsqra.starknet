@@ -15,9 +15,10 @@ trait IStrategyRouter<TContractState> {
 #[starknet::contract]
 mod StrategyRouter {
     use starknet::{
-        ContractAddress, get_caller_address, get_contract_address,
-        get_block_timestamp
+        ContractAddress, get_caller_address, get_block_timestamp
     };
+    use starknet::storage::StoragePointerWriteAccess;
+    use starknet::storage::StoragePointerReadAccess;
     
     #[storage]
     struct Storage {
@@ -104,13 +105,13 @@ mod StrategyRouter {
         });
     }
     
-    #[view]
+    #[external(v0)]
     fn get_allocation(ref self: ContractState) -> (felt252, felt252, felt252) {
-        return (
+        (
             self.aave_allocation.read(),
             self.lido_allocation.read(),
             self.compound_allocation.read()
-        );
+        )
     }
     
     #[external(v0)]

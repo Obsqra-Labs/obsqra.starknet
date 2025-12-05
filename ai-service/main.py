@@ -48,12 +48,28 @@ async def health_check():
     })
 
 
+# Global contract client (initialized on startup)
+contract_client = None
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize contract client on startup"""
+    global contract_client
+    try:
+        from contract_client import ContractClient
+        contract_client = ContractClient()
+        await contract_client.initialize_contracts()
+        logger.info("Contract client initialized")
+    except Exception as e:
+        logger.warning(f"Contract client initialization failed: {e}")
+        contract_client = None
+
 @app.post('/trigger-rebalance')
 async def trigger_rebalance():
     """Trigger AI rebalancing"""
     try:
         from monitor import ProtocolMonitor
-        monitor = ProtocolMonitor()
+        monitor = ProtocolMonitor(contract_client=contract_client)
         allocation = await monitor.trigger_rebalance()
         
         return JSONResponse({
