@@ -13,7 +13,8 @@
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
     "@starknet-react/core": "^0.9.0",
-    "get-starknet-core": "^3.0.0"
+    "get-starknet-core": "^3.0.0",
+    "starknet": "^6.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
