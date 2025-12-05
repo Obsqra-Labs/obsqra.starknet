@@ -12,7 +12,29 @@ class RiskModel:
     """Risk scoring model"""
     
     def __init__(self):
-        self.protocol_data = {}
+        self.protocol_data = {
+            "aave": {
+                "utilization": 5000,
+                "volatility": 2000,
+                "liquidity": "Very High",
+                "audit_score": 95,
+                "age_days": 1000,
+            },
+            "lido": {
+                "utilization": 6000,
+                "volatility": 1500,
+                "liquidity": "Very High",
+                "audit_score": 98,
+                "age_days": 1200,
+            },
+            "compound": {
+                "utilization": 5500,
+                "volatility": 2500,
+                "liquidity": "High",
+                "audit_score": 92,
+                "age_days": 1500,
+            },
+        }
     
     def get_risk_score(self, protocol_name: str) -> Tuple[int, str, Dict]:
         """
