@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use super::{IDAOConstraintManagerDispatcher, IDAOConstraintManagerDispatcherTrait};
+    use obsqra_contracts::dao_constraint_manager::{IDAOConstraintManagerDispatcher, IDAOConstraintManagerDispatcherTrait, DAOConstraintManager};
     use starknet::ContractAddress;
-    use starknet::testing::{set_caller_address, set_contract_address};
+    use snforge_std::{declare, ContractClassTrait, DeclareResultTrait, get_contract_class, deploy, start_cheat_caller_address, stop_cheat_caller_address};
     
     fn deploy_contract() -> ContractAddress {
         let owner: ContractAddress = starknet::contract_address_const::<0x123>();
@@ -38,10 +38,12 @@ mod tests {
         let dispatcher = IDAOConstraintManagerDispatcher { contract_address: manager };
         
         let owner: ContractAddress = starknet::contract_address_const::<0x123>();
-        set_caller_address(owner);
+        start_cheat_caller_address(manager, owner);
         
         // Update constraints
         dispatcher.set_constraints(5000, 2, 4000, 2000000);
+        
+        stop_cheat_caller_address(manager);
         
         // Verify update
         let (max_single, min_div, max_vol, min_liq) = dispatcher.get_constraints();
@@ -58,10 +60,12 @@ mod tests {
         let dispatcher = IDAOConstraintManagerDispatcher { contract_address: manager };
         
         let unauthorized: ContractAddress = starknet::contract_address_const::<0x999>();
-        set_caller_address(unauthorized);
+        start_cheat_caller_address(manager, unauthorized);
         
         // Should fail - unauthorized
         dispatcher.set_constraints(5000, 2, 4000, 2000000);
+        
+        stop_cheat_caller_address(manager);
     }
     
     #[test]
@@ -122,17 +126,23 @@ mod tests {
         let dispatcher = IDAOConstraintManagerDispatcher { contract_address: manager };
         
         let owner: ContractAddress = starknet::contract_address_const::<0x123>();
-        set_caller_address(owner);
+        start_cheat_caller_address(manager, owner);
         
         // Change constraints to be more lenient
         dispatcher.set_constraints(8000, 2, 5000, 1000000);
+        
+        stop_cheat_caller_address(manager);
         
         // Now this should pass (only need 2 protocols >10%)
         let valid = dispatcher.validate_allocation(5000, 4000, 1000);
         assert(valid == true, 'Should pass with relaxed constraints');
         
+        start_cheat_caller_address(manager, owner);
+        
         // Change to be more strict
         dispatcher.set_constraints(4000, 3, 5000, 1000000);
+        
+        stop_cheat_caller_address(manager);
         
         // This should fail (max single is now 40%, we have 50%)
         let invalid = dispatcher.validate_allocation(5000, 3000, 2000);

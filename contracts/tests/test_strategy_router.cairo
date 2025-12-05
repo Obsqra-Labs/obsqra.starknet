@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use super::{IStrategyRouterDispatcher, IStrategyRouterDispatcherTrait};
+    use obsqra_contracts::strategy_router::{IStrategyRouterDispatcher, IStrategyRouterDispatcherTrait, StrategyRouter};
     use starknet::ContractAddress;
-    use starknet::testing::{set_caller_address, set_contract_address};
+    use snforge_std::{declare, ContractClassTrait, DeclareResultTrait, get_contract_class, deploy, start_cheat_caller_address, stop_cheat_caller_address};
     
     fn deploy_contract() -> ContractAddress {
         let owner: ContractAddress = starknet::contract_address_const::<0x123>();
@@ -46,10 +46,12 @@ mod tests {
         let dispatcher = IStrategyRouterDispatcher { contract_address: router };
         
         let owner: ContractAddress = starknet::contract_address_const::<0x123>();
-        set_caller_address(owner);
+        start_cheat_caller_address(router, owner);
         
         // Update allocation
         dispatcher.update_allocation(4000, 3500, 2500);
+        
+        stop_cheat_caller_address(router);
         
         // Verify update
         let (aave, lido, compound) = dispatcher.get_allocation();
@@ -65,10 +67,12 @@ mod tests {
         let dispatcher = IStrategyRouterDispatcher { contract_address: router };
         
         let risk_engine: ContractAddress = starknet::contract_address_const::<0xdef>();
-        set_caller_address(risk_engine);
+        start_cheat_caller_address(router, risk_engine);
         
         // Risk engine should be able to update allocation
         dispatcher.update_allocation(5000, 3000, 2000);
+        
+        stop_cheat_caller_address(router);
         
         let (aave, lido, compound) = dispatcher.get_allocation();
         assert(aave == 5000, 'Aave should be 50%');
@@ -83,10 +87,12 @@ mod tests {
         let dispatcher = IStrategyRouterDispatcher { contract_address: router };
         
         let unauthorized: ContractAddress = starknet::contract_address_const::<0x999>();
-        set_caller_address(unauthorized);
+        start_cheat_caller_address(router, unauthorized);
         
         // Should fail - unauthorized caller
         dispatcher.update_allocation(4000, 3500, 2500);
+        
+        stop_cheat_caller_address(router);
     }
     
     #[test]
@@ -96,10 +102,12 @@ mod tests {
         let dispatcher = IStrategyRouterDispatcher { contract_address: router };
         
         let owner: ContractAddress = starknet::contract_address_const::<0x123>();
-        set_caller_address(owner);
+        start_cheat_caller_address(router, owner);
         
         // Should fail - doesn't sum to 10000
         dispatcher.update_allocation(4000, 3500, 2000); // Sum = 9500
+        
+        stop_cheat_caller_address(router);
     }
     
     #[test]
@@ -108,7 +116,7 @@ mod tests {
         let dispatcher = IStrategyRouterDispatcher { contract_address: router };
         
         let owner: ContractAddress = starknet::contract_address_const::<0x123>();
-        set_caller_address(owner);
+        start_cheat_caller_address(router, owner);
         
         // Edge case: All in one protocol (if max allows)
         dispatcher.update_allocation(10000, 0, 0);
@@ -121,6 +129,8 @@ mod tests {
         dispatcher.update_allocation(3333, 3333, 3334);
         let (aave2, lido2, compound2) = dispatcher.get_allocation();
         assert(aave2 == 3333 && lido2 == 3333 && compound2 == 3334, 'Equal split should work');
+        
+        stop_cheat_caller_address(router);
     }
     
     #[test]
