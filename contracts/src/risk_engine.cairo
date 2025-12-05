@@ -1,5 +1,5 @@
 #[starknet::interface]
-trait IRiskEngine<TContractState> {
+pub trait IRiskEngine<TContractState> {
     fn calculate_risk_score(
         ref self: TContractState,
         utilization: felt252,

@@ -1,5 +1,5 @@
 #[starknet::interface]
-trait IDAOConstraintManager<TContractState> {
+pub trait IDAOConstraintManager<TContractState> {
     fn set_constraints(
         ref self: TContractState,
         max_single: felt252,

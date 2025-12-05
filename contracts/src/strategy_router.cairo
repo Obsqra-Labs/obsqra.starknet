@@ -1,5 +1,5 @@
 #[starknet::interface]
-trait IStrategyRouter<TContractState> {
+pub trait IStrategyRouter<TContractState> {
     fn update_allocation(
         ref self: TContractState,
         aave_pct: felt252,

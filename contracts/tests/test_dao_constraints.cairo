@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use obsqra_contracts::dao_constraint_manager::IDAOConstraintManagerDispatcher;
+    use obsqra_contracts::dao_constraint_manager::{IDAOConstraintManagerDispatcher, IDAOConstraintManagerDispatcherTrait};
     use starknet::ContractAddress;
-    use snforge_std::{declare, deploy, start_cheat_caller_address, stop_cheat_caller_address};
+    use snforge_std::{declare, ContractClassTrait, DeclareResultTrait, deploy, start_cheat_caller_address, stop_cheat_caller_address};
     use core::result::ResultTrait;
     
     fn deploy_contract() -> ContractAddress {
