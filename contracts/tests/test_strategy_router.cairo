@@ -1,26 +1,12 @@
 #[cfg(test)]
 mod tests {
-    use obsqra_contracts::strategy_router::{IStrategyRouterDispatcher, IStrategyRouterDispatcherTrait, StrategyRouter};
+    use obsqra_contracts::strategy_router::IStrategyRouterDispatcher;
     use starknet::ContractAddress;
-    use snforge_std::{declare, ContractClassTrait, DeclareResultTrait, get_contract_class, deploy, start_cheat_caller_address, stop_cheat_caller_address};
+    use snforge_std::{declare, ContractClassTrait, DeclareResultTrait, deploy, start_cheat_caller_address, stop_cheat_caller_address};
     
     fn deploy_contract() -> ContractAddress {
-        let owner: ContractAddress = starknet::contract_address_const::<0x123>();
-        let aave: ContractAddress = starknet::contract_address_const::<0x456>();
-        let lido: ContractAddress = starknet::contract_address_const::<0x789>();
-        let compound: ContractAddress = starknet::contract_address_const::<0xabc>();
-        let risk_engine: ContractAddress = starknet::contract_address_const::<0xdef>();
-        
-        let (contract_address, _) = StrategyRouter::StrategyRouter::deploy(
-            @array![
-                owner.into(),
-                aave.into(),
-                lido.into(),
-                compound.into(),
-                risk_engine.into()
-            ],
-            @array![]
-        );
+        let declared = declare("StrategyRouter").unwrap();
+        let (contract_address, _) = deploy(@declared).unwrap();
         contract_address
     }
     
