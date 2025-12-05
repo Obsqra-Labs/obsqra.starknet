@@ -2,11 +2,12 @@
 mod tests {
     use obsqra_contracts::dao_constraint_manager::{IDAOConstraintManagerDispatcher, IDAOConstraintManagerDispatcherTrait};
     use starknet::ContractAddress;
-    use snforge_std::{declare, ContractClassTrait, DeclareResultTrait, deploy, start_cheat_caller_address, stop_cheat_caller_address};
+    use snforge_std::{declare_contract, ContractClass, ContractClassTrait, DeclareResultTrait, deploy, start_cheat_caller_address, stop_cheat_caller_address};
     use core::result::ResultTrait;
     
     fn deploy_contract() -> ContractAddress {
-        let declared = declare("DAOConstraintManager").unwrap();
+        let declare_result: Result<ContractClass, felt252> = declare_contract("DAOConstraintManager");
+        let declared = declare_result.unwrap();
         let owner: ContractAddress = starknet::contract_address_const::<0x123>();
         let deploy_result: Result<(ContractAddress, Span<felt252>), felt252> = deploy(@declared, @array![
             owner.into(),

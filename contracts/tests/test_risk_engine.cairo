@@ -1,4 +1,4 @@
-use snforge_std::{declare, ContractClassTrait, DeclareResultTrait, deploy, start_cheat_caller_address, stop_cheat_caller_address};
+use snforge_std::{declare_contract, ContractClass, ContractClassTrait, DeclareResultTrait, deploy, start_cheat_caller_address, stop_cheat_caller_address};
 use starknet::ContractAddress;
 use core::traits::Into;
 use core::result::ResultTrait;
@@ -25,7 +25,8 @@ fn felt252_gt(lhs: felt252, rhs: felt252) -> bool {
 
 #[test]
 fn test_calculate_risk_score_low_risk() {
-    let declared = declare("RiskEngine").unwrap();
+    let declare_result: Result<ContractClass, felt252> = declare_contract("RiskEngine");
+    let declared = declare_result.unwrap();
     let owner: ContractAddress = starknet::contract_address_const::<0x123>();
     let deploy_result: Result<(ContractAddress, Span<felt252>), felt252> = deploy(@declared, @array![owner.into()]);
     let (contract_address, _) = deploy_result.unwrap();
@@ -46,7 +47,8 @@ fn test_calculate_risk_score_low_risk() {
 
 #[test]
 fn test_calculate_risk_score_high_risk() {
-    let declared = declare("RiskEngine").unwrap();
+    let declare_result: Result<ContractClass, felt252> = declare_contract("RiskEngine");
+    let declared = declare_result.unwrap();
     let owner: ContractAddress = starknet::contract_address_const::<0x123>();
     let deploy_result: Result<(ContractAddress, Span<felt252>), felt252> = deploy(@declared, @array![owner.into()]);
     let (contract_address, _) = deploy_result.unwrap();
@@ -67,7 +69,8 @@ fn test_calculate_risk_score_high_risk() {
 
 #[test]
 fn test_calculate_allocation_balanced() {
-    let declared = declare("RiskEngine").unwrap();
+    let declare_result: Result<ContractClass, felt252> = declare_contract("RiskEngine");
+    let declared = declare_result.unwrap();
     let owner: ContractAddress = starknet::contract_address_const::<0x123>();
     let deploy_result: Result<(ContractAddress, Span<felt252>), felt252> = deploy(@declared, @array![owner.into()]);
     let (contract_address, _) = deploy_result.unwrap();
@@ -92,7 +95,8 @@ fn test_calculate_allocation_balanced() {
 
 #[test]
 fn test_verify_constraints_valid() {
-    let declared = declare("RiskEngine").unwrap();
+    let declare_result: Result<ContractClass, felt252> = declare_contract("RiskEngine");
+    let declared = declare_result.unwrap();
     let owner: ContractAddress = starknet::contract_address_const::<0x123>();
     let deploy_result: Result<(ContractAddress, Span<felt252>), felt252> = deploy(@declared, @array![owner.into()]);
     let (contract_address, _) = deploy_result.unwrap();
@@ -114,7 +118,8 @@ fn test_verify_constraints_valid() {
 
 #[test]
 fn test_verify_constraints_invalid_max_single() {
-    let declared = declare("RiskEngine").unwrap();
+    let declare_result: Result<ContractClass, felt252> = declare_contract("RiskEngine");
+    let declared = declare_result.unwrap();
     let owner: ContractAddress = starknet::contract_address_const::<0x123>();
     let deploy_result: Result<(ContractAddress, Span<felt252>), felt252> = deploy(@declared, @array![owner.into()]);
     let (contract_address, _) = deploy_result.unwrap();
