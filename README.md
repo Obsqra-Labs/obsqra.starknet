@@ -2,7 +2,7 @@
 
 **Verifiable AI Infrastructure for Private DeFi on Starknet**
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Contracts
 ```bash
@@ -26,7 +26,7 @@ pip install -r requirements.txt
 python main.py
 ```
 
-## 📊 Project Status
+## Project Status
 
 - ✅ **3 Cairo Contracts** - RiskEngine, StrategyRouter, DAOConstraintManager
 - ✅ **28 Unit Tests** - Comprehensive test suite (578 lines)
@@ -60,11 +60,11 @@ obsqra.starknet/
 4. Configure environment variables
 5. Run end-to-end tests
 
-## 🎯 Goals
+##  Goals
 
 - On-chain AI computation (Cairo)
 - Automatic proving (SHARP)
 - Privacy integration (MIST.cash)
 - End-to-end functionality
 
-**Ready for development!** 🚀
+**Ready for development!** 
