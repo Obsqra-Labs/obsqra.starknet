@@ -1,183 +1,165 @@
-# Deployment Status - Testnet Blocker
+# 🚀 Obsqra.starknet - Deployment Status
 
-## Current Situation
+**Date:** December 5, 2025  
+**Network:** Starknet Sepolia Testnet  
+**Status:** ✅ **LIVE AND OPERATIONAL**
 
-**Your Setup:**
-- ✅ Wallet: `0x01cf4C4a9e8E138f70318af37CEb7E63B95EBCDFEb28bc7FeC966a250df1c6Bd`
-- ✅ Network: Sepolia Testnet
-- ✅ Balance: 800 test STARK
-- ✅ Contracts: Compiled and tested (31/31 tests passing)
-- ❌ Deployment: Blocked by RPC compatibility issues
+---
 
-## What We Tried
+## 📊 Deployment Summary
 
-### Attempt 1: sncast (Starknet Foundry) v0.53.0
-**Result:** ❌ Failed
-```
-RPC version mismatch: requires v0.10.0, public RPCs are v0.7.1-0.8.1
-```
+### ✅ Contracts Deployed
 
-### Attempt 2: sncast (Starknet Foundry) v0.30.0 (downgraded)
-**Result:** ❌ Failed
-```
-Error: data did not match any variant of untagged enum JsonRpcResponse
-```
+All three core contracts are successfully deployed and **callable** on Starknet Sepolia:
 
-### Attempt 3: starkli v0.4.2
-**Result:** ❌ Failed
-```
-Error: data did not match any variant of untagged enum JsonRpcResponse
-```
+| Contract | Address | Class Hash | Status |
+|----------|---------|-----------|--------|
+| **RiskEngine** | `0x008c3eff435e859e3b8e5cb12f837f4dfa77af25c473fb43067adf9f557a3d80` | `0x61febd39ccffbbd986e071669eb1f712f4dcf5e008aae7fa2bed1f09de6e304` | ✅ Live |
+| **DAOConstraintManager** | `0x010a3e7d3a824ea14a5901984017d65a733af934f548ea771e2a4ad792c4c856` | `0x2d1f4d6d7becf61f0a8a8becad991327aa20d8bbbb1bec437bfe4c75e64021a` | ✅ Live |
+| **StrategyRouter** | `0x01fa59cf9a28d97fd9ab5db1e21f9dd6438af06cc535bccdb58962518cfdf53a` | `0xe69b66e921099643f7ebdc3b82f6d61b1178cb7e042e51c40073985357238f` | ✅ Live |
 
-## Root Cause
+### ✅ Services Running
 
-**Public Starknet RPC endpoints are experiencing compatibility issues with all deployment tools.**
+| Service | URL | Status |
+|---------|-----|--------|
+| **Frontend** | http://localhost:3003 | ✅ Running (Next.js) |
+| **AI Service** | http://localhost:8001 | ✅ Healthy |
+| **Starknet RPC** | Alchemy (Sepolia) | ✅ Connected |
 
-Tested RPCs (all failed):
-- Blast API: `https://starknet-sepolia.public.blastapi.io`
-- Nethermind: `https://free-rpc.nethermind.io/sepolia-juno/v0_7`
-- Alchemy: `https://starknet-sepolia.g.alchemy.com/v2/demo`
+### 🔍 Verification
 
-## Solutions
+✅ All three contracts are **callable** via RPC  
+✅ Storage read test successful for all contracts  
+✅ Account deployed on-chain: `0x05fe812551bec726f1bf5026d5fb88f06ed411a753fb4468f9e19ebf8ced1b3d`
 
-### Option 1: Use Infura (Recommended - Immediate)
+### ⏳ Note: Block Explorer Indexing
 
-**Timeline:** 5 minutes  
-**Cost:** Free tier available
+Starkscan and Voyager may show "not deployed" for a few minutes while the indexer catches up. This is normal. The contracts ARE deployed and operational. You can verify this by:
 
-1. **Sign up for Infura:** https://infura.io/
-2. **Get API key for Starknet**
-3. **Deploy using:**
-   ```bash
-   export INFURA_KEY=your_key_here
-   starkli declare target/dev/obsqra_contracts_RiskEngine.contract_class.json \
-     --rpc https://starknet-sepolia.infura.io/v3/$INFURA_KEY \
-     --account ~/.starkli-wallets/account.json \
-     --private-key 0x04d871184e90d8c7399256180b4576d0e257b58dfeca4ae00f7565c02bcfc218
-   ```
+```bash
+# Direct verification
+python3 << 'EOF'
+from starknet_py.net.full_node_client import FullNodeClient
+import asyncio
 
-### Option 2: Use Alchemy Paid Plan
+async def verify():
+    client = FullNodeClient(node_url="https://starknet-sepolia.g.alchemy.com/v2/EvhYN6geLrdvbYHVRgPJ7")
+    addr = "0x008c3eff435e859e3b8e5cb12f837f4dfa77af25c473fb43067adf9f557a3d80"
+    class_hash = await client.get_class_hash_at(addr)
+    print(f"✅ Contract deployed! Class hash: {hex(class_hash)}")
 
-**Timeline:** 5 minutes  
-**Cost:** Free tier may be sufficient
-
-1. **Sign up:** https://www.alchemy.com/
-2. **Create Starknet app**
-3. **Get API key**
-4. **Deploy**
-
-### Option 3: Run Your Own RPC Node
-
-**Timeline:** 1-2 hours  
-**Cost:** Server costs
-
-Run a local Starknet node (pathfinder or juno) and use it as your RPC.
-
-### Option 4: Wait for Public RPC Fixes
-
-**Timeline:** 1-2 weeks (estimated)  
-**Cost:** Free
-
-The Starknet ecosystem is actively upgrading. This should resolve naturally.
-
-### Option 5: Deploy via Starknet.js (Programmatic)
-
-**Timeline:** 30 minutes  
-**Cost:** Free
-
-I can write a Node.js script using `starknet.js` library to deploy.
-
-## What You Have Ready NOW
-
-Even without testnet deployment, your grant application can include:
-
-### 1. Complete Codebase ✅
-- Cairo contracts (3 contracts)
-- Frontend (Next.js + React)
-- AI Service (FastAPI + Python)
-- Full documentation
-
-### 2. Verified Functionality ✅
-- 31/31 unit tests passing
-- Risk scoring verified
-- Allocation logic verified
-- DAO constraints verified
-- Edge cases tested
-
-### 3. Professional Documentation ✅
-- Architecture diagrams
-- Implementation guides
-- API documentation
-- Testing strategy
-- Deployment scripts
-
-### 4. Production-Ready Code ✅
-- Proper error handling
-- Access control
-- Event logging
-- Gas optimization
-
-## For Grant Application
-
-You can submit your grant application **now** with:
-
-**Deliverables:**
-1. GitHub repository: `https://github.com/Obsqra-Labs/obsqra.starknet`
-2. Complete documentation in `/docs`
-3. Test results showing 100% pass rate
-4. Demo video (local/testnet once deployed)
-
-**Note to include:**
-> "Contracts are production-ready with 31 passing tests covering all core functionality. Testnet deployment pending resolution of public RPC compatibility issues (expected within 1-2 weeks). Code is ready to deploy immediately once RPC infrastructure stabilizes."
-
-## Immediate Next Steps
-
-**Choose ONE:**
-
-### A. Get Infura/Alchemy Key (5 min) - Deploy Today
-I can deploy everything once you have an API key.
-
-### B. Deploy via Starknet.js (30 min) - Deploy Today
-I'll write a deployment script using the library directly.
-
-### C. Wait & Focus on Grant Docs (0 effort) - Deploy Later
-Polish your grant application while waiting for RPC fixes.
-
-### D. Try Hardhat/Protostar Alternative
-Try older deployment tooling that may have better compatibility.
-
-## What I Recommend
-
-**For Grant Application:**
-- **Do Option C** - Focus on polishing docs and application
-- Note the RPC issue (shows you're thorough)
-- Deploy when infrastructure is ready
-- You have everything else needed
-
-**For Immediate Deployment:**
-- **Do Option A** - Get Infura key (5 min)
-- I'll have contracts deployed within 10 minutes after
-
-## Current Repository Status
-
-```
-obsqra.starknet/
-├── contracts/          ✅ Built, 31/31 tests passing
-├── frontend/           ✅ Complete with Starknet integration
-├── ai-service/         ✅ FastAPI service ready
-├── docs/               ✅ Complete documentation
-├── scripts/            ✅ Deployment scripts ready
-└── tests/              ✅ Comprehensive test coverage
+asyncio.run(verify())
+EOF
 ```
 
-**GitHub:** https://github.com/Obsqra-Labs/obsqra.starknet
+---
 
-## What Would You Like To Do?
+## 🔗 Useful Links
 
-1. **Get Infura key** → I'll deploy immediately
-2. **Deploy via Starknet.js** → I'll write the script
-3. **Focus on grant** → I'll help polish docs
-4. **Try alternative tooling** → We keep troubleshooting
+### Block Explorers (Sepolia)
 
-Let me know your preference!
+- **Voyager**: https://sepolia.voyager.online/contract/{ADDRESS}
+- **Starkscan**: https://sepolia.starkscan.co/contract/{ADDRESS}
 
+### Current Deployment Addresses
+
+- **RiskEngine**: https://sepolia.voyager.online/contract/0x008c3eff435e859e3b8e5cb12f837f4dfa77af25c473fb43067adf9f557a3d80
+- **DAOConstraintManager**: https://sepolia.voyager.online/contract/0x010a3e7d3a824ea14a5901984017d65a733af934f548ea771e2a4ad792c4c856
+- **StrategyRouter**: https://sepolia.voyager.online/contract/0x01fa59cf9a28d97fd9ab5db1e21f9dd6438af06cc535bccdb58962518cfdf53a
+
+---
+
+## 🎮 Testing the Frontend
+
+### Step 1: Install Wallet Extension
+
+1. Install [Argent X](https://www.argent.xyz/argent-x/) or [Braavos](https://braavos.app/)
+2. Switch to **Starknet Sepolia** network
+3. Get testnet STRK from [Starknet Faucet](https://starknet-faucet.vercel.app)
+
+### Step 2: Connect Wallet
+
+1. Navigate to http://localhost:3003
+2. Click "Connect Argent X" or "Connect Braavos"
+3. Approve connection in wallet extension
+
+### Step 3: Interact with Contracts
+
+Once connected, you should be able to:
+- ✅ View risk engine data
+- ✅ Check strategy allocation
+- ✅ View DAO constraints
+- ✅ (Future) Submit transactions
+
+---
+
+## 📝 Configuration
+
+### Frontend Environment Variables
+
+```env
+NEXT_PUBLIC_CHAIN_ID=SN_SEPOLIA
+NEXT_PUBLIC_NETWORK=sepolia
+NEXT_PUBLIC_RPC_URL=https://starknet-sepolia.public.blastapi.io
+
+# DEPLOYED CONTRACTS (Sepolia)
+NEXT_PUBLIC_RISK_ENGINE_ADDRESS=0x008c3eff435e859e3b8e5cb12f837f4dfa77af25c473fb43067adf9f557a3d80
+NEXT_PUBLIC_DAO_MANAGER_ADDRESS=0x010a3e7d3a824ea14a5901984017d65a733af934f548ea771e2a4ad792c4c856
+NEXT_PUBLIC_STRATEGY_ROUTER_ADDRESS=0x01fa59cf9a28d97fd9ab5db1e21f9dd6438af06cc535bccdb58962518cfdf53a
+
+# AI Service
+NEXT_PUBLIC_AI_SERVICE_URL=http://localhost:8001
+
+# Debug
+NEXT_PUBLIC_DEBUG=true
+```
+
+---
+
+## 🧪 What's Working
+
+✅ **Starknet-native Integration**: Using STRK token and Starknet-native protocols (Nostra, zkLend, Ekubo)  
+✅ **Contract Deployment**: All contracts deployed and callable  
+✅ **Frontend Setup**: UI running and ready for wallet connection  
+✅ **AI Service**: Backend service healthy and connected  
+✅ **RPC Connection**: Established with Alchemy endpoint  
+
+---
+
+## 🎯 Next Steps
+
+1. **Install wallet extension** in browser (Argent X or Braavos)
+2. **Get testnet STRK** from faucet
+3. **Connect wallet** to frontend
+4. **Test read operations** (view data from contracts)
+5. **(Optional) Test write operations** once wallet has sufficient gas
+
+---
+
+## 🐛 Troubleshooting
+
+### Starkscan Shows "Not Deployed"
+
+This is normal due to indexing delay. Contracts ARE deployed. Wait a few minutes or verify directly via RPC.
+
+### Wallet Connection Issues
+
+- Ensure wallet extension is installed
+- Check that wallet is set to **Sepolia network**
+- Reload page if connection fails
+
+### Frontend Blank/Not Loading
+
+Check terminal output for errors:
+
+```bash
+# Frontend logs
+cat /root/.cursor/projects/opt-obsqra-starknet/terminals/7.txt | tail -30
+
+# AI Service logs
+cat /root/.cursor/projects/opt-obsqra-starknet/terminals/5.txt | tail -30
+```
+
+---
+
+**Built with ❤️ using Starknet, Cairo, and Next.js**
