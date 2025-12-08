@@ -204,11 +204,13 @@ def main():
     
     args = parser.parse_args()
     
-    # Check if running in mock mode
+    # Check if API key is set
     if not os.getenv('GIZA_API_KEY'):
-        print("\n⚠️  Running in MOCK MODE (GIZA_API_KEY not set)")
-        print("   Proofs will be generated instantly for testing")
-        print("   Set GIZA_API_KEY environment variable for real proofs\n")
+        print("\n✗ ERROR: GIZA_API_KEY not set")
+        print("   Real proof generation required.")
+        print("\n   Setup: python3 scripts/giza_setup_sdk.py")
+        print("   Or see: docs/GIZA_API_KEY_SETUP.md\n")
+        sys.exit(1)
     
     if args.mode == "single":
         # Single proof generation

@@ -226,10 +226,12 @@ def main():
     
     args = parser.parse_args()
     
-    # Check if running in mock mode
+    # Check if API key is set
     if not os.getenv('GIZA_API_KEY'):
-        print("\n⚠️  Running in MOCK MODE (GIZA_API_KEY not set)")
-        print("   Status checks will return instant verification\n")
+        print("\n✗ ERROR: GIZA_API_KEY not set")
+        print("   Real proof generation required.")
+        print("\n   Setup: python3 scripts/giza_setup_sdk.py\n")
+        sys.exit(1)
     
     if args.list_pending:
         asyncio.run(list_pending_submissions())
