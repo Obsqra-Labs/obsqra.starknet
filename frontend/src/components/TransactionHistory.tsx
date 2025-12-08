@@ -1,7 +1,7 @@
 'use client';
 
 import { useTransactionHistory, Transaction } from '@/hooks/useTransactionHistory';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const TX_TYPE_LABELS: Record<Transaction['type'], string> = {
   UPDATE_ALLOCATION: 'Update Allocation',
@@ -110,8 +110,51 @@ function TransactionRow({ tx }: { tx: Transaction }) {
 }
 
 export function TransactionHistory() {
-  const { transactions, pendingCount, clearHistory } = useTransactionHistory();
+  const { transactions, pendingCount, clearHistory, updateTransaction } = useTransactionHistory();
   const [filter, setFilter] = useState<Transaction['status'] | 'all'>('all');
+  
+  // Migrate old transactions with decision IDs to real tx hashes
+  useEffect(() => {
+    const migrateOldTransactions = async () => {
+      // Find transactions that look like decision IDs (just numbers, no 0x prefix)
+      const oldTransactions = transactions.filter(tx => 
+        tx.type === 'AI_ORCHESTRATION' && 
+        tx.hash && 
+        !tx.hash.startsWith('0x') && 
+        !tx.hash.startsWith('pending-') &&
+        /^\d+$/.test(tx.hash)
+      );
+      
+      if (oldTransactions.length === 0) return;
+      
+      try {
+        const historyResponse = await fetch('/api/v1/analytics/rebalance-history?limit=50');
+        if (historyResponse.ok) {
+          const history = await historyResponse.json();
+          
+          // Try to match old transactions with real tx hashes
+          oldTransactions.forEach(oldTx => {
+            const decisionId = parseInt(oldTx.hash);
+            if (isNaN(decisionId)) return;
+            
+            // Try to find matching record by decision ID
+            const matchingRecord = history.find((r: any) => {
+              const rDecisionId = oldTx.details?.decisionId;
+              return rDecisionId === decisionId;
+            });
+            
+            if (matchingRecord?.tx_hash && matchingRecord.tx_hash.startsWith('0x')) {
+              updateTransaction(oldTx.id, { hash: matchingRecord.tx_hash });
+            }
+          });
+        }
+      } catch (err) {
+        console.warn('Failed to migrate old transaction hashes:', err);
+      }
+    };
+    
+    migrateOldTransactions();
+  }, [transactions, updateTransaction]);
 
   const filteredTransactions = filter === 'all' 
     ? transactions 
