@@ -1,15 +1,21 @@
 """
 Risk Engine API endpoints for on-chain risk calculations
 """
-from fastapi import APIRouter, HTTPException
+import asyncio
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 import logging
+from sqlalchemy.orm import Session
 from starknet_py.contract import Contract
 from starknet_py.net.full_node_client import FullNodeClient
 from starknet_py.net.account.account import Account
 from starknet_py.net.signer.stark_curve_signer import KeyPair
 from starknet_py.net.models import StarknetChainId
 from app.config import get_settings
+from app.db.session import get_db
+from app.models.proof_job import ProofJob, ProofStatus
+from app.services.luminair_service import get_luminair_service
+from app.workers.sharp_worker import submit_proof_to_sharp
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -179,6 +185,10 @@ class OrchestrationResponse(BaseModel):
     rationale_hash: str
     strategy_router_tx: str
     message: str
+    # Proof information
+    proof_job_id: str = None
+    proof_hash: str = None
+    proof_status: str = None
 
 
 @router.post("/orchestrate-allocation", response_model=OrchestrationResponse, tags=["Risk Engine"])
