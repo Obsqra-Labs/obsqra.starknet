@@ -37,6 +37,12 @@ export function Dashboard() {
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [isDepositing, setIsDepositing] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [latestDecision, setLatestDecision] = useState<{
+    decisionId?: number;
+    proofHash?: string;
+    jediswap_pct?: number;
+    ekubo_pct?: number;
+  } | null>(null);
   
   // Now safe to call other hooks
   const { account, address } = useAccount();
@@ -116,14 +122,25 @@ export function Dashboard() {
       const jediswapAmt = (depositAmt * allocation.jediswap) / 100;
       const ekuboAmt = (depositAmt * allocation.ekubo) / 100;
       
+      // Check if allocation matches latest recommendation
+      const matchesRecommendation = latestDecision && (
+        Math.abs(allocation.jediswap - (latestDecision.jediswap_pct || 0)) < 0.1 &&
+        Math.abs(allocation.ekubo - (latestDecision.ekubo_pct || 0)) < 0.1
+      );
+      
       setDepositAmount('');
       alert(
         '✅ Deposit Submitted!\n\n' +
         '💰 Amount: ' + depositAmount + ' STRK\n\n' +
-        '📊 Allocation (AI Recommended):\n' +
+        '📊 Allocation:\n' +
         '  JediSwap: ' + allocation.jediswap.toFixed(2) + '% (' + jediswapAmt.toFixed(4) + ' STRK)\n' +
         '  Ekubo: ' + allocation.ekubo.toFixed(2) + '% (' + ekuboAmt.toFixed(4) + ' STRK)\n\n' +
-        (latestDecision?.decisionId ? `✅ Based on AI Decision #${latestDecision.decisionId}\n` : '') +
+        (matchesRecommendation && latestDecision?.decisionId ? 
+          `✅ Verified: Matches AI Decision #${latestDecision.decisionId}\n` +
+          (latestDecision.proofHash ? `🔐 Proof: ${latestDecision.proofHash.slice(0, 12)}...\n` : '') :
+          latestDecision?.decisionId ?
+          `⚠️ Note: Allocation differs from latest AI Decision #${latestDecision.decisionId}\n` :
+          '') +
         '🔗 Tx Hash: ' + txHash.slice(0, 10) + '...\n\n' +
         '⏳ Waiting for confirmation on Starknet...\n\n' +
         'Check History tab to see transaction (should appear as "pending")'
@@ -388,12 +405,20 @@ export function Dashboard() {
         }, 3000); // Wait 3 seconds for backend to store tx_hash
       }
       
+      // Store latest decision for deposit routing display
+      setLatestDecision({
+        decisionId: decision.decision_id,
+        proofHash: decision.proof_hash,
+        jediswap_pct: decision.jediswap_pct / 100, // Convert from basis points to percentage
+        ekubo_pct: decision.ekubo_pct / 100,
+      });
+      
       // Show success message with proof
       const proofStatus = decision.proof_status || 'generated';
       const isVerified = proofStatus === 'verified';
       const proofIcon = isVerified ? '✅' : '🔐';
       const proofInfo = decision.proof_hash 
-        ? `\n\n${proofIcon} STARK Proof:\n${decision.proof_hash.slice(0, 20)}...\nStatus: ${proofStatus}\n${isVerified ? '✅ Locally verified (<1s)\n' : ''}`
+        ? `\n\n${proofIcon} STARK Proof:\n${decision.proof_hash.slice(0, 20)}...\nStatus: ${proofStatus}\n${isVerified ? '✅ Locally verified (&lt;1s)\n' : ''}`
         : '';
       
       alert(
@@ -594,6 +619,10 @@ export function Dashboard() {
                   ekuboPct={allocation.ekubo}
                   latestDecisionId={latestDecision?.decisionId}
                   proofHash={latestDecision?.proofHash}
+                  latestRecommendation={latestDecision ? {
+                    jediswap_pct: latestDecision.jediswap_pct || 0,
+                    ekubo_pct: latestDecision.ekubo_pct || 0,
+                  } : null}
                 />
               )}
               
