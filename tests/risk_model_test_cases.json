@@ -1,0 +1,272 @@
+[
+  {
+    "name": "perfect_protocol",
+    "input": {
+      "utilization": 100,
+      "volatility": 100,
+      "liquidity": 3,
+      "audit_score": 100,
+      "age_days": 5000
+    },
+    "expected_output": {
+      "total_score": 5,
+      "util_component": 0,
+      "vol_component": 0,
+      "liq_component": 0,
+      "audit_component": 0,
+      "age_penalty": 0
+    }
+  },
+  {
+    "name": "dangerous_protocol",
+    "input": {
+      "utilization": 10000,
+      "volatility": 10000,
+      "liquidity": 0,
+      "audit_score": 0,
+      "age_days": 0
+    },
+    "expected_output": {
+      "total_score": 95,
+      "util_component": 35,
+      "vol_component": 30,
+      "liq_component": 15,
+      "audit_component": 20,
+      "age_penalty": 10
+    }
+  },
+  {
+    "name": "blue_chip",
+    "input": {
+      "utilization": 6500,
+      "volatility": 2000,
+      "liquidity": 3,
+      "audit_score": 98,
+      "age_days": 1500
+    },
+    "expected_output": {
+      "total_score": 28,
+      "util_component": 22,
+      "vol_component": 6,
+      "liq_component": 0,
+      "audit_component": 0,
+      "age_penalty": 0
+    }
+  },
+  {
+    "name": "established_mid",
+    "input": {
+      "utilization": 7000,
+      "volatility": 3500,
+      "liquidity": 2,
+      "audit_score": 85,
+      "age_days": 800
+    },
+    "expected_output": {
+      "total_score": 44,
+      "util_component": 24,
+      "vol_component": 10,
+      "liq_component": 5,
+      "audit_component": 3,
+      "age_penalty": 2
+    }
+  },
+  {
+    "name": "new_high_tvl",
+    "input": {
+      "utilization": 8500,
+      "volatility": 5000,
+      "liquidity": 2,
+      "audit_score": 90,
+      "age_days": 150
+    },
+    "expected_output": {
+      "total_score": 60,
+      "util_component": 29,
+      "vol_component": 15,
+      "liq_component": 5,
+      "audit_component": 2,
+      "age_penalty": 9
+    }
+  },
+  {
+    "name": "mature_low_risk",
+    "input": {
+      "utilization": 4000,
+      "volatility": 1500,
+      "liquidity": 3,
+      "audit_score": 95,
+      "age_days": 2000
+    },
+    "expected_output": {
+      "total_score": 19,
+      "util_component": 14,
+      "vol_component": 4,
+      "liq_component": 0,
+      "audit_component": 1,
+      "age_penalty": 0
+    }
+  },
+  {
+    "name": "high_util_stable",
+    "input": {
+      "utilization": 9500,
+      "volatility": 1000,
+      "liquidity": 3,
+      "audit_score": 95,
+      "age_days": 1000
+    },
+    "expected_output": {
+      "total_score": 37,
+      "util_component": 33,
+      "vol_component": 3,
+      "liq_component": 0,
+      "audit_component": 1,
+      "age_penalty": 0
+    }
+  },
+  {
+    "name": "low_util_volatile",
+    "input": {
+      "utilization": 2000,
+      "volatility": 8000,
+      "liquidity": 1,
+      "audit_score": 80,
+      "age_days": 600
+    },
+    "expected_output": {
+      "total_score": 49,
+      "util_component": 7,
+      "vol_component": 24,
+      "liq_component": 10,
+      "audit_component": 4,
+      "age_penalty": 4
+    }
+  },
+  {
+    "name": "balanced",
+    "input": {
+      "utilization": 5000,
+      "volatility": 5000,
+      "liquidity": 2,
+      "audit_score": 75,
+      "age_days": 500
+    },
+    "expected_output": {
+      "total_score": 47,
+      "util_component": 17,
+      "vol_component": 15,
+      "liq_component": 5,
+      "audit_component": 5,
+      "age_penalty": 5
+    }
+  },
+  {
+    "name": "jediswap_like",
+    "input": {
+      "utilization": 6500,
+      "volatility": 3500,
+      "liquidity": 1,
+      "audit_score": 98,
+      "age_days": 800
+    },
+    "expected_output": {
+      "total_score": 44,
+      "util_component": 22,
+      "vol_component": 10,
+      "liq_component": 10,
+      "audit_component": 0,
+      "age_penalty": 2
+    }
+  },
+  {
+    "name": "ekubo_like",
+    "input": {
+      "utilization": 5200,
+      "volatility": 2800,
+      "liquidity": 2,
+      "audit_score": 95,
+      "age_days": 400
+    },
+    "expected_output": {
+      "total_score": 38,
+      "util_component": 18,
+      "vol_component": 8,
+      "liq_component": 5,
+      "audit_component": 1,
+      "age_penalty": 6
+    }
+  },
+  {
+    "name": "fresh_launch",
+    "input": {
+      "utilization": 3000,
+      "volatility": 7000,
+      "liquidity": 0,
+      "audit_score": 60,
+      "age_days": 10
+    },
+    "expected_output": {
+      "total_score": 64,
+      "util_component": 10,
+      "vol_component": 21,
+      "liq_component": 15,
+      "audit_component": 8,
+      "age_penalty": 10
+    }
+  },
+  {
+    "name": "ancient_declining",
+    "input": {
+      "utilization": 2000,
+      "volatility": 4000,
+      "liquidity": 1,
+      "audit_score": 70,
+      "age_days": 3000
+    },
+    "expected_output": {
+      "total_score": 35,
+      "util_component": 7,
+      "vol_component": 12,
+      "liq_component": 10,
+      "audit_component": 6,
+      "age_penalty": 0
+    }
+  },
+  {
+    "name": "growing",
+    "input": {
+      "utilization": 7500,
+      "volatility": 4500,
+      "liquidity": 2,
+      "audit_score": 88,
+      "age_days": 250
+    },
+    "expected_output": {
+      "total_score": 54,
+      "util_component": 26,
+      "vol_component": 13,
+      "liq_component": 5,
+      "audit_component": 2,
+      "age_penalty": 8
+    }
+  },
+  {
+    "name": "liquid_risky",
+    "input": {
+      "utilization": 9000,
+      "volatility": 6000,
+      "liquidity": 3,
+      "audit_score": 75,
+      "age_days": 400
+    },
+    "expected_output": {
+      "total_score": 60,
+      "util_component": 31,
+      "vol_component": 18,
+      "liq_component": 0,
+      "audit_component": 5,
+      "age_penalty": 6
+    }
+  }
+]
