@@ -1,19 +1,15 @@
 """
 LuminAIR proof generation service
 
-MVP Implementation:
-- Generates proof metadata structure
-- Computes risk scores using our Python model
-- Creates proof hash for tracking
-- Prepares for future LuminAIR integration
-
-Future: Replace with actual LuminAIR Rust binary calls
+Calls Rust binary to generate real STARK proofs using LuminAIR framework
 """
 import asyncio
-import hashlib
 import json
 import logging
+import os
+import subprocess
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict
 
 logger = logging.getLogger(__name__)
@@ -35,12 +31,21 @@ class LuminAIRService:
     """
     Service for generating STARK proofs of risk model execution
     
-    Current: MVP with Python model + proof structure
-    Future: Call Rust binary with LuminAIR operator
+    Calls Rust binary with LuminAIR operator to generate real STARK proofs
     """
     
     def __init__(self):
-        logger.info("LuminAIR Service initialized (MVP mode)")
+        # Path to Rust binary (relative to backend directory)
+        backend_dir = Path(__file__).parent.parent.parent
+        self.binary_path = backend_dir / ".." / "operators" / "risk-scoring" / "target" / "release" / "risk_scoring_operator"
+        self.binary_path = self.binary_path.resolve()
+        
+        if not self.binary_path.exists():
+            logger.warning(f"LuminAIR binary not found at {self.binary_path}, falling back to mock mode")
+            self.use_mock = True
+        else:
+            logger.info(f"LuminAIR Service initialized with binary: {self.binary_path}")
+            self.use_mock = False
     
     async def generate_proof(
         self,
@@ -59,42 +64,101 @@ class LuminAIRService:
         """
         logger.info("Generating STARK proof for risk scoring...")
         
-        # Simulate proof generation time (2-5 seconds)
-        await asyncio.sleep(2)
+        if self.use_mock:
+            # Fallback to mock if binary not available
+            return await self._generate_mock_proof(jediswap_metrics, ekubo_metrics)
         
-        # Calculate risk scores using our Python model
+        # Prepare input JSON
+        input_data = {
+            "jediswap_metrics": jediswap_metrics,
+            "ekubo_metrics": ekubo_metrics
+        }
+        input_json = json.dumps(input_data)
+        
+        try:
+            # Call Rust binary
+            logger.info(f"Calling LuminAIR binary: {self.binary_path}")
+            result = subprocess.run(
+                [str(self.binary_path)],
+                input=input_json.encode(),
+                capture_output=True,
+                timeout=300,  # 5 minute timeout
+                check=True
+            )
+            
+            # Parse output (JSON is at the end after log messages)
+            output_lines = result.stdout.decode().strip().split('\n')
+            # Find JSON output (last line or line containing '{')
+            json_output = None
+            for line in reversed(output_lines):
+                if line.strip().startswith('{'):
+                    json_output = line.strip()
+                    break
+            
+            if not json_output:
+                raise ValueError("No JSON output found in binary response")
+            
+            output_data = json.loads(json_output)
+            
+            # Read proof data from file
+            proof_data_path = output_data["proof_data_path"]
+            with open(proof_data_path, "rb") as f:
+                proof_data = f.read()
+            
+            logger.info(f"Proof generated: {output_data['proof_hash'][:16]}...")
+            logger.info(f"Jediswap risk: {output_data['jediswap_risk']}, Ekubo risk: {output_data['ekubo_risk']}")
+            
+            # Calculate components for compatibility (we can enhance this later)
+            jediswap_components = self._calculate_risk_components(jediswap_metrics)
+            ekubo_components = self._calculate_risk_components(ekubo_metrics)
+            
+            return ProofResult(
+                proof_hash=output_data["proof_hash"],
+                output_score_jediswap=output_data["jediswap_risk"],
+                output_score_ekubo=output_data["ekubo_risk"],
+                output_components_jediswap=jediswap_components,
+                output_components_ekubo=ekubo_components,
+                proof_data=proof_data,
+                status="generated"
+            )
+            
+        except subprocess.TimeoutExpired:
+            logger.error("LuminAIR binary timed out after 5 minutes")
+            raise
+        except subprocess.CalledProcessError as e:
+            logger.error(f"LuminAIR binary failed: {e.stderr.decode() if e.stderr else 'Unknown error'}")
+            # Fallback to mock
+            logger.warning("Falling back to mock proof generation")
+            return await self._generate_mock_proof(jediswap_metrics, ekubo_metrics)
+        except Exception as e:
+            logger.error(f"Error calling LuminAIR binary: {e}")
+            # Fallback to mock
+            logger.warning("Falling back to mock proof generation")
+            return await self._generate_mock_proof(jediswap_metrics, ekubo_metrics)
+    
+    async def _generate_mock_proof(
+        self,
+        jediswap_metrics: Dict[str, int],
+        ekubo_metrics: Dict[str, int]
+    ) -> ProofResult:
+        """Fallback mock proof generation"""
+        import hashlib
+        await asyncio.sleep(1)  # Simulate work
+        
         jediswap_score, jediswap_components = self._calculate_risk_score(jediswap_metrics)
         ekubo_score, ekubo_components = self._calculate_risk_score(ekubo_metrics)
         
-        # Create proof structure
         proof_structure = {
-            "version": "1.0.0",
+            "version": "1.0.0-mock",
             "operator": "risk_scoring",
-            "inputs": {
-                "jediswap": jediswap_metrics,
-                "ekubo": ekubo_metrics
-            },
+            "inputs": {"jediswap": jediswap_metrics, "ekubo": ekubo_metrics},
             "outputs": {
                 "jediswap_score": jediswap_score,
                 "ekubo_score": ekubo_score,
-                "jediswap_components": jediswap_components,
-                "ekubo_components": ekubo_components
-            },
-            "metadata": {
-                "scale": 4096,  # Q12 fixed-point
-                "constraints": ["score >= 5", "score <= 95"]
             }
         }
-        
-        # Serialize and hash
         proof_json = json.dumps(proof_structure, sort_keys=True)
         proof_hash = hashlib.sha256(proof_json.encode()).hexdigest()
-        
-        # Mock binary proof data (future: actual STARK proof)
-        proof_data = proof_json.encode()
-        
-        logger.info(f"Proof generated: {proof_hash[:16]}...")
-        logger.info(f"Jediswap score: {jediswap_score}, Ekubo score: {ekubo_score}")
         
         return ProofResult(
             proof_hash=f"0x{proof_hash}",
@@ -102,8 +166,8 @@ class LuminAIRService:
             output_score_ekubo=ekubo_score,
             output_components_jediswap=jediswap_components,
             output_components_ekubo=ekubo_components,
-            proof_data=proof_data,
-            status="generated"
+            proof_data=proof_json.encode(),
+            status="generated-mock"
         )
     
     def _calculate_risk_score(
@@ -149,6 +213,14 @@ class LuminAIRService:
         }
         
         return total_clamped, components
+    
+    def _calculate_risk_components(
+        self,
+        metrics: Dict[str, int]
+    ) -> Dict[str, int]:
+        """Calculate risk components for display (helper method)"""
+        _, components = self._calculate_risk_score(metrics)
+        return components
     
     async def verify_proof(
         self,

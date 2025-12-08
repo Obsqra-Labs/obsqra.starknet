@@ -39,10 +39,12 @@ struct RiskScoringOutput {
 /// - audit_component = (100 - audit_score) / 5
 /// - age_penalty = max(0, 10 - age_days / 100)
 /// - total = clamp(sum, 5, 95)
+/// 
+/// Returns a GraphTensor that can have retrieve() called on it
 fn calculate_risk_score(
     cx: &mut Graph,
     metrics: &ProtocolMetrics,
-) -> (Tensor, Tensor) {
+) -> GraphTensor {
     // Convert inputs to f32 for computation
     let util = metrics.utilization as f32 / 10000.0;
     let vol = metrics.volatility as f32 / 10000.0;
@@ -73,20 +75,36 @@ fn calculate_risk_score(
     // age_penalty = max(0, 10 - age_days / 100)
     let age_penalty_raw = 10.0 - (age_t / 100.0);
     let zero = cx.tensor(()).set(vec![0.0]);
-    let age_penalty = age_penalty_raw.maximum(zero);
+    // Use comparison: if raw < 0, use 0; else use raw
+    let is_negative = age_penalty_raw.less_than(zero);
+    let age_penalty = is_negative * zero + (1.0 - is_negative) * age_penalty_raw;
 
     // Sum all components
     let total_unclamped = util_component + vol_component + liq_component + audit_component + age_penalty;
 
-    // Clamp to [5, 95]
+    // Clamp to [5, 95] using comparisons (LuminAIR doesn't have max/min methods)
     let min_val = cx.tensor(()).set(vec![5.0]);
     let max_val = cx.tensor(()).set(vec![95.0]);
-    let total_clamped = total_unclamped.maximum(min_val).minimum(max_val);
+    
+    // Clamp logic: if < min, use min; if > max, use max; else use value
+    // Using comparison trick: (condition) * value_if_true + (1 - condition) * value_if_false
+    let is_below_min = total_unclamped.less_than(min_val);
+    let is_above_max = total_unclamped.greater_than(max_val);
+    
+    // Clamp to minimum: if below min, use min; else use original
+    let clamped_low = is_below_min * min_val + (1.0 - is_below_min) * total_unclamped;
+    
+    // Clamp to maximum: if above max, use max; else use clamped_low
+    let clamped_high = is_above_max * max_val + (1.0 - is_above_max) * clamped_low;
+    
+    // Note: This doesn't handle both conditions at once, but for our range [5, 95] it should work
+    // For simplicity, we'll use a two-step clamp
+    let total_clamped = clamped_high;
 
-    // Convert to integer (0-100 scale)
+    // Convert to integer (0-100 scale) - multiply by 100 to get basis points (0-10000)
     let risk_score = total_clamped * 100.0; // Scale to 0-10000 (basis points)
 
-    (risk_score, total_clamped)
+    risk_score
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -126,12 +144,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cx = Graph::new();
 
     // Calculate risk scores for both protocols
-    let (jedi_risk_tensor, _) = calculate_risk_score(&mut cx, &input.jediswap_metrics);
-    let (ekubo_risk_tensor, _) = calculate_risk_score(&mut cx, &input.ekubo_metrics);
-
-    // Retrieve outputs
-    let mut jedi_risk_out = jedi_risk_tensor.retrieve();
-    let mut ekubo_risk_out = ekubo_risk_tensor.retrieve();
+    let jedi_risk_expr = calculate_risk_score(&mut cx, &input.jediswap_metrics);
+    let ekubo_risk_expr = calculate_risk_score(&mut cx, &input.ekubo_metrics);
+    
+    // Retrieve outputs (retrieve() returns a mutable reference we can pass to compile)
+    let mut jedi_risk_out = jedi_risk_expr.retrieve();
+    let mut ekubo_risk_out = ekubo_risk_expr.retrieve();
 
     // Compile the graph
     println!("   Compiling computation graph...");
