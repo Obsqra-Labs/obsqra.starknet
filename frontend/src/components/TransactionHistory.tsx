@@ -137,14 +137,26 @@ export function TransactionHistory() {
             const decisionId = parseInt(oldTx.hash);
             if (isNaN(decisionId)) return;
             
-            // Try to find matching record by decision ID
+            // Try to find matching record by timestamp proximity
+            // Rebalance history doesn't have decision IDs, so we match by time
             const matchingRecord = history.find((r: any) => {
-              const rDecisionId = oldTx.details?.decisionId;
-              return rDecisionId === decisionId;
+              if (!r.timestamp || !oldTx.timestamp || !r.tx_hash || !r.tx_hash.startsWith('0x')) {
+                return false;
+              }
+              
+              const txTime = new Date(oldTx.timestamp).getTime();
+              const recordTime = new Date(r.timestamp).getTime();
+              const diff = Math.abs(txTime - recordTime);
+              
+              // Match if within 5 minutes
+              return diff < 5 * 60 * 1000;
             });
             
             if (matchingRecord?.tx_hash && matchingRecord.tx_hash.startsWith('0x')) {
+              console.log(`🔄 Migrating transaction ${oldTx.id}: ${oldTx.hash} → ${matchingRecord.tx_hash}`);
               updateTransaction(oldTx.id, { hash: matchingRecord.tx_hash });
+            } else {
+              console.log(`⚠️ No matching record found for transaction ${oldTx.id} (decision ID: ${decisionId})`);
             }
           });
         }
