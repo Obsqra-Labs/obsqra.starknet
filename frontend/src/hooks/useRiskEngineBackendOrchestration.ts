@@ -89,7 +89,7 @@ export function useRiskEngineBackendOrchestration(): UseRiskEngineBackendOrchest
         // 2. Call propose_and_execute_allocation on RiskEngine (via user wallet or backend account)
         // 3. Read the on-chain decision
         // 4. Return the decision data
-        const response = await fetch(`${backendUrl}/api/risk-engine/orchestrate-allocation`, {
+        const response = await fetch(`${backendUrl}/api/v1/risk-engine/orchestrate-allocation`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -170,7 +170,7 @@ export function useRiskEngineBackendOrchestration(): UseRiskEngineBackendOrchest
 
       // Call the same endpoint but with a GET to fetch latest decision
       // For MVP, we can use a simple POST with empty metrics to trigger a read
-      const response = await fetch(`${backendUrl}/api/risk-engine/orchestrate-allocation`, {
+      const response = await fetch(`${backendUrl}/api/v1/risk-engine/orchestrate-allocation`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
