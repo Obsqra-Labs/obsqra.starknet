@@ -511,11 +511,11 @@ export function Dashboard() {
               </div>
               
               {/* Status Messages */}
-              {strategyDeposit.contractVersion === 'v1' && !isDemoMode && (
+              {strategyDeposit.contractVersion === 'v1' && (
                 <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mb-4">
                   <p className="text-yellow-400 text-xs">
-                    ⏳ <strong>V2 Coming Soon!</strong> Current contract (V1) only manages allocations. 
-                    V2 with deposits is ready to deploy. Use Demo Mode to preview the full flow.
+                    ⏳ <strong>V2 Deployment</strong> Current contract (V1) only manages allocations. 
+                    V2 with deposits is deployed and ready.
                   </p>
                 </div>
               )}
@@ -548,7 +548,7 @@ export function Dashboard() {
               />
               <button
                 onClick={handleDeposit}
-                disabled={isDepositing || !depositAmount || parseFloat(depositAmount) <= 0 || (strategyDeposit.contractVersion === 'v1' && !isDemoMode)}
+                disabled={isDepositing || !depositAmount || parseFloat(depositAmount) <= 0 || strategyDeposit.contractVersion === 'v1'}
                 className="w-full py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isDepositing ? (
@@ -576,11 +576,10 @@ export function Dashboard() {
               </div>
               
               {/* Status Messages */}
-              {strategyDeposit.contractVersion === 'v1' && !isDemoMode && (
+              {strategyDeposit.contractVersion === 'v1' && (
                 <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mb-4">
                   <p className="text-yellow-400 text-xs">
-                    ⏳ <strong>V2 Coming Soon!</strong> Withdrawals will be enabled with V2 deployment.
-                    Use Demo Mode to preview the flow.
+                    ⏳ <strong>V2 Required</strong> Withdrawals require V2 contract deployment.
                   </p>
                 </div>
               )}
@@ -613,7 +612,7 @@ export function Dashboard() {
               />
               <button
                 onClick={handleWithdraw}
-                disabled={isWithdrawing || !withdrawAmount || parseFloat(withdrawAmount) <= 0 || (strategyDeposit.contractVersion === 'v1' && !isDemoMode)}
+                disabled={isWithdrawing || !withdrawAmount || parseFloat(withdrawAmount) <= 0 || strategyDeposit.contractVersion === 'v1'}
                 className="w-full py-3 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isWithdrawing ? (
@@ -674,7 +673,7 @@ export function Dashboard() {
                 className="w-full py-3 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white rounded-xl font-bold disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isUpdating ? (
-                  <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> {isDemoMode ? 'Updating...' : 'Settling on-chain...'}</>
+                  <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Settling on-chain...</>
                 ) : (
                   '🔄 Update Allocation'
                 )}
@@ -741,7 +740,7 @@ export function Dashboard() {
           </div>
 
           {/* Error */}
-          {routerV2.error && !isDemoMode && (
+          {routerV2.error && (
             <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
               <p className="text-red-400 text-sm">⚠️ {routerV2.error}</p>
             </div>

@@ -1,8 +1,6 @@
 'use client';
 
 import { Dashboard } from '@/components/Dashboard';
-import { DemoModeToggle } from '@/components/DemoModeToggle';
-import { DemoModeProvider } from '@/contexts/DemoModeContext';
 import { useEffect, useState } from 'react';
 import { useWallet } from '@/hooks/useWallet';
 
@@ -70,7 +68,7 @@ export default function Home() {
   }
 
   return (
-    <DemoModeProvider>
+    <>
       {isConnected ? (
         <ConnectedApp
           address={address}
@@ -121,7 +119,7 @@ export default function Home() {
           </div>
         </div>
       )}
-    </DemoModeProvider>
+    </>
   );
 }
 
@@ -489,7 +487,6 @@ function ConnectedApp({
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <DemoModeToggle />
             <span className="px-4 py-2 rounded-full bg-white/10 text-sm text-white border border-white/15">
               {walletTag}
             </span>

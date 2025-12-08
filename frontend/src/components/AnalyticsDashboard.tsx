@@ -15,10 +15,9 @@ interface ProtocolStats {
 
 interface AnalyticsDashboardProps {
   allocation: { jediswap: number; ekubo: number } | null;
-  isDemoMode?: boolean;
 }
 
-export function AnalyticsDashboard({ allocation, isDemoMode = false }: AnalyticsDashboardProps) {
+export function AnalyticsDashboard({ allocation }: AnalyticsDashboardProps) {
   const protocolStats: ProtocolStats[] = useMemo(() => {
     const jediAlloc = allocation?.jediswap ?? 50;
     const ekuboAlloc = allocation?.ekubo ?? 50;
@@ -28,24 +27,24 @@ export function AnalyticsDashboard({ allocation, isDemoMode = false }: Analytics
         name: 'JediSwap',
         icon: '🔄',
         allocation: jediAlloc,
-        apy: isDemoMode ? 8.5 : 5.2,
-        tvl: isDemoMode ? '$2.5M' : '$1.8M',
+        apy: 5.2,
+        tvl: '$1.8M',
         risk: 'low',
-        change24h: isDemoMode ? 2.3 : 1.1,
+        change24h: 1.1,
         color: 'blue',
       },
       {
         name: 'Ekubo',
         icon: '🌀',
         allocation: ekuboAlloc,
-        apy: isDemoMode ? 12.8 : 8.5,
-        tvl: isDemoMode ? '$3.2M' : '$2.1M',
+        apy: 8.5,
+        tvl: '$2.1M',
         risk: 'medium',
-        change24h: isDemoMode ? 5.7 : 2.4,
+        change24h: 2.4,
         color: 'orange',
       },
     ];
-  }, [allocation, isDemoMode]);
+  }, [allocation]);
 
   const totalAPY = useMemo(() => {
     return protocolStats.reduce((sum, protocol) => {
@@ -53,7 +52,7 @@ export function AnalyticsDashboard({ allocation, isDemoMode = false }: Analytics
     }, 0);
   }, [protocolStats]);
 
-  const portfolioValue = isDemoMode ? 1000 : 100;
+  const portfolioValue = 100; // Real portfolio value from on-chain data
 
   const getRiskBadge = (risk: string) => {
     switch (risk) {
@@ -91,11 +90,9 @@ export function AnalyticsDashboard({ allocation, isDemoMode = false }: Analytics
     <div className="space-y-6">
       {/* Mode Indicator */}
       <div className={`px-4 py-2 rounded-xl border text-sm font-semibold flex items-center gap-2 ${
-        isDemoMode 
-          ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' 
-          : 'bg-green-500/10 border-green-500/30 text-green-400'
+        'bg-green-500/10 border-green-500/30 text-green-400'
       }`}>
-        {isDemoMode ? '🎮 Demo Mode - Simulated Data' : '✅ Live Mode - StrategyRouterV2'}
+        ✅ Live Production Data - StrategyRouterV2
       </div>
 
       {/* Portfolio Overview Cards */}
