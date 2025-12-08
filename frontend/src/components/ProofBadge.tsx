@@ -11,6 +11,9 @@ interface ProofBadgeProps {
   factHash?: string | null;
   submittedAt?: string | null;
   verifiedAt?: string | null;
+  proofJobId?: string | null;
+  generationTime?: number | null;
+  proofSize?: number | null;
 }
 
 export function ProofBadge({ hash, status, txHash, factHash, submittedAt, verifiedAt, proofJobId, generationTime, proofSize }: ProofBadgeProps) {

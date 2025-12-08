@@ -184,7 +184,8 @@ class OrchestrationResponse(BaseModel):
     jediswap_apy: int
     ekubo_apy: int
     rationale_hash: str
-    strategy_router_tx: str
+    strategy_router_tx: str  # Decision ID from contract (legacy)
+    tx_hash: str = None  # Actual on-chain transaction hash
     message: str
     # Proof information
     proof_job_id: str = None
@@ -413,7 +414,8 @@ async def orchestrate_allocation(
                     jediswap_apy=int(decision_data['jediswap_apy']),
                     ekubo_apy=int(decision_data['ekubo_apy']),
                     rationale_hash=str(decision_data['rationale_hash']),
-                    strategy_router_tx=str(decision_data['strategy_router_tx']),
+                    strategy_router_tx=str(decision_data['strategy_router_tx']),  # Decision ID (legacy)
+                    tx_hash=tx_hash,  # Actual on-chain transaction hash
                     message=f"✅ AI executed decision #{decision_count} on-chain (tx: {tx_hash})",
                     # Proof information
                     proof_job_id=str(proof_job.id),
