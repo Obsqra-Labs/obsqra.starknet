@@ -167,31 +167,33 @@ export function useRiskEngineOrchestration(): UseRiskEngineOrchestrationReturn {
           account as unknown as AccountInterface
         );
 
-        // Prepare metrics structs - Starknet.js expects structs as objects with field names matching ABI
-        const jediswapMetricsStruct = {
-          utilization: jediswapMetrics.utilization,
-          volatility: jediswapMetrics.volatility,
-          liquidity: jediswapMetrics.liquidity,
-          audit_score: jediswapMetrics.auditScore,
-          age_days: jediswapMetrics.ageDays,
-        };
+        // Prepare metrics structs - Starknet.js populate expects structs as arrays of values
+        // ABI order for each struct: utilization, volatility, liquidity, audit_score, age_days
+        const jediswapMetricsArray = [
+          jediswapMetrics.utilization,
+          jediswapMetrics.volatility,
+          jediswapMetrics.liquidity,
+          jediswapMetrics.auditScore,
+          jediswapMetrics.ageDays,
+        ];
 
-        const ekuboMetricsStruct = {
-          utilization: ekuboMetrics.utilization,
-          volatility: ekuboMetrics.volatility,
-          liquidity: ekuboMetrics.liquidity,
-          audit_score: ekuboMetrics.auditScore,
-          age_days: ekuboMetrics.ageDays,
-        };
+        const ekuboMetricsArray = [
+          ekuboMetrics.utilization,
+          ekuboMetrics.volatility,
+          ekuboMetrics.liquidity,
+          ekuboMetrics.auditScore,
+          ekuboMetrics.ageDays,
+        ];
 
         console.log('🤖 RiskEngine Orchestration: Proposing and executing allocation...');
-        console.log('📊 JediSwap metrics struct:', jediswapMetricsStruct);
-        console.log('📊 Ekubo metrics struct:', ekuboMetricsStruct);
+        console.log('📊 JediSwap metrics array:', jediswapMetricsArray);
+        console.log('📊 Ekubo metrics array:', ekuboMetricsArray);
 
         // Use populate to properly serialize structs, then execute
+        // Structs are passed as arrays of their member values
         const call = contract.populate('propose_and_execute_allocation', [
-          jediswapMetricsStruct,
-          ekuboMetricsStruct,
+          jediswapMetricsArray,
+          ekuboMetricsArray,
         ]);
         
         const response = await account.execute([call]);
