@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAccount } from '@starknet-react/core';
 import { Contract, RpcProvider, uint256 } from 'starknet';
 import { getConfig } from '@/lib/config';
