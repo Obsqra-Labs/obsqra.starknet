@@ -49,7 +49,12 @@ class SHARPService:
         # API key (if required by SHARP)
         self.api_key = os.getenv("SHARP_API_KEY")
         
+        # SSL verification (disable for testnet development)
+        self.verify_ssl = os.getenv("SHARP_VERIFY_SSL", "false").lower() == "true"
+        
         logger.info(f"SHARP Service initialized: {self.gateway_url}")
+        if not self.verify_ssl:
+            logger.warning("⚠️ SSL verification disabled for SHARP (testnet/dev only)")
     
     async def submit_proof(
         self,
@@ -72,13 +77,21 @@ class SHARPService:
         logger.info(f"Submitting proof to SHARP: {proof_hash[:16]}...")
         
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            # Note: SHARP is StarkWare's internal service, not a public API
+            # For now, we'll disable SSL verification for testnet (development only)
+            # In production, use proper certificate validation or deploy verifier contract
+            async with httpx.AsyncClient(
+                timeout=30.0,
+                verify=self.verify_ssl  # Configurable SSL verification
+            ) as client:
                 # Prepare request
                 headers = {}
                 if self.api_key:
                     headers["Authorization"] = f"Bearer {self.api_key}"
                 
                 # Submit proof
+                # Note: This endpoint may not exist - SHARP is internal to StarkWare
+                # Alternative: Deploy verifier contract on Starknet for on-chain verification
                 response = await client.post(
                     f"{self.gateway_url}/add_job",
                     files={"proof": proof_data},
@@ -115,7 +128,10 @@ class SHARPService:
             SHARPStatus with current state
         """
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(
+                timeout=10.0,
+                verify=self.verify_ssl  # Configurable SSL verification
+            ) as client:
                 response = await client.get(
                     f"{self.gateway_url}/get_status",
                     params={"job_id": job_id}
