@@ -176,7 +176,7 @@ function Landing({
           <div className="bg-white/80 border border-white/70 rounded-3xl p-8 shadow-lift backdrop-blur">
             <div className="flex flex-wrap gap-3 items-center text-xs font-medium text-ink/80">
               <span className="px-3 py-1 rounded-full bg-lagoon-100 text-ink">zkML + SHARP</span>
-              <span className="px-3 py-1 rounded-full bg-mint-100 text-ink">MIST-native privacy</span>
+              <span className="px-3 py-1 rounded-full bg-mint-100 text-ink">Wallet kit</span>
               <span className="px-3 py-1 rounded-full bg-white border border-ink/10">Starknet Lab</span>
             </div>
             <h1 className="font-display text-4xl md:text-5xl leading-tight mt-4">
@@ -188,7 +188,7 @@ function Landing({
               Obsqra turns your allocation engine into Cairo constraints so Starknet users, DAOs, and regulators can verify the math—live on-chain.
             </p>
             <p className="text-base text-slate-600 mt-2">
-              Starknet lets us do what EVM could not: Cairo constraints + SHARP verification for provable computation, and MIST for privacy without rebuilding pools. The result is a public-facing, verifiable AI layer that makes allocations auditable instead of opaque.
+              Starknet lets us do what EVM could not: Cairo constraints + SHARP verification for provable computation. The result is a public-facing, verifiable AI layer that makes allocations auditable instead of opaque.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <button
@@ -231,7 +231,7 @@ function Landing({
               <div className="p-4 rounded-2xl border border-white/70 bg-cloud">
                 <p className="font-semibold text-ink">Starknet-first</p>
                 <p className="mt-1">
-                  MIST handles privacy rails. Cairo + SHARP prove computation. Obsqra stitches them into a Starknet-native SDK and router.
+                  Cairo + SHARP prove computation. Obsqra stitches them into a Starknet-native SDK, router, and wallet kit; privacy can be added modularly.
                 </p>
               </div>
             </div>
@@ -259,8 +259,8 @@ function Landing({
               <li className="flex gap-3">
                 <span className="mt-1 h-2.5 w-2.5 rounded-full bg-lagoon-500" />
                 <div>
-                  <p className="font-semibold text-ink">Privacy is handled</p>
-                  <p>MIST gives us shielded rails out-of-the-box. That lets Obsqra focus on provability instead of rebuilding privacy pools.</p>
+                  <p className="font-semibold text-ink">UX is handled</p>
+                  <p>Unified wallet kit keeps users in flow; privacy can be plugged in later if needed.</p>
                 </div>
               </li>
               <li className="flex gap-3">
@@ -319,7 +319,7 @@ function Landing({
             <div className="mt-6 p-4 rounded-2xl border border-white/70 bg-white/60 text-sm text-slate-700">
               <p className="font-semibold text-ink">Shipping status</p>
               <p className="mt-1">
-                Settlement layer is live on Sepolia. Proof display UI is wired. zkML constraint set and SHARP verification are in build to ship a public, verifiable allocation demo.
+                Settlement layer is live on Sepolia. Proof display UI is wired. zkML constraint set and SHARP verification are in build to ship a public, verifiable allocation demo. Privacy layer is currently out of scope; can be plugged in later.
               </p>
             </div>
           </div>
@@ -335,12 +335,12 @@ function Landing({
           <InfoCard
             title="For risk & compliance"
             body="Deterministic constraints, policy guardrails, and reproducible metrics keep regulators and risk teams in the loop. Proofs show intent and outcome without exposing user data."
-            badge="MIST"
+            badge="Proofs"
             accent="mint"
           />
           <InfoCard
             title="For users & LPs"
-            body="Wallets display the proof trail alongside allocation and APY. Privacy is handled by MIST, provability by Cairo/SHARP, so they can finally trust how capital is routed."
+            body="Wallets display the proof trail alongside allocation and APY. Provability comes from Cairo/SHARP; optional privacy adapters can be added per strategy."
             badge="SDK"
             accent="ink"
           />
@@ -351,7 +351,7 @@ function Landing({
             <div>
               <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Integrations</p>
               <h2 className="font-display text-2xl text-ink mt-1">Starknet-native protocols</h2>
-              <p className="text-sm text-slate-600">Plug-and-play slots for Nostra, zkLend, Ekubo, plus MIST for privacy rails.</p>
+              <p className="text-sm text-slate-600">Plug-and-play slots for Nostra, zkLend, Ekubo, plus wallet kit for UX.</p>
             </div>
             <a
               href={DOCS_URL}
@@ -366,7 +366,7 @@ function Landing({
             <IntegrationCard title="Nostra" status="Router slot wired; proof gating next" role="Lending" accent="ink" />
             <IntegrationCard title="zkLend" status="Hooked for allocation feed" role="Lending" accent="lagoon" />
             <IntegrationCard title="Ekubo" status="Sepolia routing live" role="DEX / LP" accent="mint" />
-            <IntegrationCard title="MIST.cash" status="Shielded rails integrated" role="Privacy pools" accent="ink" />
+            <IntegrationCard title="Wallet kit" status="Argent/Braavos modal live" role="Wallet UX" accent="ink" />
           </div>
         </section>
 
@@ -381,7 +381,7 @@ function Landing({
               </li>
               <li className="flex gap-3">
                 <span className="mt-1 h-2 w-2 rounded-full bg-ink" />
-                <span>Wrap those steps in Cairo constraints; SHARP attests the computation; MIST provides privacy for movements.</span>
+                <span>Wrap those steps in Cairo constraints; SHARP attests the computation; privacy adapters can be added per flow.</span>
               </li>
               <li className="flex gap-3">
                 <span className="mt-1 h-2 w-2 rounded-full bg-ink" />
@@ -414,11 +414,11 @@ function Landing({
               </li>
               <li className="flex gap-3">
                 <span className="mt-1 h-2 w-2 rounded-full bg-lagoon-500" />
-                <span>Privacy rails are native: MIST lets users opt into shielded flows without protocol overhead.</span>
+                <span>Privacy can be plugged in as needed; base stack focuses on provability first.</span>
               </li>
               <li className="flex gap-3">
                 <span className="mt-1 h-2 w-2 rounded-full bg-ink" />
-                <span>We package both into an SDK + router so builders can ship verifiable AI without rewriting stacks.</span>
+                <span>We package proofs into an SDK + router so builders can ship verifiable AI without rewriting stacks.</span>
               </li>
             </ul>
           </div>
@@ -438,7 +438,7 @@ function Landing({
             </div>
           </div>
           <p className="text-center text-xs text-slate-400 mt-6">
-            Wrap Cairo proofs around AI logic. Built on Starknet. MIST + Cairo + SHARP.
+            Wrap Cairo proofs around AI logic. Built on Starknet. Wallet kit + Cairo + SHARP.
           </p>
         </footer>
       </main>

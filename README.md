@@ -4,13 +4,15 @@
 
 **LIVE ON STARKNET SEPOLIA** - Contracts deployed December 5, 2025
 
-## 🌐 Deployed Contracts (Sepolia Testnet)
+## 🌐 Deployed Contracts (Sepolia Testnet) - v2
 
 | Contract | Address | Explorer |
 |----------|---------|----------|
-| **RiskEngine** | `0x008c3eff...7a3d80` | [View on Starkscan](https://sepolia.starkscan.co/contract/0x008c3eff435e859e3b8e5cb12f837f4dfa77af25c473fb43067adf9f557a3d80) |
+| **RiskEngine v2** | `0x0751c852...44d31` | [View on Starkscan](https://sepolia.starkscan.co/contract/0x0751c85290c660d738236a12bb362bf64c0a8ef4b1a9cc05dc7000d14fd44d31) |
+| **StrategyRouterV2** | `0x0539d561...41d6` | [View on Starkscan](https://sepolia.starkscan.co/contract/0x0539d5611c6158a4234f7c4e8e7fe50af7b9502314ca95409f5106ee2f6741d6) |
 | **DAOConstraintManager** | `0x010a3e7d...4c856` | [View on Starkscan](https://sepolia.starkscan.co/contract/0x010a3e7d3a824ea14a5901984017d65a733af934f548ea771e2a4ad792c4c856) |
-| **StrategyRouter** | `0x01fa59cf...df53a` | [View on Starkscan](https://sepolia.starkscan.co/contract/0x01fa59cf9a28d97fd9ab5db1e21f9dd6438af06cc535bccdb58962518cfdf53a) |
+
+> **Note:** v2 contracts include full on-chain AI orchestration and deposit/withdraw functionality. See [DEPLOYMENT_COMPLETE.md](DEPLOYMENT_COMPLETE.md) for details.
 
 Full deployment details: [`deployments/sepolia.json`](deployments/sepolia.json)
 

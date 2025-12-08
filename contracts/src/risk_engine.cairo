@@ -821,6 +821,16 @@ mod RiskEngine {
         self.decision_counter.read()
     }
     
+    #[external(v0)]
+    fn set_strategy_router(
+        ref self: ContractState,
+        new_router: ContractAddress,
+    ) {
+        let owner = self.owner.read();
+        assert(get_caller_address() == owner, 'Unauthorized');
+        self.strategy_router.write(new_router);
+    }
+    
     // Helper: Calculate risk score (internal)
     fn calculate_risk_score_internal(
         utilization: felt252,

@@ -8,7 +8,6 @@ import { useRiskEngineOrchestration, ProtocolMetrics } from '@/hooks/useRiskEngi
 import { useTransactionMonitor, TransactionStatusBadge } from '@/hooks/useTransactionMonitor';
 import { useProofGeneration } from '@/hooks/useProofGeneration';
 import { useDemoMode } from '@/contexts/DemoModeContext';
-import { useMistCash } from '@/hooks/useMistCash';
 import { useStrategyDeposit } from '@/hooks/useStrategyDeposit';
 import { useTransactionHistory } from '@/hooks/useTransactionHistory';
 // import { usePoolSelection } from '@/hooks/usePoolSelection';
@@ -26,7 +25,6 @@ export function Dashboard() {
   const { isDemoMode, mockData } = useDemoMode();
   // const { selectedPool, setSelectedPool, pool, allPools } = usePoolSelection();
   const routerV2 = useStrategyRouterV2();
-  const { mistService } = useMistCash();
   const strategyDeposit = useStrategyDeposit(getConfig().strategyRouterAddress);
   const txHistory = useTransactionHistory();
   const riskEngine = useRiskEngineBackend();
@@ -34,12 +32,12 @@ export function Dashboard() {
   const proofGen = useProofGeneration();
   const riskEngineOrchestration = useRiskEngineOrchestration();
   
-  // Fetch user's STRK balance on mount
+  // Fetch user's STRK balance on mount and when address changes
   useEffect(() => {
-    if (address) {
+    if (address && strategyDeposit.isReady) {
       strategyDeposit.fetchBalance();
     }
-  }, [address, strategyDeposit.fetchBalance]);
+  }, [address, strategyDeposit.isReady]); // Removed fetchBalance from deps to prevent infinite loop
   
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [allocationForm, setAllocationForm] = useState({ jediswap: 50, ekubo: 50 });
@@ -482,8 +480,14 @@ export function Dashboard() {
           <div className="bg-slate-900/70 border border-white/10 rounded-xl p-6 shadow-lg">
             <h2 className="text-xl font-bold text-white mb-4">Select Your Pool</h2>
             <p className="text-sm text-gray-400 mb-4">Choose a risk profile that matches your investment goals</p>
-            <div className="text-center py-8 text-gray-400">
-              Pool selection UI loading...
+            <div className="text-center py-8">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                <span className="text-blue-400">🚧</span>
+                <span className="text-blue-300 text-sm">Pool selection feature coming soon</span>
+              </div>
+              <p className="text-gray-500 text-xs mt-4">
+                For now, use the AI Risk Engine orchestration to automatically optimize allocations
+              </p>
             </div>
           </div>
 
@@ -520,7 +524,7 @@ export function Dashboard() {
                   <p className="text-green-400 text-xs">
                     ✓ <strong>Direct Deposit</strong> — Your STRK goes directly to the Strategy Router for yield optimization.
                     <br/>
-                    <span className="text-green-300/70">🔒 MIST.cash privacy layer coming soon!</span>
+                    <span className="text-green-300/70">🔒 Optional privacy adapter coming soon.</span>
                   </p>
                 </div>
               )}
@@ -585,7 +589,7 @@ export function Dashboard() {
                   <p className="text-rose-300 text-xs">
                     ✓ <strong>Direct Withdrawal</strong> — Withdraw your STRK + accumulated yields.
                     <br/>
-                    <span className="text-rose-300/70">🔒 MIST.cash private withdrawals coming soon!</span>
+                  <span className="text-rose-300/70">🔒 Private withdrawals coming soon.</span>
                   </p>
                 </div>
               )}

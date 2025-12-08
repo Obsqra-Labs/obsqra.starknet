@@ -43,15 +43,15 @@ function StackDiagram({ className }: { className: string }) {
           <div className="w-0.5 h-6 bg-gradient-to-b from-mint-500 to-lagoon-500" />
         </div>
 
-        {/* Privacy Layer */}
+        {/* Optional Privacy Layer */}
         <div className="bg-mint-900/30 border border-mint-500/30 rounded-xl p-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-mint-500/20 border border-mint-500/50 flex items-center justify-center text-lg">
               🔐
             </div>
             <div>
-              <p className="font-semibold text-mint-300">Privacy Layer — MIST.cash</p>
-              <p className="text-sm text-slate-400">Unlinkable deposits & withdrawals</p>
+              <p className="font-semibold text-mint-300">Optional Privacy Layer</p>
+              <p className="text-sm text-slate-400">Pluggable shielded flows (swap in your provider)</p>
             </div>
           </div>
         </div>
@@ -121,7 +121,7 @@ function StackDiagram({ className }: { className: string }) {
         {/* Yields */}
         <div className="bg-green-900/30 border border-green-500/30 rounded-xl p-4 text-center">
           <p className="font-semibold text-green-300">Verifiable Yields</p>
-          <p className="text-xs text-slate-400">Private withdrawal via MIST</p>
+          <p className="text-xs text-slate-400">Proof-backed allocations; privacy optional</p>
         </div>
       </div>
     </div>
@@ -176,8 +176,8 @@ function ComparisonDiagram({ className }: { className: string }) {
           </div>
           <div className="flex justify-center text-mint-500">↓</div>
           <div className="bg-mint-100 rounded-lg p-3 border border-mint-300">
-            <p className="text-mint-800 font-medium">MIST (native privacy)</p>
-            <p className="text-xs text-mint-600 mt-1">Days of integration</p>
+            <p className="text-mint-800 font-medium">Optional privacy adapter</p>
+            <p className="text-xs text-mint-600 mt-1">Pluggable when needed</p>
           </div>
           <div className="flex justify-center text-lagoon-500">↓</div>
           <div className="bg-lagoon-100 rounded-lg p-3 border border-lagoon-300">
@@ -201,7 +201,7 @@ function ComparisonDiagram({ className }: { className: string }) {
 function FlowDiagram({ className }: { className: string }) {
   return (
     <div className={`bg-white border border-slate-200 rounded-2xl p-6 ${className}`}>
-      <h3 className="font-display text-lg text-ink mb-4">Private Yield Flow</h3>
+      <h3 className="font-display text-lg text-ink mb-4">Yield Flow (provable)</h3>
       
       <div className="flex flex-col md:flex-row items-center justify-between gap-4">
         {/* Step 1 */}
@@ -209,8 +209,8 @@ function FlowDiagram({ className }: { className: string }) {
           <div className="w-12 h-12 rounded-full bg-mint-100 border-2 border-mint-300 flex items-center justify-center mx-auto mb-2">
             <span className="text-mint-700 font-bold">1</span>
           </div>
-          <p className="font-semibold text-ink text-sm">Private Deposit</p>
-          <p className="text-xs text-slate-500 mt-1">via MIST</p>
+          <p className="font-semibold text-ink text-sm">Deposit</p>
+          <p className="text-xs text-slate-500 mt-1">Starknet wallet</p>
         </div>
 
         <div className="hidden md:block text-slate-300">→</div>
@@ -253,17 +253,13 @@ function FlowDiagram({ className }: { className: string }) {
           <div className="w-12 h-12 rounded-full bg-green-100 border-2 border-green-300 flex items-center justify-center mx-auto mb-2">
             <span className="text-green-700 font-bold">5</span>
           </div>
-          <p className="font-semibold text-ink text-sm">Private Withdraw</p>
-          <p className="text-xs text-slate-500 mt-1">via MIST</p>
+          <p className="font-semibold text-ink text-sm">Withdraw</p>
+          <p className="text-xs text-slate-500 mt-1">Proof-backed flow</p>
         </div>
       </div>
 
       <div className="mt-6 pt-4 border-t border-slate-100">
         <div className="flex flex-wrap justify-center gap-4 text-xs">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-mint-300" />
-            <span className="text-slate-600">Privacy (MIST)</span>
-          </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-lagoon-300" />
             <span className="text-slate-600">Verification (Cairo)</span>
@@ -279,4 +275,3 @@ function FlowDiagram({ className }: { className: string }) {
 }
 
 export default ArchitectureDiagram;
-

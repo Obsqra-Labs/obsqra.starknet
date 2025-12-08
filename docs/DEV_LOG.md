@@ -138,15 +138,27 @@ Success: Declaration completed
 Class Hash: 0x61febd39ccffbbd986e071669eb1f712f4dcf5e008aae7fa2bed1f09de6e304
 ```
 
-All three contracts deployed:
+## December 8, 2025 - v2 Contracts Deployed (Full On-Chain Orchestration)
 
+**v2 Contracts Deployed:**
+| Contract | Address | Features |
+|----------|---------|----------|
+| RiskEngine v2 | `0x0751c85290c660d738236a12bb362bf64c0a8ef4b1a9cc05dc7000d14fd44d31` | Full on-chain orchestration, `propose_and_execute_allocation` |
+| StrategyRouterV2 | `0x0539d5611c6158a4234f7c4e8e7fe50af7b9502314ca95409f5106ee2f6741d6` | Deposit/withdraw, performance tracking |
+| DAOConstraintManager | `0x010a3e7d3a824ea14a5901984017d65a733af934f548ea771e2a4ad792c4c856` | (unchanged) |
+
+**Previous v1 Contracts (deprecated):**
 | Contract | Address |
 |----------|---------|
-| RiskEngine | `0x008c3eff435e859e3b8e5cb12f837f4dfa77af25c473fb43067adf9f557a3d80` |
-| DAOConstraintManager | `0x010a3e7d3a824ea14a5901984017d65a733af934f548ea771e2a4ad792c4c856` |
-| StrategyRouter | `0x01fa59cf9a28d97fd9ab5db1e21f9dd6438af06cc535bccdb58962518cfdf53a` |
+| RiskEngine v1 | `0x008c3eff435e859e3b8e5cb12f837f4dfa77af25c473fb43067adf9f557a3d80` |
+| StrategyRouter v1 | `0x01fa59cf9a28d97fd9ab5db1e21f9dd6438af06cc535bccdb58962518cfdf53a` |
 
 ---
+
+## Wallet (current)
+
+- Wallet UX: using the `obsqra.kit` wallet package for unified connect/disconnect, preferred connector, modal, and network guard rails (Argent X / Braavos via `@starknet-react/core`).
+- Privacy: not included in the current build; plug in a privacy layer separately if needed.
 
 ## Key Takeaways for EVM Developers
 
@@ -396,4 +408,3 @@ Added `/orchestrate-allocation` endpoint:
 *Updated December 2025*
 
 **From computation to settlement, everything is on-chain and auditable.** 🔺
-

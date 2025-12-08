@@ -333,5 +333,15 @@ mod StrategyRouterV2 {
             timestamp: get_block_timestamp(),
         });
     }
+    
+    #[external(v0)]
+    fn set_risk_engine(
+        ref self: ContractState,
+        new_risk_engine: ContractAddress,
+    ) {
+        let owner = self.owner.read();
+        assert(get_caller_address() == owner, 'Unauthorized');
+        self.risk_engine.write(new_risk_engine);
+    }
 }
 

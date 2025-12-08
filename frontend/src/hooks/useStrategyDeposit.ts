@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAccount } from '@starknet-react/core';
 import { Contract, RpcProvider, uint256 } from 'starknet';
 import { getConfig } from '@/lib/config';
@@ -76,8 +76,10 @@ export function useStrategyDeposit(strategyRouterAddress: string) {
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [contractVersion, setContractVersion] = useState<'v1' | 'v2' | 'unknown'>('unknown');
+  const checkingVersionRef = useRef(false); // Prevent multiple simultaneous version checks
 
-  const provider = new RpcProvider({ nodeUrl: config.rpcUrl });
+  // Memoize provider to prevent recreation on every render
+  const provider = useMemo(() => new RpcProvider({ nodeUrl: config.rpcUrl }), [config.rpcUrl]);
 
   // Check if contract has deposit function (V2)
   const checkContractVersion = useCallback(async () => {
@@ -86,6 +88,12 @@ export function useStrategyDeposit(strategyRouterAddress: string) {
       return;
     }
 
+    // Prevent multiple simultaneous checks
+    if (checkingVersionRef.current) {
+      return;
+    }
+
+    checkingVersionRef.current = true;
     try {
       // Try to get class and check for deposit function
       const classAt = await provider.getClassAt(strategyRouterAddress);
@@ -101,6 +109,8 @@ export function useStrategyDeposit(strategyRouterAddress: string) {
     } catch (error) {
       console.warn('Could not detect contract version:', error);
       setContractVersion('unknown');
+    } finally {
+      checkingVersionRef.current = false;
     }
   }, [strategyRouterAddress, provider]);
 
@@ -115,9 +125,6 @@ export function useStrategyDeposit(strategyRouterAddress: string) {
     setIsLoadingBalance(true);
 
     try {
-      // Check contract version first
-      await checkContractVersion();
-
       // Fetch STRK wallet balance
       const strkContract = new Contract(STRK_TOKEN_ABI, STRK_TOKEN_ADDRESS, provider);
       const balanceResult = await strkContract.balanceOf(address);
@@ -134,10 +141,17 @@ export function useStrategyDeposit(strategyRouterAddress: string) {
         balanceValue = BigInt(balanceResult || 0);
       }
       
-      setUserBalance(Number(balanceValue) / 1e18);
-      console.log('💰 STRK wallet balance:', Number(balanceValue) / 1e18);
+      const newBalance = Number(balanceValue) / 1e18;
+      setUserBalance((prev) => {
+        // Only log if balance actually changed
+        if (prev !== newBalance) {
+          console.log('💰 STRK wallet balance:', newBalance);
+        }
+        return newBalance;
+      });
 
       // Only try to fetch contract balance if V2 is detected
+      // Use current state value, but don't depend on it in the callback
       if (contractVersion === 'v2' && strategyRouterAddress && strategyRouterAddress !== '0x0') {
         try {
           const routerContract = new Contract(STRATEGY_ROUTER_V2_ABI, strategyRouterAddress, provider);
@@ -145,7 +159,7 @@ export function useStrategyDeposit(strategyRouterAddress: string) {
           const deposited = BigInt(depositedResult || 0);
           setContractBalance(Number(deposited) / 1e18);
         } catch (error) {
-          console.warn('Could not fetch contract balance (V1 contract):', error);
+          console.warn('Could not fetch contract balance:', error);
           setContractBalance(0);
         }
       } else {
@@ -158,7 +172,8 @@ export function useStrategyDeposit(strategyRouterAddress: string) {
     } finally {
       setIsLoadingBalance(false);
     }
-  }, [address, provider, strategyRouterAddress, checkContractVersion, contractVersion]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address, provider, strategyRouterAddress]); // Removed contractVersion and checkContractVersion to prevent infinite loop
 
   // Deposit STRK to Strategy Router
   const deposit = useCallback(
@@ -276,6 +291,13 @@ export function useStrategyDeposit(strategyRouterAddress: string) {
     },
     [account, address, provider, strategyRouterAddress, fetchBalance, contractVersion]
   );
+
+  // Check contract version once on mount or when router address changes
+  useEffect(() => {
+    if (strategyRouterAddress && strategyRouterAddress !== '0x0' && contractVersion === 'unknown') {
+      checkContractVersion();
+    }
+  }, [strategyRouterAddress, checkContractVersion, contractVersion]);
 
   return {
     userBalance,

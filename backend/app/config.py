@@ -49,8 +49,8 @@ class Settings(BaseSettings):
     
     # Starknet
     STARKNET_RPC_URL: str = "https://starknet-sepolia-rpc.publicnode.com"
-    RISK_ENGINE_ADDRESS: str = "0x008c3eff435e859e3b8e5cb12f837f4dfa77af25c473fb43067adf9f557a3d80"
-    STRATEGY_ROUTER_ADDRESS: str = "0x01fa59cf9a28d97fd9ab5db1e21f9dd6438af06cc535bccdb58962518cfdf53a"
+    RISK_ENGINE_ADDRESS: str = "0x0751c85290c660d738236a12bb362bf64c0a8ef4b1a9cc05dc7000d14fd44d31"  # v2 with orchestration
+    STRATEGY_ROUTER_ADDRESS: str = "0x0539d5611c6158a4234f7c4e8e7fe50af7b9502314ca95409f5106ee2f6741d6"  # v2 with deposit/withdraw
     
     # ML Models
     MODEL_VERSION: str = "v1"

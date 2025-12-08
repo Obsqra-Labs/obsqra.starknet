@@ -8,7 +8,6 @@ export enum ErrorCategory {
   NETWORK = 'NETWORK',
   VALIDATION = 'VALIDATION',
   TRANSACTION = 'TRANSACTION',
-  MIST = 'MIST',
   RPC = 'RPC',
   UNKNOWN = 'UNKNOWN',
 }
@@ -145,17 +144,6 @@ export function categorizeError(error: unknown): ObsqraError {
     };
   }
 
-  // MIST errors
-  if (message.includes('MIST') || message.includes('chamber')) {
-    return {
-      category: ErrorCategory.MIST,
-      userMessage: 'Privacy protocol error. Please try the operation again.',
-      technicalMessage: message,
-      originalError: error instanceof Error ? error : undefined,
-      retryable: true,
-    };
-  }
-
   // Default unknown error
   return {
     category: ErrorCategory.UNKNOWN,
@@ -181,7 +169,6 @@ export function formatErrorForDisplay(error: ObsqraError): {
     [ErrorCategory.NETWORK]: '📡',
     [ErrorCategory.VALIDATION]: '⚠️',
     [ErrorCategory.TRANSACTION]: '💸',
-    [ErrorCategory.MIST]: '🔐',
     [ErrorCategory.RPC]: '🌐',
     [ErrorCategory.UNKNOWN]: '❌',
   };
@@ -253,4 +240,3 @@ export function logError(
   //   reportToErrorTracking(logEntry);
   // }
 }
-

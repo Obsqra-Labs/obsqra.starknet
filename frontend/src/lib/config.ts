@@ -8,7 +8,6 @@ interface FrontendConfig {
   backendUrl: string;
   strategyRouterAddress: string;
   riskEngineAddress: string;
-  mistChamberAddress: string;
   networkName: 'sepolia' | 'mainnet';
   docsUrl: string;
   githubUrl: string;
@@ -19,7 +18,6 @@ const REQUIRED_ENV_VARS = {
   NEXT_PUBLIC_BACKEND_URL: { default: 'http://localhost:8000', isDev: true },
   NEXT_PUBLIC_STRATEGY_ROUTER_ADDRESS: { default: '', isDev: true }, // V2 not deployed yet - optional
   NEXT_PUBLIC_RISK_ENGINE_ADDRESS: { default: '', isDev: true }, // Optional for now
-  NEXT_PUBLIC_MIST_CHAMBER_ADDRESS: { default: '', isDev: true }, // MIST.cash not deployed - optional
   NEXT_PUBLIC_NETWORK: { default: 'sepolia', isDev: true },
 };
 
@@ -49,7 +47,6 @@ function loadConfig(): FrontendConfig {
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
   const strategyRouterAddress = process.env.NEXT_PUBLIC_STRATEGY_ROUTER_ADDRESS || '';
   const riskEngineAddress = process.env.NEXT_PUBLIC_RISK_ENGINE_ADDRESS || '';
-  const mistChamberAddress = process.env.NEXT_PUBLIC_MIST_CHAMBER_ADDRESS || '';
   const networkName = (process.env.NEXT_PUBLIC_NETWORK || 'sepolia') as 'sepolia' | 'mainnet';
 
   // Validate address format (should be 0x... format)
@@ -61,14 +58,12 @@ function loadConfig(): FrontendConfig {
 
   validateAddress(strategyRouterAddress, 'Strategy Router Address');
   validateAddress(riskEngineAddress, 'Risk Engine Address');
-  validateAddress(mistChamberAddress, 'MIST Chamber Address');
 
   return {
     rpcUrl,
     backendUrl,
     strategyRouterAddress: strategyRouterAddress as `0x${string}`,
     riskEngineAddress: riskEngineAddress as `0x${string}`,
-    mistChamberAddress: mistChamberAddress as `0x${string}`,
     networkName,
     docsUrl: 'https://github.com/obsqra-labs/obsqra.starknet/tree/main/docs',
     githubUrl: 'https://github.com/obsqra-labs/obsqra.starknet',
@@ -90,12 +85,11 @@ export function getConfig(): FrontendConfig {
 /**
  * Check if a critical contract address is configured
  */
-export function isContractConfigured(contractType: 'strategyRouter' | 'riskEngine' | 'mistChamber'): boolean {
+export function isContractConfigured(contractType: 'strategyRouter' | 'riskEngine'): boolean {
   const cfg = getConfig();
   const address = {
     strategyRouter: cfg.strategyRouterAddress,
     riskEngine: cfg.riskEngineAddress,
-    mistChamber: cfg.mistChamberAddress,
   }[contractType];
 
   return !!address && address !== '';
@@ -104,7 +98,7 @@ export function isContractConfigured(contractType: 'strategyRouter' | 'riskEngin
 /**
  * Get a contract address or null if not configured
  */
-export function getContractAddress(contractType: 'strategyRouter' | 'riskEngine' | 'mistChamber'): `0x${string}` | null {
+export function getContractAddress(contractType: 'strategyRouter' | 'riskEngine'): `0x${string}` | null {
   if (!isContractConfigured(contractType)) {
     return null;
   }
@@ -113,9 +107,7 @@ export function getContractAddress(contractType: 'strategyRouter' | 'riskEngine'
   return {
     strategyRouter: cfg.strategyRouterAddress,
     riskEngine: cfg.riskEngineAddress,
-    mistChamber: cfg.mistChamberAddress,
   }[contractType] as `0x${string}`;
 }
 
 export type { FrontendConfig };
-

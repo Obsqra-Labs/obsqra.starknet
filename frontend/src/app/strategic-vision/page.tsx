@@ -19,7 +19,7 @@ const SECTION_LINKS = [
 type PulseColor = 'mint' | 'lagoon' | 'ink';
 
 const STATUS_PULSES: Array<{ title: string; status: string; detail: string; color: PulseColor }> = [
-  { title: 'MIST privacy', status: 'Integrated', detail: 'Deposits/withdrawals live via SDK.', color: 'mint' },
+  { title: 'Wallet kit', status: 'Live', detail: 'Unified Argent/Braavos modal + network guard rails.', color: 'mint' },
   { title: 'Risk engine (Cairo)', status: 'Building now', detail: 'Proofed allocation logic + SHARP wiring.', color: 'lagoon' },
   { title: 'zkML', status: 'Planned', detail: 'Model proving + SDK toolkit — Q1 2026.', color: 'ink' },
 ];
@@ -27,12 +27,13 @@ const STATUS_PULSES: Array<{ title: string; status: string; detail: string; colo
 const ROADMAP = [
   {
     phase: 'Phase 1',
-    title: 'MIST + Routing',
+    title: 'Router + Wallet',
     status: 'Complete',
     statusTone: 'success',
-    summary: 'Privacy integration and routing baseline.',
+    summary: 'Routing baseline and unified wallet UX.',
     items: [
-      'MIST.cash SDK live (deposit/withdraw)',
+      'Strategy router deployed on Sepolia',
+      'Unified wallet kit (Argent/Braavos modal)',
       'Strategy router deployed on Sepolia',
       'Frontend with wallet + demo mode',
       'Nostra, zkLend, Ekubo routing wired',
@@ -76,15 +77,15 @@ const EXAMPLES = [
   {
     badge: 'Example 1',
     accent: 'lagoon',
-    title: 'BTCFi yield with private allocation',
-    scenario: 'Alice allocates BTC without revealing identity or position size.',
+    title: 'BTCFi yield with verifiable allocation',
+    scenario: 'Alice allocates BTC with transparent, provable logic.',
     steps: [
-      'Deposit privately via MIST chamber; wallet unlinkable.',
+      'Deposit via Starknet wallet.',
       'Cairo engine computes allocation: 40% Nostra, 60% Ekubo.',
       'SHARP proves the allocation respected DAO constraints.',
-      'Private withdrawal preserves unlinkability.',
+      'Withdrawal follows the same constraints with an auditable proof trail.',
     ],
-    proof: 'Proof covers allocation logic; identity/size/timing stay private.',
+    proof: 'Proof covers allocation logic; users see the computation path, not just the APY.',
   },
   {
     badge: 'Example 2',
@@ -139,7 +140,7 @@ const USE_CASES = [
 
 const COMPARISON = [
   { feature: 'Verifiable AI', evm: 'Black box; oracle trust required', starknet: 'Cairo + SHARP proofs native' },
-  { feature: 'Privacy', evm: 'Custom privacy pools; heavy lift', starknet: 'MIST SDK — native + fast' },
+  { feature: 'Privacy', evm: 'Custom privacy pools; heavy lift', starknet: 'Pluggable privacy; optional per strategy' },
   { feature: 'Proof attestation', evm: 'Not feasible for AI logic', starknet: 'Shared prover (SHARP) on tap' },
   { feature: 'DAO auditability', evm: 'Trust + monitoring only', starknet: 'Proof-backed constraints' },
   { feature: 'zkML capability', evm: 'Retrofit at best; no native support', starknet: 'Cairo-first model proving' },
@@ -154,7 +155,7 @@ const TOOLKIT = [
   },
   {
     title: 'Frontend (React)',
-    items: ['useMistCash — private flows', 'useStrategyRouter — allocations', 'Demo mode for testing'],
+    items: ['Wallet kit — unified connect', 'useStrategyRouter — allocations', 'Demo mode for testing'],
     link: `${GITHUB_URL}/tree/main/frontend`,
   },
   {
@@ -225,7 +226,7 @@ export default function StrategicVisionPage() {
               </div>
               <h1 className="font-display text-4xl md:text-5xl leading-tight">The Verifiable AI SDK</h1>
               <p className="text-lg text-slate-700 max-w-3xl">
-                Starknet lets us prove AI logic, intent, and outcomes. MIST provides native privacy. Cairo + SHARP
+                Starknet lets us prove AI logic, intent, and outcomes. Cairo + SHARP
                 make the computation verifiable. This page is the operating plan.
               </p>
               <div className="flex flex-wrap gap-3">
@@ -255,8 +256,8 @@ export default function StrategicVisionPage() {
               <div className="grid gap-4 md:grid-cols-3 pt-2">
                 <div className="rounded-2xl border border-white/70 bg-cloud p-4">
                   <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Time to market</p>
-                  <p className="font-semibold text-ink mt-1">MIST integrated</p>
-                  <p className="text-sm text-slate-600">SDK hooks live. Deposits/withdrawals working now.</p>
+                  <p className="font-semibold text-ink mt-1">Wallet kit live</p>
+                  <p className="text-sm text-slate-600">Unified Argent/Braavos modal with guard rails.</p>
                 </div>
                 <div className="rounded-2xl border border-white/70 bg-cloud p-4">
                   <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Risk engine</p>
@@ -277,8 +278,8 @@ export default function StrategicVisionPage() {
               <p className="text-xs uppercase tracking-[0.16em] text-white/60">Strategic signal</p>
               <p className="font-display text-2xl mt-2">Prove AI. Keep it private.</p>
               <p className="text-sm text-white/75 mt-3">
-                EVM forced a trade-off between privacy and provability. Starknet removes it. We lean on MIST for
-                privacy and Cairo + SHARP for proofs. That stack is the product.
+                EVM forced a trade-off between privacy and provability. Starknet removes it. We lean on Cairo + SHARP
+                for proofs and keep privacy pluggable. That stack is the product.
               </p>
               <div className="mt-4 rounded-2xl bg-white/10 border border-white/10 p-4">
                 <p className="text-sm font-semibold">Next milestone</p>
@@ -327,12 +328,12 @@ export default function StrategicVisionPage() {
                 <div className="rounded-2xl bg-white/90 border border-white/70 p-5 shadow-sm">
                   <p className="text-sm text-slate-500">Move</p>
                   <p className="font-semibold text-ink mt-1">Starknet-native verifiability</p>
-                  <p className="text-sm text-slate-600 mt-2">Cairo + SHARP prove AI logic; MIST keeps it private.</p>
+                  <p className="text-sm text-slate-600 mt-2">Cairo + SHARP prove AI logic; privacy stays optional.</p>
                 </div>
                 <div className="rounded-2xl bg-white/90 border border-white/70 p-5 shadow-sm">
                   <p className="text-sm text-slate-500">Why now</p>
                   <p className="font-semibold text-ink mt-1">Infrastructure is ready</p>
-                  <p className="text-sm text-slate-600 mt-2">MIST SDK live; router deployed; proofs in flight.</p>
+                  <p className="text-sm text-slate-600 mt-2">Wallet kit live; router deployed; proofs in flight.</p>
                 </div>
               </div>
 
@@ -341,8 +342,8 @@ export default function StrategicVisionPage() {
                   Obsqra is the verifiable AI SDK for DeFi on Starknet.
                 </p>
                 <p className="text-slate-600">
-                  We stopped rebuilding privacy. MIST solves it natively. Now we wrap Cairo proofs around AI logic,
-                  validate via SHARP, and route capital with verifiable constraints. Proofs replace trust.
+                  We stopped rebuilding privacy from scratch and focused on provable computation. We wrap Cairo proofs around AI logic,
+                  validate via SHARP, and route capital with verifiable constraints. Proofs replace trust; privacy can be added modularly.
                 </p>
               </div>
             </section>
@@ -362,13 +363,13 @@ export default function StrategicVisionPage() {
                 <div className="rounded-2xl bg-white/90 border border-white/70 p-5 shadow-sm">
                   <p className="font-semibold text-ink">Starknet advantage</p>
                   <p className="text-sm text-slate-600 mt-2">
-                    Cairo computation is provable by default. SHARP attests. MIST provides native privacy. No rebuilds.
+                    Cairo computation is provable by default. SHARP attests. Privacy can be added without rebuilding core logic.
                   </p>
                 </div>
                 <div className="rounded-2xl bg-white/90 border border-white/70 p-5 shadow-sm">
                   <p className="font-semibold text-ink">Product focus</p>
                   <p className="text-sm text-slate-600 mt-2">
-                    A verifiable AI wrapper: privacy (MIST), proofs (Cairo/SHARP), routing (StrategyRouter).
+                    A verifiable AI wrapper: proofs (Cairo/SHARP) and routing (StrategyRouter), with optional privacy adapters.
                   </p>
                 </div>
               </div>
@@ -402,10 +403,9 @@ export default function StrategicVisionPage() {
                   </p>
                 </div>
                 <div className="rounded-2xl bg-white/90 border border-white/70 p-5 shadow-sm space-y-3">
-                  <p className="font-semibold text-ink">MIST privacy layer</p>
+                  <p className="font-semibold text-ink">Wallet + network guard rails</p>
                   <p className="text-sm text-slate-600">
-                    Native privacy on Starknet. SDK integrated; deposits/withdrawals are unlinkable. No custom privacy
-                    rebuild.
+                    Wallet kit unifies Argent/Braavos with a modal and preferred connector logic; add privacy adapters separately as needed.
                   </p>
                 </div>
                 <div className="rounded-2xl bg-white/90 border border-white/70 p-5 shadow-sm space-y-3">
@@ -419,13 +419,7 @@ export default function StrategicVisionPage() {
               <div className="rounded-2xl bg-slate-900 text-white p-6 font-mono text-sm overflow-x-auto shadow-lift">
                 <p className="text-slate-400 mb-3"># Starknet Obsqra Architecture</p>
                 <pre className="whitespace-pre leading-6">
-{`User Deposit (Private)
-    │
-    ▼
-┌─────────────────────────────┐
-│  MIST.cash Chamber          │
-│  └─ Unlinkable transaction  │
-└─────────────────────────────┘
+{`User Deposit
     │
     ▼
 ┌─────────────────────────────┐
@@ -452,7 +446,7 @@ export default function StrategicVisionPage() {
           ▼
    Verifiable Yields
           ▼
-   Private Withdrawal (MIST)`}
+   Withdrawal`}
                 </pre>
               </div>
 
@@ -464,7 +458,7 @@ export default function StrategicVisionPage() {
                 <ul className="text-sm text-slate-700 space-y-2">
                   <li>• Ontology keeps vocab stable: assets, pools, constraints, policy rules.</li>
                   <li>• Graph features are deterministic inputs—easy to audit, easy to prove.</li>
-                  <li>• Privacy holds: sensitive positions stay private via MIST; proofs cover logic.</li>
+                  <li>• Privacy optional: proofs cover logic; sensitive inputs can be shielded when required.</li>
                 </ul>
               </div>
             </section>
@@ -628,18 +622,17 @@ export default function StrategicVisionPage() {
                 ))}
               </div>
               <div className="rounded-2xl bg-slate-900 text-white p-6 font-mono text-sm overflow-x-auto shadow-lift">
-                <p className="text-slate-400 mb-2"># Example: MIST integration snippet</p>
+                <p className="text-slate-400 mb-2"># Example: Wallet kit snippet</p>
                 <pre className="whitespace-pre leading-6 text-green-200">
-{`import { useMistCash } from '@/hooks/useMistCash';
+{`import { useWalletKit } from 'obsqra.kit';
 
-function PrivateDeposit() {
-  const { mistService, isReady } = useMistCash();
-  const handleDeposit = async (amount: bigint) => {
-    if (!isReady) return;
-    const claimingKey = 'mist_' + Date.now();
-    const txHash = await mistService.deposit(amount, recipientAddress, claimingKey);
-    return { txHash, claimingKey };
-  };
+function ConnectButton() {
+  const { connect, disconnect, isConnected, preferredConnector } = useWalletKit();
+  return isConnected ? (
+    <button onClick={disconnect}>Disconnect</button>
+  ) : (
+    <button onClick={() => connect(preferredConnector)}>Connect</button>
+  );
 }`}
                 </pre>
               </div>
