@@ -33,7 +33,6 @@ export function Dashboard() {
   const proofGen = useProofGeneration();
   const riskEngineOrchestration = useRiskEngineOrchestration();
   const backendOrchestration = useRiskEngineBackendOrchestration();
-  const backendOrchestration = useRiskEngineBackendOrchestration();
   
   // Fetch user's STRK balance on mount and when address changes
   useEffect(() => {
@@ -300,19 +299,19 @@ export function Dashboard() {
 
     try {
       // Real protocol metrics for JediSwap and Ekubo on Sepolia testnet
-      const jediswapMetrics: ProtocolMetrics = {
+      const jediswapMetrics: BackendProtocolMetrics = {
         utilization: 6500,  // 65% in basis points
         volatility: 3500,   // 35% in basis points
         liquidity: 1,       // Medium liquidity
-        auditScore: 98,
-        ageDays: 800,
+        audit_score: 98,
+        age_days: 800,
       };
-      const ekuboMetrics: ProtocolMetrics = {
+      const ekuboMetrics: BackendProtocolMetrics = {
         utilization: 5800,
         volatility: 4800,
         liquidity: 2,  // Low liquidity
-        auditScore: 92,
-        ageDays: 400,
+        audit_score: 92,
+        age_days: 400,
       };
 
       console.log('🤖 AI Risk Engine: Starting full on-chain orchestration...');
