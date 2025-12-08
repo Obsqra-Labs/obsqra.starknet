@@ -30,6 +30,9 @@ export interface AllocationDecision {
   rationale_hash: string;
   strategy_router_tx: string;
   message: string;
+  proof_job_id?: string;
+  proof_hash?: string;
+  proof_status?: string;
 }
 
 interface UseRiskEngineBackendOrchestrationReturn {

@@ -44,7 +44,7 @@ export function useWallet(): UseWalletReturn {
 
   return {
     address,
-    isConnected,
+    isConnected: !!isConnected,
     isConnecting,
     connectors,
     preferredConnector,

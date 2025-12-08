@@ -2,7 +2,7 @@
 
 import { Chain, sepolia } from '@starknet-react/chains';
 import { ReactNode, useMemo } from 'react';
-import { StarknetConfig, publicProvider, argent, braavos, connect, disconnect } from '@starknet-react/core';
+import { StarknetConfig, publicProvider, argent, braavos } from '@starknet-react/core';
 
 export function StarknetProvider({ children }: { children: ReactNode }) {
   // Prefer production proxy when served over https to avoid CORS; otherwise use env or fallback RPC.

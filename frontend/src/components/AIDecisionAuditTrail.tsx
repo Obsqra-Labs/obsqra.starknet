@@ -68,7 +68,7 @@ export function AIDecisionAuditTrail() {
       for (let i = count; i > count - decisionsToFetch; i--) {
         try {
           const result = await contract.call('get_decision', [i]);
-          const decision = result[0];
+          const decision = (result as any)[0];
           
           fetchedDecisions.push({
             decision_id: Number(decision.decision_id),
