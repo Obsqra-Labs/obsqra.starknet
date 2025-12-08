@@ -5,9 +5,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import desc
 from datetime import datetime, timedelta
+from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import User, RiskHistory, AllocationHistory
+from app.db.session import get_db as get_sync_db
+from app.models import User, RiskHistory, AllocationHistory, ProofJob
 from app.api.routes.auth import get_current_user
 
 router = APIRouter()
@@ -116,4 +118,41 @@ async def get_dashboard_stats(
         ],
         "period_days": days,
     }
+
+
+@router.get("/rebalance-history")
+async def get_rebalance_history(
+    limit: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_sync_db)
+):
+    """
+    Get recent rebalance history with proof verification status.
+    
+    Returns list of rebalances with:
+    - Allocation percentages
+    - Proof hash and status
+    - Transaction hash
+    - Timestamp
+    """
+    # Query proof jobs ordered by creation time (most recent first)
+    proof_jobs = db.query(ProofJob).order_by(
+        desc(ProofJob.created_at)
+    ).limit(limit).all()
+    
+    return [
+        {
+            "id": str(job.id),
+            "timestamp": job.created_at.isoformat() if job.created_at else None,
+            "jediswap_pct": job.metrics.get("jediswap", {}).get("utilization", 0) / 100 if job.metrics else 50,
+            "ekubo_pct": job.metrics.get("ekubo", {}).get("utilization", 0) / 100 if job.metrics else 50,
+            "jediswap_risk": job.metrics.get("jediswap_risk", 0) if job.metrics else 0,
+            "ekubo_risk": job.metrics.get("ekubo_risk", 0) if job.metrics else 0,
+            "proof_hash": job.proof_hash,
+            "proof_status": job.status.value if hasattr(job.status, 'value') else str(job.status),
+            "tx_hash": job.tx_hash,
+            "fact_hash": job.fact_hash,
+            "submitted_at": job.submitted_at.isoformat() if job.submitted_at else None,
+        }
+        for job in proof_jobs
+    ]
 

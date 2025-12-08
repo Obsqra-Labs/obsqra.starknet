@@ -14,6 +14,7 @@ import { useTransactionHistory } from '@/hooks/useTransactionHistory';
 import { ProofDisplay } from './ProofDisplay';
 import { TransactionHistory } from './TransactionHistory';
 import { AnalyticsDashboard } from './AnalyticsDashboard';
+import { RebalanceHistory } from './RebalanceHistory';
 import { categorizeError } from '@/services/errorHandler';
 import { useState, useMemo, useEffect } from 'react';
 import { getConfig } from '@/lib/config';
@@ -737,6 +738,11 @@ export function Dashboard() {
                 <p className="text-sm text-green-400">✅ Risk calculation confirmed on-chain</p>
               </div>
             )}
+          </div>
+
+          {/* Rebalance History with Proofs */}
+          <div className="bg-gradient-to-br from-slate-900/70 via-purple-900/20 to-slate-900/70 border border-purple-400/30 rounded-xl p-6 shadow-lg">
+            <RebalanceHistory />
           </div>
 
           {/* Error */}
