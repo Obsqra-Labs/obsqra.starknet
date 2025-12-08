@@ -211,3 +211,63 @@ async def download_proof(
         }
     )
 
+
+@router.get("/proof-performance")
+async def get_proof_performance(
+    limit: int = Query(100, ge=1, le=1000),
+    db: Session = Depends(get_sync_db)
+):
+    """
+    Get proof generation performance metrics
+    
+    Returns statistics about proof generation times, sizes, and success rates.
+    """
+    from sqlalchemy import func
+    
+    # Get recent proof jobs
+    proof_jobs = db.query(ProofJob).order_by(
+        desc(ProofJob.created_at)
+    ).limit(limit).all()
+    
+    if not proof_jobs:
+        return {
+            "total": 0,
+            "average_generation_time": 0,
+            "average_proof_size": 0,
+            "verified_count": 0,
+            "verified_percentage": 0
+        }
+    
+    # Calculate metrics
+    generation_times = []
+    proof_sizes = []
+    verified_count = 0
+    
+    for job in proof_jobs:
+        if job.metrics:
+            gen_time = job.metrics.get("proof_generation_time_seconds")
+            if gen_time:
+                generation_times.append(gen_time)
+            
+            proof_size = job.metrics.get("proof_data_size_bytes")
+            if proof_size:
+                proof_sizes.append(proof_size)
+        
+        if job.status.value == "verified" if hasattr(job.status, 'value') else str(job.status) == "verified":
+            verified_count += 1
+    
+    avg_gen_time = sum(generation_times) / len(generation_times) if generation_times else 0
+    avg_proof_size = sum(proof_sizes) / len(proof_sizes) if proof_sizes else 0
+    verified_percentage = (verified_count / len(proof_jobs)) * 100 if proof_jobs else 0
+    
+    return {
+        "total": len(proof_jobs),
+        "average_generation_time_seconds": round(avg_gen_time, 2),
+        "average_proof_size_bytes": int(avg_proof_size),
+        "average_proof_size_kb": round(avg_proof_size / 1024, 2),
+        "verified_count": verified_count,
+        "verified_percentage": round(verified_percentage, 1),
+        "min_generation_time": round(min(generation_times), 2) if generation_times else 0,
+        "max_generation_time": round(max(generation_times), 2) if generation_times else 0,
+    }
+
