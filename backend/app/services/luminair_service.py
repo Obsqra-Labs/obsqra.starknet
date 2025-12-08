@@ -87,16 +87,31 @@ class LuminAIRService:
             )
             
             # Parse output (JSON is at the end after log messages)
-            output_lines = result.stdout.decode().strip().split('\n')
-            # Find JSON output (last line or line containing '{')
-            json_output = None
-            for line in reversed(output_lines):
-                if line.strip().startswith('{'):
-                    json_output = line.strip()
-                    break
+            output_text = result.stdout.decode()
             
-            if not json_output:
-                raise ValueError("No JSON output found in binary response")
+            # Extract JSON - it's the last complete JSON object in the output
+            # Look for the JSON object that contains "jediswap_risk"
+            import re
+            # Match JSON object that spans multiple lines
+            json_match = re.search(r'\{[^{}]*"jediswap_risk"[^{}]*"settings_path"[^{}]*\}', output_text, re.DOTALL)
+            if json_match:
+                json_output = json_match.group(0)
+            else:
+                # Fallback: try to find any JSON object
+                json_match = re.search(r'\{.*"jediswap_risk".*\}', output_text, re.DOTALL)
+                if json_match:
+                    json_output = json_match.group(0)
+                else:
+                    # Last resort: try to parse the last few lines
+                    output_lines = output_text.strip().split('\n')
+                    for line in reversed(output_lines[-5:]):  # Check last 5 lines
+                        stripped = line.strip()
+                        if stripped.startswith('{') and '"jediswap_risk"' in stripped:
+                            json_output = stripped
+                            break
+                    
+                    if not json_output:
+                        raise ValueError(f"No JSON output found in binary response. Last 500 chars: {output_text[-500:]}")
             
             output_data = json.loads(json_output)
             
