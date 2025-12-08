@@ -13,7 +13,7 @@ interface ProofBadgeProps {
   verifiedAt?: string | null;
 }
 
-export function ProofBadge({ hash, status, txHash, factHash, submittedAt, verifiedAt }: ProofBadgeProps) {
+export function ProofBadge({ hash, status, txHash, factHash, submittedAt, verifiedAt, proofJobId }: ProofBadgeProps) {
   const [showDetails, setShowDetails] = useState(false);
 
   const statusConfig = {
@@ -120,6 +120,19 @@ export function ProofBadge({ hash, status, txHash, factHash, submittedAt, verifi
               <div>
                 <p className="text-xs text-gray-400 mb-1">On-Chain:</p>
                 <p className="text-xs text-white">{new Date(submittedAt).toLocaleString()}</p>
+              </div>
+            )}
+
+            {proofJobId && (
+              <div className="mt-2">
+                <a
+                  href={`/api/v1/analytics/proof/${proofJobId}/download`}
+                  download
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded text-xs text-blue-300 transition-colors"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  📥 Download Proof
+                </a>
               </div>
             )}
 

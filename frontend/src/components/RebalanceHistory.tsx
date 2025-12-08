@@ -17,6 +17,7 @@ interface RebalanceRecord {
   fact_hash: string | null;
   submitted_at: string | null;
   verified_at: string | null;
+  proof_job_id?: string;
 }
 
 export function RebalanceHistory() {
@@ -171,6 +172,8 @@ export function RebalanceHistory() {
                     txHash={record.tx_hash}
                     factHash={record.fact_hash}
                     submittedAt={record.submitted_at}
+                    verifiedAt={record.verified_at}
+                    proofJobId={record.proof_job_id || record.id}
                   />
                 </td>
 
@@ -218,6 +221,8 @@ export function RebalanceHistory() {
                 txHash={record.tx_hash}
                 factHash={record.fact_hash}
                 submittedAt={record.submitted_at}
+                verifiedAt={record.verified_at}
+                proofJobId={record.proof_job_id || record.id}
               />
             </div>
 

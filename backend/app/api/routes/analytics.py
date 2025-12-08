@@ -174,3 +174,41 @@ async def get_rebalance_history(
         for job in proof_jobs
     ]
 
+
+@router.get("/proof/{proof_job_id}/download")
+async def download_proof(
+    proof_job_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Download proof binary data for a specific proof job
+    
+    Returns the STARK proof binary file for verification or archival purposes.
+    """
+    from fastapi.responses import Response
+    from app.models import ProofJob
+    import uuid
+    
+    try:
+        job_uuid = uuid.UUID(proof_job_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid proof job ID format")
+    
+    job = db.query(ProofJob).filter(ProofJob.id == job_uuid).first()
+    
+    if not job:
+        raise HTTPException(status_code=404, detail="Proof job not found")
+    
+    if not job.proof_data:
+        raise HTTPException(status_code=404, detail="Proof data not available for this job")
+    
+    return Response(
+        content=job.proof_data,
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f'attachment; filename="proof_{job.proof_hash[:16]}.bin"',
+            "X-Proof-Hash": job.proof_hash,
+            "X-Proof-Status": job.status.value if hasattr(job.status, 'value') else str(job.status),
+        }
+    )
+
