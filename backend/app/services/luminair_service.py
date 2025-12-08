@@ -25,6 +25,7 @@ class ProofResult:
     output_components_ekubo: Dict[str, int]
     proof_data: bytes  # Binary proof (mock for now)
     status: str
+    verified: bool = False  # Local verification status
 
 
 class LuminAIRService:
@@ -120,8 +121,15 @@ class LuminAIRService:
             with open(proof_data_path, "rb") as f:
                 proof_data = f.read()
             
+            # Get verification status
+            is_verified = output_data.get("verified", False)
+            
             logger.info(f"Proof generated: {output_data['proof_hash'][:16]}...")
             logger.info(f"Jediswap risk: {output_data['jediswap_risk']}, Ekubo risk: {output_data['ekubo_risk']}")
+            if is_verified:
+                logger.info("✅ Proof verified locally!")
+            else:
+                logger.warning("⚠️ Proof verification failed or not performed")
             
             # Calculate components for compatibility (we can enhance this later)
             jediswap_components = self._calculate_risk_components(jediswap_metrics)
@@ -134,7 +142,8 @@ class LuminAIRService:
                 output_components_jediswap=jediswap_components,
                 output_components_ekubo=ekubo_components,
                 proof_data=proof_data,
-                status="generated"
+                status="verified" if is_verified else "generated",
+                verified=is_verified
             )
             
         except subprocess.TimeoutExpired:

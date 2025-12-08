@@ -230,9 +230,11 @@ async def orchestrate_allocation(
         logger.info(f"   Ekubo risk: {proof.output_score_ekubo}")
         
         # STEP 2: Store proof in database
+        # Set status based on verification result
+        proof_status = ProofStatus.VERIFIED if proof.verified else ProofStatus.GENERATED
         proof_job = ProofJob(
             proof_hash=proof.proof_hash,
-            status=ProofStatus.GENERATED,
+            status=proof_status,
             metrics={
                 "jediswap": request.jediswap_metrics.dict(),
                 "ekubo": request.ekubo_metrics.dict(),
@@ -350,9 +352,13 @@ async def orchestrate_allocation(
         logger.info(f"✅ Transaction accepted on-chain!")
         
         # Update proof status to executed (on-chain transaction succeeded)
-        # Note: SHARP verification happens separately and doesn't affect this status
-        proof_job.status = ProofStatus.SUBMITTED  # "SUBMITTED" = on-chain execution succeeded
+        # Keep VERIFIED status if proof was verified locally, otherwise set to SUBMITTED
+        if proof_job.status != ProofStatus.VERIFIED:
+            proof_job.status = ProofStatus.SUBMITTED  # "SUBMITTED" = on-chain execution succeeded
         proof_job.submitted_at = datetime.utcnow()
+        # Set verified_at if proof was verified locally
+        if proof.verified and not proof_job.verified_at:
+            proof_job.verified_at = datetime.utcnow()
         db.commit()
         db.refresh(proof_job)
         

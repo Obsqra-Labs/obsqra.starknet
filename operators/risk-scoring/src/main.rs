@@ -28,6 +28,7 @@ struct RiskScoringOutput {
     proof_hash: String,
     proof_data_path: String,
     settings_path: String,
+    verified: bool,
 }
 
 /// Calculate risk score using LuminAIR ZK circuit
@@ -168,12 +169,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let proof = prove(trace, settings.clone())?;
     println!("   ✅ Proof generated successfully!");
 
-    // Save proof and settings to files
+    // Save proof and settings to files first
     let proof_path = "/tmp/risk_proof.bin";
     let settings_path = "/tmp/risk_settings.bin";
     
     proof.to_bincode_file(proof_path)?;
     settings.to_bincode_file(settings_path)?;
+
+    // Verify proof immediately (verify consumes proof, so do it after saving)
+    println!("   Verifying proof...");
+    // Reload proof and settings for verification
+    let proof_for_verify = LuminairProof::from_bincode_file(proof_path)?;
+    let settings_for_verify = CircuitSettings::from_bincode_file(settings_path)?;
+    let verification_result = verify(proof_for_verify, settings_for_verify);
+    let is_verified = verification_result.is_ok();
+    
+    if is_verified {
+        println!("   ✅ Proof verified successfully!");
+    } else {
+        eprintln!("   ❌ Proof verification failed: {:?}", verification_result.err());
+        // Don't fail - return verification status
+    }
 
     // Calculate proof hash (SHA256 of proof data)
     use std::collections::hash_map::DefaultHasher;
@@ -194,6 +210,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         proof_hash,
         proof_data_path: proof_path.to_string(),
         settings_path: settings_path.to_string(),
+        verified: is_verified,
     };
 
     println!("\n📊 Risk Scores:");
