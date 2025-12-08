@@ -415,7 +415,7 @@ async def orchestrate_allocation(
                     ekubo_apy=int(decision_data['ekubo_apy']),
                     rationale_hash=str(decision_data['rationale_hash']),
                     strategy_router_tx=str(decision_data['strategy_router_tx']),  # Decision ID (legacy)
-                    tx_hash=tx_hash,  # Actual on-chain transaction hash
+                    tx_hash=tx_hash if tx_hash else None,  # Actual on-chain transaction hash
                     message=f"✅ AI executed decision #{decision_count} on-chain (tx: {tx_hash})",
                     # Proof information
                     proof_job_id=str(proof_job.id),

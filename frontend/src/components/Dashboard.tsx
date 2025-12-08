@@ -337,7 +337,9 @@ export function Dashboard() {
 
       // Add to transaction history with full audit trail
       // Use actual tx_hash if available, otherwise fallback to strategy_router_tx (decision ID)
-      const actualTxHash = decision.tx_hash || decision.strategy_router_tx || 'ai-orchestration-' + Date.now();
+      // IMPORTANT: tx_hash is the real on-chain transaction hash, strategy_router_tx is just the decision ID
+      // If tx_hash is not available, we'll fetch it from the rebalance history API later
+      const actualTxHash = decision.tx_hash || `pending-${decision.decision_id}`;
       const txId = txHistory.addTransaction(
         actualTxHash,
         'AI_ORCHESTRATION',
@@ -358,6 +360,24 @@ export function Dashboard() {
 
       // Confirm transaction
       txHistory.confirmTransaction(txId);
+      
+      // If tx_hash wasn't provided, try to fetch it from rebalance history after a delay
+      if (!decision.tx_hash && decision.proof_job_id) {
+        setTimeout(async () => {
+          try {
+            const historyResponse = await fetch('/api/v1/analytics/rebalance-history?limit=20');
+            if (historyResponse.ok) {
+              const history = await historyResponse.json();
+              const matchingRecord = history.find((r: any) => r.id === decision.proof_job_id);
+              if (matchingRecord?.tx_hash && matchingRecord.tx_hash.startsWith('0x')) {
+                txHistory.updateTransaction(txId, { hash: matchingRecord.tx_hash });
+              }
+            }
+          } catch (err) {
+            console.warn('Failed to fetch real tx_hash from history:', err);
+          }
+        }, 3000); // Wait 3 seconds for backend to store tx_hash
+      }
       
       // Show success message with proof
       const proofStatus = decision.proof_status || 'generated';
