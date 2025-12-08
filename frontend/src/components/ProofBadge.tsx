@@ -157,9 +157,9 @@ export function ProofBadge({ hash, status, txHash, factHash, submittedAt, verifi
               <p className="text-xs text-gray-400">
                 {status === 'verified' && (
                   <>
-                    ✅ <span className="text-green-400 font-semibold">Locally verified</span> (<1 second)
+                    ✅ <span className="text-green-400 font-semibold">Locally verified</span> (&lt;1 second)
                     <br />
-                    <span className="text-gray-500 text-[10px] mt-1 block">Cryptographic proof of computation integrity</span>
+                    <span className="text-gray-500 text-xs mt-1 block">Cryptographic proof of computation integrity</span>
                   </>
                 )}
                 {status === 'verifying' && '⏳ SHARP verification in progress (10-60 min)'}
@@ -167,7 +167,7 @@ export function ProofBadge({ hash, status, txHash, factHash, submittedAt, verifi
                   <>
                     📡 On-chain execution succeeded
                     <br />
-                    <span className="text-gray-500 text-[10px] mt-1 block">Proof verified locally before execution</span>
+                    <span className="text-gray-500 text-xs mt-1 block">Proof verified locally before execution</span>
                   </>
                 )}
                 {status === 'generated' && '🔐 Cryptographic proof generated (verification pending)'}
