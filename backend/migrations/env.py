@@ -8,7 +8,7 @@ from alembic import context
 
 # Import all models to ensure they are registered with SQLAlchemy
 from app.db.base_class import Base
-from app.models.proof_job import ProofJob
+from app.models import ProofJob
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

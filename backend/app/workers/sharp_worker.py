@@ -11,7 +11,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
-from app.models.proof_job import ProofJob, ProofStatus
+from app.models import ProofJob, ProofStatus
 from app.services.sharp_service import get_sharp_service
 
 logger = logging.getLogger(__name__)

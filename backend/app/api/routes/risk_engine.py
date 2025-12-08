@@ -13,7 +13,7 @@ from starknet_py.net.signer.stark_curve_signer import KeyPair
 from starknet_py.net.models import StarknetChainId
 from app.config import get_settings
 from app.db.session import get_db
-from app.models.proof_job import ProofJob, ProofStatus
+from app.models import ProofJob, ProofStatus
 from app.services.luminair_service import get_luminair_service
 from app.workers.sharp_worker import submit_proof_to_sharp
 
