@@ -1,0 +1,29 @@
+{
+  "name": "balanced",
+  "proof_hash": "0x7a7ax7x114",
+  "job_id": "job_-4460259036589557842",
+  "input": {
+    "utilization": 5000,
+    "volatility": 5000,
+    "liquidity": 2,
+    "audit_score": 75,
+    "age_days": 500
+  },
+  "output": {
+    "total_score": 47,
+    "util_component": 17,
+    "vol_component": 15,
+    "liq_component": 5,
+    "audit_component": 5,
+    "age_penalty": 5
+  },
+  "expected": {
+    "total_score": 47,
+    "util_component": 17,
+    "vol_component": 15,
+    "liq_component": 5,
+    "audit_component": 5,
+    "age_penalty": 5
+  },
+  "status": "complete"
+}

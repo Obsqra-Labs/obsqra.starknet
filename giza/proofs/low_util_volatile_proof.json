@@ -1,0 +1,29 @@
+{
+  "name": "low_util_volatile",
+  "proof_hash": "0xx37dx212d7",
+  "job_id": "job_4685231610152507287",
+  "input": {
+    "utilization": 2000,
+    "volatility": 8000,
+    "liquidity": 1,
+    "audit_score": 80,
+    "age_days": 600
+  },
+  "output": {
+    "total_score": 49,
+    "util_component": 7,
+    "vol_component": 24,
+    "liq_component": 10,
+    "audit_component": 4,
+    "age_penalty": 4
+  },
+  "expected": {
+    "total_score": 49,
+    "util_component": 7,
+    "vol_component": 24,
+    "liq_component": 10,
+    "audit_component": 4,
+    "age_penalty": 4
+  },
+  "status": "complete"
+}

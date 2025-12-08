@@ -1,0 +1,29 @@
+{
+  "name": "dangerous_protocol",
+  "proof_hash": "0xx4x4x3x3x3",
+  "job_id": "job_-5363267073290617426",
+  "input": {
+    "utilization": 10000,
+    "volatility": 10000,
+    "liquidity": 0,
+    "audit_score": 0,
+    "age_days": 0
+  },
+  "output": {
+    "total_score": 95,
+    "util_component": 35,
+    "vol_component": 30,
+    "liq_component": 15,
+    "audit_component": 20,
+    "age_penalty": 10
+  },
+  "expected": {
+    "total_score": 95,
+    "util_component": 35,
+    "vol_component": 30,
+    "liq_component": 15,
+    "audit_component": 20,
+    "age_penalty": 10
+  },
+  "status": "complete"
+}

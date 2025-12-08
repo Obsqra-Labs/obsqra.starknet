@@ -1,0 +1,29 @@
+{
+  "name": "growing",
+  "proof_hash": "0x9964x7x5f6",
+  "job_id": "job_-5670968480463564705",
+  "input": {
+    "utilization": 7500,
+    "volatility": 4500,
+    "liquidity": 2,
+    "audit_score": 88,
+    "age_days": 250
+  },
+  "output": {
+    "total_score": 54,
+    "util_component": 26,
+    "vol_component": 13,
+    "liq_component": 5,
+    "audit_component": 2,
+    "age_penalty": 8
+  },
+  "expected": {
+    "total_score": 54,
+    "util_component": 26,
+    "vol_component": 13,
+    "liq_component": 5,
+    "audit_component": 2,
+    "age_penalty": 8
+  },
+  "status": "complete"
+}

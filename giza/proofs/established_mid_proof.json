@@ -1,0 +1,29 @@
+{
+  "name": "established_mid",
+  "proof_hash": "0x50x7x744xa",
+  "job_id": "job_-6771548864621405885",
+  "input": {
+    "utilization": 7000,
+    "volatility": 3500,
+    "liquidity": 2,
+    "audit_score": 85,
+    "age_days": 800
+  },
+  "output": {
+    "total_score": 44,
+    "util_component": 24,
+    "vol_component": 10,
+    "liq_component": 5,
+    "audit_component": 3,
+    "age_penalty": 2
+  },
+  "expected": {
+    "total_score": 44,
+    "util_component": 24,
+    "vol_component": 10,
+    "liq_component": 5,
+    "audit_component": 3,
+    "age_penalty": 2
+  },
+  "status": "complete"
+}

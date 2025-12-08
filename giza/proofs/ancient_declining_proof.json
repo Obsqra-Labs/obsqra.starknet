@@ -1,0 +1,29 @@
+{
+  "name": "ancient_declining",
+  "proof_hash": "0xx3x1x21c69",
+  "job_id": "job_-8796642297404457845",
+  "input": {
+    "utilization": 2000,
+    "volatility": 4000,
+    "liquidity": 1,
+    "audit_score": 70,
+    "age_days": 3000
+  },
+  "output": {
+    "total_score": 35,
+    "util_component": 7,
+    "vol_component": 12,
+    "liq_component": 10,
+    "audit_component": 6,
+    "age_penalty": 0
+  },
+  "expected": {
+    "total_score": 35,
+    "util_component": 7,
+    "vol_component": 12,
+    "liq_component": 10,
+    "audit_component": 6,
+    "age_penalty": 0
+  },
+  "status": "complete"
+}

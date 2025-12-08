@@ -1,0 +1,29 @@
+{
+  "name": "fresh_launch",
+  "proof_hash": "0x6950x331xa",
+  "job_id": "job_-2131012967178808916",
+  "input": {
+    "utilization": 3000,
+    "volatility": 7000,
+    "liquidity": 0,
+    "audit_score": 60,
+    "age_days": 10
+  },
+  "output": {
+    "total_score": 64,
+    "util_component": 10,
+    "vol_component": 21,
+    "liq_component": 15,
+    "audit_component": 8,
+    "age_penalty": 10
+  },
+  "expected": {
+    "total_score": 64,
+    "util_component": 10,
+    "vol_component": 21,
+    "liq_component": 15,
+    "audit_component": 8,
+    "age_penalty": 10
+  },
+  "status": "complete"
+}

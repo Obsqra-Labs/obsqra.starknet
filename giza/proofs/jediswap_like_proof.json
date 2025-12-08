@@ -1,0 +1,29 @@
+{
+  "name": "jediswap_like",
+  "proof_hash": "0x6ex7x2x1xa",
+  "job_id": "job_-7270289900212283731",
+  "input": {
+    "utilization": 6500,
+    "volatility": 3500,
+    "liquidity": 1,
+    "audit_score": 98,
+    "age_days": 800
+  },
+  "output": {
+    "total_score": 44,
+    "util_component": 22,
+    "vol_component": 10,
+    "liq_component": 10,
+    "audit_component": 0,
+    "age_penalty": 2
+  },
+  "expected": {
+    "total_score": 44,
+    "util_component": 22,
+    "vol_component": 10,
+    "liq_component": 10,
+    "audit_component": 0,
+    "age_penalty": 2
+  },
+  "status": "complete"
+}

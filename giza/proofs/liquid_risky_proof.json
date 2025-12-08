@@ -1,0 +1,29 @@
+{
+  "name": "liquid_risky",
+  "proof_hash": "0xx1x165x1x1",
+  "job_id": "job_6321359002151290225",
+  "input": {
+    "utilization": 9000,
+    "volatility": 6000,
+    "liquidity": 3,
+    "audit_score": 75,
+    "age_days": 400
+  },
+  "output": {
+    "total_score": 60,
+    "util_component": 31,
+    "vol_component": 18,
+    "liq_component": 0,
+    "audit_component": 5,
+    "age_penalty": 6
+  },
+  "expected": {
+    "total_score": 60,
+    "util_component": 31,
+    "vol_component": 18,
+    "liq_component": 0,
+    "audit_component": 5,
+    "age_penalty": 6
+  },
+  "status": "complete"
+}

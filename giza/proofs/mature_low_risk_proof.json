@@ -1,0 +1,29 @@
+{
+  "name": "mature_low_risk",
+  "proof_hash": "0xx1cc6526x3",
+  "job_id": "job_3500831107727932476",
+  "input": {
+    "utilization": 4000,
+    "volatility": 1500,
+    "liquidity": 3,
+    "audit_score": 95,
+    "age_days": 2000
+  },
+  "output": {
+    "total_score": 19,
+    "util_component": 14,
+    "vol_component": 4,
+    "liq_component": 0,
+    "audit_component": 1,
+    "age_penalty": 0
+  },
+  "expected": {
+    "total_score": 19,
+    "util_component": 14,
+    "vol_component": 4,
+    "liq_component": 0,
+    "audit_component": 1,
+    "age_penalty": 0
+  },
+  "status": "complete"
+}

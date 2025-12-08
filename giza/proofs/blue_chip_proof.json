@@ -1,0 +1,29 @@
+{
+  "name": "blue_chip",
+  "proof_hash": "0x6ex365x1cc",
+  "job_id": "job_8577357703615966793",
+  "input": {
+    "utilization": 6500,
+    "volatility": 2000,
+    "liquidity": 3,
+    "audit_score": 98,
+    "age_days": 1500
+  },
+  "output": {
+    "total_score": 28,
+    "util_component": 22,
+    "vol_component": 6,
+    "liq_component": 0,
+    "audit_component": 0,
+    "age_penalty": 0
+  },
+  "expected": {
+    "total_score": 28,
+    "util_component": 22,
+    "vol_component": 6,
+    "liq_component": 0,
+    "audit_component": 0,
+    "age_penalty": 0
+  },
+  "status": "complete"
+}

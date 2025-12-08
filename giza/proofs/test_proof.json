@@ -1,0 +1,20 @@
+{
+  "proof_hash": "0x24x4x610x1",
+  "job_id": "job_5589146955498442938",
+  "input": {
+    "utilization": 6500,
+    "volatility": 3500,
+    "liquidity": 1,
+    "audit_score": 98,
+    "age_days": 800
+  },
+  "output": {
+    "total_score": 44,
+    "util_component": 22,
+    "vol_component": 10,
+    "liq_component": 10,
+    "audit_component": 0,
+    "age_penalty": 2
+  },
+  "status": "complete"
+}

@@ -1,0 +1,29 @@
+{
+  "name": "perfect_protocol",
+  "proof_hash": "0xx6x665x67a",
+  "job_id": "job_-8277575896582302550",
+  "input": {
+    "utilization": 100,
+    "volatility": 100,
+    "liquidity": 3,
+    "audit_score": 100,
+    "age_days": 5000
+  },
+  "output": {
+    "total_score": 5,
+    "util_component": 0,
+    "vol_component": 0,
+    "liq_component": 0,
+    "audit_component": 0,
+    "age_penalty": 0
+  },
+  "expected": {
+    "total_score": 5,
+    "util_component": 0,
+    "vol_component": 0,
+    "liq_component": 0,
+    "audit_component": 0,
+    "age_penalty": 0
+  },
+  "status": "complete"
+}

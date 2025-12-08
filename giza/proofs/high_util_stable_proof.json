@@ -1,0 +1,29 @@
+{
+  "name": "high_util_stable",
+  "proof_hash": "0xx1x36526x3",
+  "job_id": "job_-6875951418934988885",
+  "input": {
+    "utilization": 9500,
+    "volatility": 1000,
+    "liquidity": 3,
+    "audit_score": 95,
+    "age_days": 1000
+  },
+  "output": {
+    "total_score": 37,
+    "util_component": 33,
+    "vol_component": 3,
+    "liq_component": 0,
+    "audit_component": 1,
+    "age_penalty": 0
+  },
+  "expected": {
+    "total_score": 37,
+    "util_component": 33,
+    "vol_component": 3,
+    "liq_component": 0,
+    "audit_component": 1,
+    "age_penalty": 0
+  },
+  "status": "complete"
+}
