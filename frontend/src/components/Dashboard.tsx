@@ -8,7 +8,6 @@ import { useRiskEngineOrchestration, ProtocolMetrics } from '@/hooks/useRiskEngi
 import { useRiskEngineBackendOrchestration, type ProtocolMetrics as BackendProtocolMetrics } from '@/hooks/useRiskEngineBackendOrchestration';
 import { useTransactionMonitor, TransactionStatusBadge } from '@/hooks/useTransactionMonitor';
 import { useProofGeneration } from '@/hooks/useProofGeneration';
-import { useDemoMode } from '@/contexts/DemoModeContext';
 import { useStrategyDeposit } from '@/hooks/useStrategyDeposit';
 import { useTransactionHistory } from '@/hooks/useTransactionHistory';
 // import { usePoolSelection } from '@/hooks/usePoolSelection';
@@ -22,9 +21,23 @@ import { getConfig } from '@/lib/config';
 type TabType = 'overview' | 'analytics' | 'history';
 
 export function Dashboard() {
+  // ⚠️ CRITICAL: All useState MUST be called FIRST, in same order every render
+  // This prevents "Cannot update a component during render" errors
+  const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const [allocationForm, setAllocationForm] = useState({ jediswap: 50, ekubo: 50 });
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [settlementError, setSettlementError] = useState<string | null>(null);
+  const [isCalculatingRisk, setIsCalculatingRisk] = useState(false);
+  const [riskError, setRiskError] = useState<string | null>(null);
+  const [lastTxHash, setLastTxHash] = useState<string | null>(null);
+  const [generatingProofType, setGeneratingProofType] = useState<'risk' | 'allocation' | null>(null);
+  const [depositAmount, setDepositAmount] = useState('');
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [isDepositing, setIsDepositing] = useState(false);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
+  
+  // Now safe to call other hooks
   const { account, address } = useAccount();
-  const { isDemoMode, mockData } = useDemoMode();
-  // const { selectedPool, setSelectedPool, pool, allPools } = usePoolSelection();
   const routerV2 = useStrategyRouterV2();
   const strategyDeposit = useStrategyDeposit(getConfig().strategyRouterAddress);
   const txHistory = useTransactionHistory();
@@ -33,6 +46,7 @@ export function Dashboard() {
   const proofGen = useProofGeneration();
   const riskEngineOrchestration = useRiskEngineOrchestration();
   const backendOrchestration = useRiskEngineBackendOrchestration();
+  const { status: txStatus } = useTransactionMonitor(lastTxHash || undefined);
   
   // Fetch user's STRK balance on mount and when address changes
   useEffect(() => {
@@ -40,26 +54,6 @@ export function Dashboard() {
       strategyDeposit.fetchBalance();
     }
   }, [address, strategyDeposit.isReady]); // Removed fetchBalance from deps to prevent infinite loop
-  
-  const [activeTab, setActiveTab] = useState<TabType>('overview');
-  const [allocationForm, setAllocationForm] = useState({ jediswap: 50, ekubo: 50 });
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [settlementError, setSettlementError] = useState<string | null>(null);
-  
-  // Risk calculation state
-  const [isCalculatingRisk, setIsCalculatingRisk] = useState(false);
-  const [riskError, setRiskError] = useState<string | null>(null);
-  const [lastTxHash, setLastTxHash] = useState<string | null>(null);
-  const { status: txStatus } = useTransactionMonitor(lastTxHash || undefined);
-  
-  // Proof generation state
-  const [generatingProofType, setGeneratingProofType] = useState<'risk' | 'allocation' | null>(null);
-  
-  // Deposit/Withdraw state
-  const [depositAmount, setDepositAmount] = useState('');
-  const [withdrawAmount, setWithdrawAmount] = useState('');
-  const [isDepositing, setIsDepositing] = useState(false);
-  const [isWithdrawing, setIsWithdrawing] = useState(false);
 
   // Calculate allocation from live contract data
   const allocation = useMemo(() => {
@@ -358,15 +352,20 @@ export function Dashboard() {
       // Confirm transaction
       txHistory.confirmTransaction(txId);
       
-      // Show success message
+      // Show success message with proof
+      const proofInfo = decision.proof_hash 
+        ? `\n\n🔐 STARK Proof:\n${decision.proof_hash.slice(0, 20)}...\nStatus: ${decision.proof_status || 'Generated'}\n`
+        : '';
+      
       alert(
         `✅ AI Risk Engine Orchestration Complete!\n\n` +
         `Decision ID: ${decision.decision_id}\n` +
         `Block: ${decision.block_number}\n\n` +
         `Allocation:\n` +
         `JediSwap: ${decision.jediswap_pct.toFixed(1)}% (Risk: ${decision.jediswap_risk}, APY: ${decision.jediswap_apy.toFixed(2)}%)\n` +
-        `Ekubo: ${decision.ekubo_pct.toFixed(1)}% (Risk: ${decision.ekubo_risk}, APY: ${decision.ekubo_apy.toFixed(2)}%)\n\n` +
-        `Full audit trail available on-chain.`
+        `Ekubo: ${decision.ekubo_pct.toFixed(1)}% (Risk: ${decision.ekubo_risk}, APY: ${decision.ekubo_apy.toFixed(2)}%)\n` +
+        proofInfo +
+        `\nFull audit trail available on-chain.`
       );
       
     } catch (error) {
@@ -405,8 +404,8 @@ export function Dashboard() {
           <p className="text-gray-400 text-sm">StrategyRouterV2 on Starknet Sepolia</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className={`px-4 py-2 rounded-full text-sm font-bold ${isDemoMode ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 'bg-green-500/20 text-green-400 border border-green-500/30'}`}>
-            {isDemoMode ? '🎮 Demo Mode' : '✅ Live'}
+          <div className="px-4 py-2 rounded-full text-sm font-bold bg-green-500/20 text-green-400 border border-green-500/30">
+            Production
           </div>
         </div>
       </div>
@@ -427,7 +426,7 @@ export function Dashboard() {
       </div>
 
       {/* Analytics Tab */}
-      {activeTab === 'analytics' && <AnalyticsDashboard allocation={allocation} isDemoMode={isDemoMode} />}
+      {activeTab === 'analytics' && <AnalyticsDashboard allocation={allocation} />}
 
       {/* History Tab */}
       {activeTab === 'history' && (

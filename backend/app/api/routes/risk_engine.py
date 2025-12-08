@@ -2,6 +2,7 @@
 Risk Engine API endpoints for on-chain risk calculations
 """
 import asyncio
+from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 import logging
@@ -192,13 +193,16 @@ class OrchestrationResponse(BaseModel):
 
 
 @router.post("/orchestrate-allocation", response_model=OrchestrationResponse, tags=["Risk Engine"])
-async def orchestrate_allocation(request: OrchestrationRequest):
+async def orchestrate_allocation(
+    request: OrchestrationRequest,
+    db: Session = Depends(get_db)
+):
     """
     🤖 AI-Driven Orchestration: Backend executes verified allocation decision
     
     This is the CORE of verifiable AI:
     1. AI proposes allocation based on protocol metrics
-    2. Generates proof that decision respects constraints
+    2. Generates STARK proof that decision respects constraints
     3. Backend EXECUTES the transaction on-chain
     4. Returns decision + proof for audit trail
     
@@ -213,6 +217,34 @@ async def orchestrate_allocation(request: OrchestrationRequest):
         logger.info(f"📊 Ekubo metrics: util={request.ekubo_metrics.utilization}, "
                    f"vol={request.ekubo_metrics.volatility}, liq={request.ekubo_metrics.liquidity}, "
                    f"audit={request.ekubo_metrics.audit_score}, age={request.ekubo_metrics.age_days}")
+        
+        # STEP 1: Generate STARK Proof
+        logger.info(f"🔐 Generating STARK proof...")
+        luminair = get_luminair_service()
+        proof = await luminair.generate_proof(
+            request.jediswap_metrics.dict(),
+            request.ekubo_metrics.dict()
+        )
+        logger.info(f"✅ Proof generated: {proof.proof_hash[:32]}...")
+        logger.info(f"   Jediswap risk: {proof.output_score_jediswap}")
+        logger.info(f"   Ekubo risk: {proof.output_score_ekubo}")
+        
+        # STEP 2: Store proof in database
+        proof_job = ProofJob(
+            proof_hash=proof.proof_hash,
+            status=ProofStatus.GENERATED,
+            metrics={
+                "jediswap": request.jediswap_metrics.dict(),
+                "ekubo": request.ekubo_metrics.dict(),
+                "jediswap_risk": proof.output_score_jediswap,
+                "ekubo_risk": proof.output_score_ekubo
+            },
+            proof_data=proof.proof_data
+        )
+        db.add(proof_job)
+        db.commit()
+        db.refresh(proof_job)
+        logger.info(f"💾 Proof stored in database (ID: {proof_job.id})")
         
         # Validate backend wallet is configured
         if not settings.BACKEND_WALLET_PRIVATE_KEY or not settings.BACKEND_WALLET_ADDRESS:
@@ -301,13 +333,36 @@ async def orchestrate_allocation(request: OrchestrationRequest):
             auto_estimate=True
         )
         
-        logger.info(f"📤 Transaction submitted: {hex(invoke_result.transaction_hash)}")
+        tx_hash = hex(invoke_result.transaction_hash)
+        logger.info(f"📤 Transaction submitted: {tx_hash}")
+        
+        # Update proof job with transaction hash
+        proof_job.tx_hash = tx_hash
+        proof_job.status = ProofStatus.SUBMITTED
+        db.commit()
+        db.refresh(proof_job)
+        
         logger.info(f"⏳ Waiting for acceptance...")
         
         # Wait for transaction to be accepted
         await invoke_result.wait_for_acceptance()
         
         logger.info(f"✅ Transaction accepted on-chain!")
+        
+        # Update proof status to executed
+        proof_job.status = ProofStatus.SUBMITTED
+        proof_job.submitted_at = datetime.utcnow()
+        db.commit()
+        db.refresh(proof_job)
+        
+        # Trigger background SHARP submission
+        logger.info(f"📡 Triggering SHARP submission...")
+        asyncio.create_task(submit_proof_to_sharp(
+            db=db,
+            proof_job_id=proof_job.id,
+            proof_data=proof.proof_data,
+            proof_hash=proof.proof_hash
+        ))
         
         # Now fetch the decision that was just created
         decision_count_result = await contract.functions["get_decision_count"].call()
@@ -334,7 +389,11 @@ async def orchestrate_allocation(request: OrchestrationRequest):
                     ekubo_apy=int(decision_data.ekubo_apy),
                     rationale_hash=str(decision_data.rationale_hash),
                     strategy_router_tx=str(decision_data.strategy_router_tx),
-                    message=f"✅ AI executed decision #{decision_count} on-chain (tx: {hex(invoke_result.transaction_hash)})"
+                    message=f"✅ AI executed decision #{decision_count} on-chain (tx: {tx_hash})",
+                    # Proof information
+                    proof_job_id=str(proof_job.id),
+                    proof_hash=proof.proof_hash,
+                    proof_status=proof_job.status.value if hasattr(proof_job.status, 'value') else str(proof_job.status)
                 )
         
         raise HTTPException(
