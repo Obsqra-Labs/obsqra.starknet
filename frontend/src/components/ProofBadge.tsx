@@ -10,9 +10,10 @@ interface ProofBadgeProps {
   txHash?: string | null;
   factHash?: string | null;
   submittedAt?: string | null;
+  verifiedAt?: string | null;
 }
 
-export function ProofBadge({ hash, status, txHash, factHash, submittedAt }: ProofBadgeProps) {
+export function ProofBadge({ hash, status, txHash, factHash, submittedAt, verifiedAt }: ProofBadgeProps) {
   const [showDetails, setShowDetails] = useState(false);
 
   const statusConfig = {
@@ -108,9 +109,16 @@ export function ProofBadge({ hash, status, txHash, factHash, submittedAt }: Proo
               </div>
             )}
 
+            {verifiedAt && (
+              <div>
+                <p className="text-xs text-gray-400 mb-1">Verified:</p>
+                <p className="text-xs text-green-400 font-semibold">{new Date(verifiedAt).toLocaleString()}</p>
+              </div>
+            )}
+
             {submittedAt && (
               <div>
-                <p className="text-xs text-gray-400 mb-1">Submitted:</p>
+                <p className="text-xs text-gray-400 mb-1">On-Chain:</p>
                 <p className="text-xs text-white">{new Date(submittedAt).toLocaleString()}</p>
               </div>
             )}

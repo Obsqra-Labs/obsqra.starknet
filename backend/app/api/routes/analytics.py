@@ -169,6 +169,7 @@ async def get_rebalance_history(
             "tx_hash": job.tx_hash,
             "fact_hash": job.fact_hash,
             "submitted_at": job.submitted_at.isoformat() if job.submitted_at else None,
+            "verified_at": job.verified_at.isoformat() if job.verified_at else None,
         }
         for job in proof_jobs
     ]

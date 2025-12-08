@@ -16,6 +16,7 @@ interface RebalanceRecord {
   tx_hash: string | null;
   fact_hash: string | null;
   submitted_at: string | null;
+  verified_at: string | null;
 }
 
 export function RebalanceHistory() {

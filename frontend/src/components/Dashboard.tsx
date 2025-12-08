@@ -358,8 +358,11 @@ export function Dashboard() {
       txHistory.confirmTransaction(txId);
       
       // Show success message with proof
+      const proofStatus = decision.proof_status || 'generated';
+      const isVerified = proofStatus === 'verified';
+      const proofIcon = isVerified ? '✅' : '🔐';
       const proofInfo = decision.proof_hash 
-        ? `\n\n🔐 STARK Proof:\n${decision.proof_hash.slice(0, 20)}...\nStatus: ${decision.proof_status || 'Generated'}\n`
+        ? `\n\n${proofIcon} STARK Proof:\n${decision.proof_hash.slice(0, 20)}...\nStatus: ${proofStatus}\n${isVerified ? '✅ Locally verified (<1s)\n' : ''}`
         : '';
       
       alert(
