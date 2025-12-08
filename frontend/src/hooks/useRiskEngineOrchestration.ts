@@ -167,26 +167,26 @@ export function useRiskEngineOrchestration(): UseRiskEngineOrchestrationReturn {
           account as unknown as AccountInterface
         );
 
-        // Prepare metrics structs
-        const jediswapMetricsStruct = [
-          jediswapMetrics.utilization,
-          jediswapMetrics.volatility,
-          jediswapMetrics.liquidity,
-          jediswapMetrics.auditScore,
-          jediswapMetrics.ageDays,
-        ];
+        // Prepare metrics structs - Starknet.js expects structs as objects with field names matching ABI
+        const jediswapMetricsStruct = {
+          utilization: jediswapMetrics.utilization,
+          volatility: jediswapMetrics.volatility,
+          liquidity: jediswapMetrics.liquidity,
+          audit_score: jediswapMetrics.auditScore,  // ABI uses snake_case
+          age_days: jediswapMetrics.ageDays,        // ABI uses snake_case
+        };
 
-        const ekuboMetricsStruct = [
-          ekuboMetrics.utilization,
-          ekuboMetrics.volatility,
-          ekuboMetrics.liquidity,
-          ekuboMetrics.auditScore,
-          ekuboMetrics.ageDays,
-        ];
+        const ekuboMetricsStruct = {
+          utilization: ekuboMetrics.utilization,
+          volatility: ekuboMetrics.volatility,
+          liquidity: ekuboMetrics.liquidity,
+          audit_score: ekuboMetrics.auditScore,      // ABI uses snake_case
+          age_days: ekuboMetrics.ageDays,            // ABI uses snake_case
+        };
 
         console.log('🤖 RiskEngine Orchestration: Proposing and executing allocation...');
-        console.log('📊 JediSwap metrics:', jediswapMetrics);
-        console.log('📊 Ekubo metrics:', ekuboMetrics);
+        console.log('📊 JediSwap metrics struct:', jediswapMetricsStruct);
+        console.log('📊 Ekubo metrics struct:', ekuboMetricsStruct);
 
         // Call propose_and_execute_allocation
         const response = await contract.invoke('propose_and_execute_allocation', [
