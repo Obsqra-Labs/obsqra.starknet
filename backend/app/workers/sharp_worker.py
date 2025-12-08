@@ -43,22 +43,28 @@ async def submit_proof_to_sharp(
             logger.error(f"Proof job {job_id} not found")
             return
         
-        job.status = ProofStatus.SUBMITTED
-        db.commit()
-        
+        # Don't change status if on-chain execution already succeeded
+        # Only update SHARP-specific fields
         logger.info(f"Submitting proof {job_id} to SHARP...")
         
-        # Submit to SHARP
-        sharp_result = await sharp_service.submit_proof(
-            proof_data=proof_data,
-            proof_hash=proof_hash
-        )
-        
-        # Update with SHARP job ID
-        job.sharp_job_id = sharp_result.job_id
-        job.status = ProofStatus.VERIFYING
-        job.submitted_at = datetime.utcnow()
-        db.commit()
+        try:
+            # Submit to SHARP
+            sharp_result = await sharp_service.submit_proof(
+                proof_data=proof_data,
+                proof_hash=proof_hash
+            )
+            
+            # Update with SHARP job ID (don't change main status)
+            job.sharp_job_id = sharp_result.job_id
+            # Keep status as SUBMITTED (on-chain success), SHARP verification is separate
+            if job.status == ProofStatus.SUBMITTED:
+                # Only update if still in submitted state (on-chain succeeded)
+                pass  # Keep SUBMITTED status
+            db.commit()
+        except Exception as e:
+            logger.warning(f"SHARP submission failed for {job_id} (non-critical, on-chain tx succeeded): {e}")
+            # Don't change status - on-chain execution already succeeded
+            return  # Exit early, don't try to monitor
         
         logger.info(f"Proof {job_id} submitted to SHARP: {sharp_result.job_id}")
         

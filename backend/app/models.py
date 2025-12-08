@@ -173,6 +173,12 @@ class ProofJob(Base):
     proof_data = Column(LargeBinary, nullable=True)  # Binary STARK proof
     error = Column(String, nullable=True)
     
+    # Allocation decision results (from on-chain execution)
+    jediswap_pct = Column(Integer, nullable=True, default=0)  # Basis points (0-10000)
+    ekubo_pct = Column(Integer, nullable=True, default=0)  # Basis points (0-10000)
+    jediswap_risk = Column(Integer, nullable=True, default=0)
+    ekubo_risk = Column(Integer, nullable=True, default=0)
+    
     def __repr__(self):
         return f"<ProofJob {self.id} status={self.status}>"
 

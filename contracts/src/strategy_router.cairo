@@ -74,6 +74,15 @@ mod StrategyRouter {
         self.ekubo_allocation.write(3334);
     }
     
+    // Owner-only function to update the risk engine address
+    #[external(v0)]
+    fn set_risk_engine(ref self: ContractState, new_risk_engine: ContractAddress) {
+        let caller = get_caller_address();
+        let owner = self.owner.read();
+        assert(caller == owner, 'Only owner');
+        self.risk_engine.write(new_risk_engine);
+    }
+    
     #[external(v0)]
     fn update_allocation(
         ref self: ContractState,

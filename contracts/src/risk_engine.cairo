@@ -1,6 +1,10 @@
 
 #[starknet::interface]
 pub trait IRiskEngine<TContractState> {
+    // Version 2.2 - Fixed 2-protocol allocation (sum to 100%)
+    fn get_contract_version(self: @TContractState) -> felt252;
+    fn get_build_timestamp(self: @TContractState) -> felt252;
+    
     // Existing functions
     fn calculate_risk_score(
         ref self: TContractState,
@@ -302,6 +306,16 @@ mod RiskEngine {
     }
     
     #[external(v0)]
+    fn get_contract_version(self: @ContractState) -> felt252 {
+        220  // Version 2.2.0
+    }
+    
+    #[external(v0)]
+    fn get_build_timestamp(self: @ContractState) -> felt252 {
+        1733673600  // Dec 8, 2024
+    }
+    
+    #[external(v0)]
     fn calculate_risk_score(
         ref self: ContractState,
         utilization: felt252,
@@ -528,14 +542,11 @@ mod RiskEngine {
         // STEP 3: Calculate Allocation (On-Chain)
         // ============================================
         // Using 2-protocol version (JediSwap + Ekubo)
-        // Pass 0 for nostra/zklend as placeholders
-        let (jedi_pct, ekubo_pct, _) = calculate_allocation_internal(
+        let (jedi_pct, ekubo_pct) = calculate_allocation_2_protocol_internal(
             jediswap_risk,
             ekubo_risk,
-            0,  // placeholder for third protocol
             jediswap_apy,
             ekubo_apy,
-            0,  // placeholder
         );
         
         // ============================================
@@ -933,6 +944,30 @@ mod RiskEngine {
     // Helper: Query Ekubo APY (internal)
     fn query_ekubo_apy_internal(ref self: ContractState) -> felt252 {
         self.ekubo_apy.read()
+    }
+    
+    // Helper: Calculate allocation for 2 protocols (internal)
+    // Ensures jedi_pct + ekubo_pct = 10000 exactly
+    fn calculate_allocation_2_protocol_internal(
+        jedi_risk: felt252,
+        ekubo_risk: felt252,
+        jedi_apy: felt252,
+        ekubo_apy: felt252,
+    ) -> (felt252, felt252) {
+        // Risk-adjusted score = (APY * 10000) / (Risk + 1)
+        let divisor_jedi = jedi_risk + 1;
+        let divisor_ekubo = ekubo_risk + 1;
+        
+        let jedi_score = felt252_div(jedi_apy * 10000, divisor_jedi);
+        let ekubo_score = felt252_div(ekubo_apy * 10000, divisor_ekubo);
+        let total_score = jedi_score + ekubo_score;
+        
+        // Calculate JediSwap percentage
+        let jedi_pct = felt252_div(jedi_score * 10000, total_score);
+        // Ekubo gets the remainder - ensures sum is exactly 10000
+        let ekubo_pct = 10000 - jedi_pct;
+        
+        (jedi_pct, ekubo_pct)
     }
     
     // Helper: Verify constraints for 2 protocols (internal)

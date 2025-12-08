@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     
     # Starknet
     STARKNET_RPC_URL: str = "https://starknet-sepolia-rpc.publicnode.com"
-    RISK_ENGINE_ADDRESS: str = "0x0751c85290c660d738236a12bb362bf64c0a8ef4b1a9cc05dc7000d14fd44d31"  # v2 with orchestration
+    RISK_ENGINE_ADDRESS: str = "0x007c2463376a0d21dbccde4c6d59bf8b0649973ca1f88865466b58d81dcbe86d"  # v2.2 with fixed 2-protocol allocation
     STRATEGY_ROUTER_ADDRESS: str = "0x0539d5611c6158a4234f7c4e8e7fe50af7b9502314ca95409f5106ee2f6741d6"  # v2 with deposit/withdraw
     
     # Backend Wallet (for automated execution)

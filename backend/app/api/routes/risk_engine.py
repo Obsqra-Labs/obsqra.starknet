@@ -345,24 +345,32 @@ async def orchestrate_allocation(
         logger.info(f"⏳ Waiting for acceptance...")
         
         # Wait for transaction to be accepted
-        await invoke_result.wait_for_acceptance()
+        await rpc_client.wait_for_tx(invoke_result.transaction_hash)
         
         logger.info(f"✅ Transaction accepted on-chain!")
         
-        # Update proof status to executed
-        proof_job.status = ProofStatus.SUBMITTED
+        # Update proof status to executed (on-chain transaction succeeded)
+        # Note: SHARP verification happens separately and doesn't affect this status
+        proof_job.status = ProofStatus.SUBMITTED  # "SUBMITTED" = on-chain execution succeeded
         proof_job.submitted_at = datetime.utcnow()
         db.commit()
         db.refresh(proof_job)
         
-        # Trigger background SHARP submission
-        logger.info(f"📡 Triggering SHARP submission...")
-        asyncio.create_task(submit_proof_to_sharp(
-            db=db,
-            proof_job_id=proof_job.id,
-            proof_data=proof.proof_data,
-            proof_hash=proof.proof_hash
-        ))
+        # Trigger background SHARP submission (non-blocking, won't affect orchestration response)
+        # Note: SHARP submission is optional - MVP uses mock proofs, real SHARP integration coming
+        if proof.proof_data:
+            logger.info(f"📡 Triggering SHARP submission (background)...")
+            try:
+                asyncio.create_task(submit_proof_to_sharp(
+                    job_id=proof_job.id,
+                    proof_data=proof.proof_data,
+                    proof_hash=proof.proof_hash
+                ))
+            except Exception as e:
+                logger.warning(f"⚠️ SHARP submission task creation failed (non-critical): {e}")
+                # Don't fail orchestration if SHARP submission setup fails
+        else:
+            logger.info(f"⏭️ Skipping SHARP submission (proof_data not available - MVP mode)")
         
         # Now fetch the decision that was just created
         decision_count_result = await contract.functions["get_decision_count"].call()
@@ -373,22 +381,31 @@ async def orchestrate_allocation(
             decision_data = latest_decision_result[0] if latest_decision_result else None
             
             if decision_data:
+                # decision_data is an OrderedDict from starknet.py
                 logger.info(f"✅ AI Decision #{decision_count} executed:")
-                logger.info(f"   JediSwap: {int(decision_data.jediswap_pct)/100}%")
-                logger.info(f"   Ekubo: {int(decision_data.ekubo_pct)/100}%")
+                logger.info(f"   JediSwap: {int(decision_data['jediswap_pct'])/100}%")
+                logger.info(f"   Ekubo: {int(decision_data['ekubo_pct'])/100}%")
+                
+                # Update proof_job with allocation decision results
+                proof_job.jediswap_pct = int(decision_data['jediswap_pct'])
+                proof_job.ekubo_pct = int(decision_data['ekubo_pct'])
+                proof_job.jediswap_risk = int(decision_data['jediswap_risk'])
+                proof_job.ekubo_risk = int(decision_data['ekubo_risk'])
+                db.commit()
+                db.refresh(proof_job)
                 
                 return OrchestrationResponse(
-                    decision_id=int(decision_data.decision_id),
-                    block_number=int(decision_data.block_number),
-                    timestamp=int(decision_data.timestamp),
-                    jediswap_pct=int(decision_data.jediswap_pct),
-                    ekubo_pct=int(decision_data.ekubo_pct),
-                    jediswap_risk=int(decision_data.jediswap_risk),
-                    ekubo_risk=int(decision_data.ekubo_risk),
-                    jediswap_apy=int(decision_data.jediswap_apy),
-                    ekubo_apy=int(decision_data.ekubo_apy),
-                    rationale_hash=str(decision_data.rationale_hash),
-                    strategy_router_tx=str(decision_data.strategy_router_tx),
+                    decision_id=int(decision_data['decision_id']),
+                    block_number=int(decision_data['block_number']),
+                    timestamp=int(decision_data['timestamp']),
+                    jediswap_pct=int(decision_data['jediswap_pct']),
+                    ekubo_pct=int(decision_data['ekubo_pct']),
+                    jediswap_risk=int(decision_data['jediswap_risk']),
+                    ekubo_risk=int(decision_data['ekubo_risk']),
+                    jediswap_apy=int(decision_data['jediswap_apy']),
+                    ekubo_apy=int(decision_data['ekubo_apy']),
+                    rationale_hash=str(decision_data['rationale_hash']),
+                    strategy_router_tx=str(decision_data['strategy_router_tx']),
                     message=f"✅ AI executed decision #{decision_count} on-chain (tx: {tx_hash})",
                     # Proof information
                     proof_job_id=str(proof_job.id),

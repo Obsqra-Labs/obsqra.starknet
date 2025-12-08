@@ -143,10 +143,27 @@ async def get_rebalance_history(
         {
             "id": str(job.id),
             "timestamp": job.created_at.isoformat() if job.created_at else None,
-            "jediswap_pct": job.metrics.get("jediswap", {}).get("utilization", 0) / 100 if job.metrics else 50,
-            "ekubo_pct": job.metrics.get("ekubo", {}).get("utilization", 0) / 100 if job.metrics else 50,
-            "jediswap_risk": job.metrics.get("jediswap_risk", 0) if job.metrics else 0,
-            "ekubo_risk": job.metrics.get("ekubo_risk", 0) if job.metrics else 0,
+            # Try new columns first, fallback to metrics JSON if not available (for in-memory DB)
+            "jediswap_pct": (
+                (getattr(job, 'jediswap_pct', None) / 100.0) 
+                if hasattr(job, 'jediswap_pct') and getattr(job, 'jediswap_pct', None) is not None 
+                else (job.metrics.get("jediswap", {}).get("utilization", 0) / 100.0 if job.metrics else 50)
+            ),
+            "ekubo_pct": (
+                (getattr(job, 'ekubo_pct', None) / 100.0)
+                if hasattr(job, 'ekubo_pct') and getattr(job, 'ekubo_pct', None) is not None
+                else (job.metrics.get("ekubo", {}).get("utilization", 0) / 100.0 if job.metrics else 50)
+            ),
+            "jediswap_risk": (
+                getattr(job, 'jediswap_risk', None)
+                if hasattr(job, 'jediswap_risk') and getattr(job, 'jediswap_risk', None) is not None
+                else (job.metrics.get("jediswap_risk", 0) if job.metrics else 0)
+            ),
+            "ekubo_risk": (
+                getattr(job, 'ekubo_risk', None)
+                if hasattr(job, 'ekubo_risk') and getattr(job, 'ekubo_risk', None) is not None
+                else (job.metrics.get("ekubo_risk", 0) if job.metrics else 0)
+            ),
             "proof_hash": job.proof_hash,
             "proof_status": job.status.value if hasattr(job.status, 'value') else str(job.status),
             "tx_hash": job.tx_hash,
