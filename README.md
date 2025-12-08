@@ -13,10 +13,15 @@ Traditional AI agents in DeFi require trust. Users cannot verify the AI followed
 **Workflow**:
 ```
 User Sets Constraints → AI Proposes Action → Generate STARK Proof → 
-Verify Constraints → Execute Transaction → Submit to SHARP → L1 Settlement
+Verify Proof Locally (<1s) → Verify Constraints → Execute Transaction → 
+Submit to SHARP → L1 Settlement
 ```
 
-**User Experience**: 15-35 second execution, 10-60 minute L1 verification (background)
+**User Experience**: 
+- Proof generation: 2-3 seconds
+- Local verification: <1 second (immediate confidence)
+- Transaction execution: 10-30 seconds
+- SHARP L1 verification: 10-60 minutes (background)
 
 ## Current Implementation (V1.2)
 
@@ -28,9 +33,9 @@ Verify Constraints → Execute Transaction → Submit to SHARP → L1 Settlement
 
 **Components**:
 - Risk scoring model (5-component algorithm)
-- STARK proof generation (Python MVP, 2-3s)
-- Local proof verification (<1s)
-- PostgreSQL job tracking
+- STARK proof generation (LuminAIR Rust operator, 2-3s)
+- **Local proof verification (<1s)** - ✅ Cryptographically verified before execution
+- PostgreSQL job tracking with verification status
 - Background SHARP worker (ready)
 - FastAPI REST interface
 
