@@ -8,6 +8,7 @@ from sqlalchemy import desc
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 import uuid
+import logging
 
 from app.database import get_db
 from app.db.session import get_db as get_sync_db
@@ -15,6 +16,7 @@ from app.models import User, RiskHistory, AllocationHistory, ProofJob
 from app.api.routes.auth import get_current_user
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/risk-history")
@@ -273,22 +275,38 @@ async def get_proof_performance(
 
 
 @router.get("/protocol-apys")
-async def get_protocol_apys():
+async def get_protocol_apys(force_refresh: bool = Query(False, description="Force refresh, bypass cache")):
     """
     Get current APY rates for protocols.
     
-    TODO: Fetch from actual protocol contracts or external APIs.
-    For now, returns default values.
-    """
-    # TODO: Implement real APY fetching from:
-    # - JediSwap: Query pool contracts for current rates
-    # - Ekubo: Query pool contracts for current rates
-    # - Or: Use external APIs (DefiLlama, etc.)
+    Fetches real APY rates from protocol contracts or uses defaults if unavailable.
+    Uses caching (5 minute TTL) to reduce RPC calls.
     
-    return {
-        "jediswap": 5.2,  # Default, replace with real data
-        "ekubo": 8.5,     # Default, replace with real data
-        "source": "default",  # Will be "on-chain" or "api" when implemented
-        "last_updated": datetime.utcnow().isoformat(),
-    }
+    Args:
+        force_refresh: If True, bypass cache and fetch fresh data
+    """
+    from app.services.protocol_apy_service import get_apy_service
+    
+    try:
+        apy_service = get_apy_service()
+        apys = await apy_service.get_all_apys(force_refresh=force_refresh)
+        
+        return {
+            "jediswap": apys["jediswap"],
+            "ekubo": apys["ekubo"],
+            "source": apys.get("source", "default"),
+            "last_updated": datetime.utcnow().isoformat(),
+            "cached": not force_refresh and apy_service._cache is not None,
+        }
+    except Exception as e:
+        logger.error(f"Failed to fetch protocol APYs: {e}")
+        # Return defaults on error
+        return {
+            "jediswap": 5.2,
+            "ekubo": 8.5,
+            "source": "default",
+            "last_updated": datetime.utcnow().isoformat(),
+            "error": str(e),
+            "cached": False,
+        }
 

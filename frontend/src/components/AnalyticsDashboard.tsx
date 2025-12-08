@@ -36,8 +36,6 @@ export function AnalyticsDashboard({ allocation }: AnalyticsDashboardProps) {
   useEffect(() => {
     const fetchAPYs = async () => {
       try {
-        // TODO: Replace with real APY fetching from protocols or backend
-        // For now, use defaults or fetch from backend API
         const response = await fetch('/api/v1/analytics/protocol-apys');
         if (response.ok) {
           const data = await response.json();
@@ -45,12 +43,21 @@ export function AnalyticsDashboard({ allocation }: AnalyticsDashboardProps) {
             jediswap: data.jediswap || 5.2,
             ekubo: data.ekubo || 8.5,
           });
+          if (data.source === 'on-chain') {
+            console.log('✅ Fetched real APY data from protocols');
+          } else {
+            console.log('⚠️ Using default APY values (real fetching not yet implemented)');
+          }
         }
       } catch (err) {
         console.warn('Failed to fetch APY data, using defaults:', err);
       }
     };
+    
     fetchAPYs();
+    // Refresh every 5 minutes (matches cache TTL)
+    const interval = setInterval(fetchAPYs, 5 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const protocolStats: ProtocolStats[] = useMemo(() => {
