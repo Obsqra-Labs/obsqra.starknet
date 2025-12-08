@@ -28,7 +28,8 @@ export interface AllocationDecision {
   jediswap_apy: number;
   ekubo_apy: number;
   rationale_hash: string;
-  strategy_router_tx: string;
+  strategy_router_tx: string;  // Decision ID from contract (legacy)
+  tx_hash?: string;  // Actual on-chain transaction hash
   message: string;
   proof_job_id?: string;
   proof_hash?: string;
@@ -142,7 +143,11 @@ export function useRiskEngineBackendOrchestration(): UseRiskEngineBackendOrchest
           ekubo_apy: data.ekubo_apy,
           rationale_hash: data.rationale_hash,
           strategy_router_tx: data.strategy_router_tx,
+          tx_hash: data.tx_hash,
           message: data.message,
+          proof_job_id: data.proof_job_id,
+          proof_hash: data.proof_hash,
+          proof_status: data.proof_status,
         };
 
         return decision;
@@ -219,7 +224,11 @@ export function useRiskEngineBackendOrchestration(): UseRiskEngineBackendOrchest
         ekubo_apy: data.ekubo_apy,
         rationale_hash: data.rationale_hash,
         strategy_router_tx: data.strategy_router_tx,
+        tx_hash: data.tx_hash,
         message: data.message,
+        proof_job_id: data.proof_job_id,
+        proof_hash: data.proof_hash,
+        proof_status: data.proof_status,
       };
 
       return decision;

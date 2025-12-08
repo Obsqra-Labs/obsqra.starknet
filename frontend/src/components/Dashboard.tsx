@@ -336,8 +336,10 @@ export function Dashboard() {
       });
 
       // Add to transaction history with full audit trail
+      // Use actual tx_hash if available, otherwise fallback to strategy_router_tx (decision ID)
+      const actualTxHash = decision.tx_hash || decision.strategy_router_tx || 'ai-orchestration-' + Date.now();
       const txId = txHistory.addTransaction(
-        decision.strategy_router_tx || 'ai-orchestration-' + Date.now(),
+        actualTxHash,
         'AI_ORCHESTRATION',
         {
           decisionId: decision.decision_id,
