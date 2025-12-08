@@ -1,245 +1,233 @@
-#  Starknet POC - Next Steps
+# Next Steps - Complete V1.3 (2-3 weeks)
 
-You now have test ETH! Here's what to do next:
+## What You Have (90%)
 
----
+✅ RiskEngine + StrategyRouterV2 contracts (deployed, working)  
+✅ Backend orchestration (executes rebalances)  
+✅ Frontend (wallet connection, dashboard)  
+✅ Proof generation service (2-3s)  
+✅ Production deployment (starknet.obsqra.fi)
 
-## ✅ **Phase 1: Test Basic Connectivity** (10 minutes)
+## What's Missing (10%)
 
-### 1. Access the Frontend
-- Open: http://localhost:3002
-- You should see the Starknet dashboard
-
-### 2. Connect Your Wallet
-- Click **"Connect Argent X"** (or Braavos)
-- Approve the connection
-- Your imported test account should show ~1000 ETH
-
-### 3. Verify Connection
-- Check that your wallet address displays correctly
-- Confirm you're on the **Local Katana** network
-- Dashboard should show "Connected" status
+❌ Proofs not connected to orchestration  
+❌ Demo mode in frontend  
+❌ Real performance tracking  
+❌ Proof visibility in UI
 
 ---
 
-## 🔨 **Phase 2: Deploy Real Contracts** (30 minutes)
+## This Week: Quick Wins (5 hours)
 
-Right now, the contracts are placeholders. Let's deploy real ones:
+### 1. Connect Proofs to Orchestration (2 hours)
 
-### 1. Compile Contracts
+**File**: `backend/app/api/routes/risk_engine.py`
+
+```python
+@router.post("/orchestrate-allocation")
+async def orchestrate_allocation(request: OrchestrationRequest):
+    # EXISTING CODE: Calculate metrics
+    
+    # ADD THIS: Generate proof
+    luminair = get_luminair_service()
+    proof = await luminair.generate_proof(
+        request.jediswap_metrics.dict(),
+        request.ekubo_metrics.dict()
+    )
+    
+    # ADD THIS: Store in database
+    proof_job = ProofJob(
+        proof_hash=proof.proof_hash,
+        status="generated",
+        metrics={"jediswap": request.jediswap_metrics.dict(), "ekubo": request.ekubo_metrics.dict()}
+    )
+    db.add(proof_job)
+    db.commit()
+    
+    # EXISTING CODE: Execute on-chain
+    decision = await execute_on_chain(...)
+    
+    # ADD THIS: Link proof to transaction
+    proof_job.tx_hash = decision.tx_hash
+    proof_job.status = "executed"
+    db.commit()
+    
+    # EXISTING RETURN + proof info
+    return {
+        **decision,
+        "proof_hash": proof.proof_hash,
+        "proof_job_id": str(proof_job.id)
+    }
+```
+
+**Test**:
 ```bash
+curl -X POST https://starknet.obsqra.fi/api/v1/risk-engine/orchestrate-allocation \
+  -d @test_metrics.json
+
+# Should return proof_hash in response
+```
+
+### 2. Show Proof in UI (2 hours)
+
+**File**: `frontend/src/components/Dashboard.tsx`
+
+```typescript
+// Add after orchestration call:
+const { data, isLoading } = useOrchestration();
+
+if (data?.proof_hash) {
+  return (
+    <div>
+      <h3>Latest Rebalance</h3>
+      <div>Allocation: Jedi {data.jediswap_pct}% / Ekubo {data.ekubo_pct}%</div>
+      <div>
+        Proof: <code>{data.proof_hash.slice(0, 16)}...</code>
+        <Badge color="green">Verified</Badge>
+      </div>
+      <Link href={`https://sepolia.voyager.online/tx/${data.tx_hash}`}>
+        View Transaction
+      </Link>
+    </div>
+  );
+}
+```
+
+### 3. Remove One Demo Toggle (1 hour)
+
+**File**: Search for demo mode
+
+```bash
+cd frontend
+grep -rn "demoMode\|demo_mode" src/
+```
+
+**Example fix**:
+```typescript
+// Before
+const [demoMode, setDemoMode] = useState(true);
+const data = demoMode ? mockData : realData;
+
+// After
+const { data } = useRealData(); // Always real
+```
+
+**Result**: Proofs visible in production by end of week
+
+---
+
+## Week 2-3: Complete V1.3
+
+### Backend Tasks
+
+1. **Real Performance Endpoint** (1 day)
+   ```python
+   @router.get("/analytics/performance/real")
+   async def get_real_performance():
+       # Query rebalance events from contract
+       # Calculate APY from on-chain data
+       # Include proof status for each
+   ```
+
+2. **SHARP Background Submission** (1 day)
+   - Already have sharp_worker.py
+   - Just need to trigger it after proof generation
+
+### Frontend Tasks
+
+1. **Find All Demo Code** (2 hours)
+   ```bash
+   grep -r "mock\|demo\|fake" src/ > demo_audit.txt
+   ```
+
+2. **Remove Demo Mode** (2 days)
+   - Delete all demo toggles
+   - Use real contract calls only
+   - Show on-chain data
+
+3. **Add Proof Components** (2 days)
+   - ProofBadge (shows status)
+   - RebalanceHistory (list with proofs)
+   - ProofDetails (expandable)
+
+4. **Real Performance** (1 day)
+   - Fetch from /analytics/performance/real
+   - Show APY from on-chain execution
+   - Chart historical rebalances
+
+### Polish (Week 3)
+
+- Error boundaries
+- Loading states
+- Mobile responsive
+- Documentation
+
+---
+
+## Success Criteria (V1.3 Complete)
+
+1. ✅ Every rebalance generates proof
+2. ✅ Proofs stored in database
+3. ✅ Proofs visible in UI
+4. ✅ Real performance from on-chain
+5. ✅ NO demo mode
+6. ✅ Production documentation
+
+**Measurement**: 1 week, 5+ rebalances, all proofs visible
+
+---
+
+## Then: V1.4 Privacy Pools (2 months)
+
+After V1.3 solid, pivot to privacy:
+- PrivatePool contract
+- MIST integration
+- Anonymous deposits/withdrawals
+- Transparent optimization (proofs still visible)
+
+---
+
+## GitHub Push
+
+**58 commits ready**:
+
+```bash
+# Get personal access token: https://github.com/settings/tokens
 cd /opt/obsqra.starknet
-scarb build
+git push https://YOUR_TOKEN@github.com/Obsqra-Labs/obsqra.starknet.git main
 ```
 
-### 2. Check Contract Structure
-```bash
-ls -la target/dev/
-```
-
-### 3. Deploy Strategy (2 options)
-
-**Option A: Quick Deploy with Starkli**
-```bash
-# Deploy RiskEngine
-starkli declare target/dev/obsqra_starknet_RiskEngine.contract_class.json \
-  --rpc http://localhost:5050 \
-  --account <your_account>
-
-# Deploy StrategyRouter
-starkli declare target/dev/obsqra_starknet_StrategyRouter.contract_class.json \
-  --rpc http://localhost:5050 \
-  --account <your_account>
-```
-
-**Option B: Automated Deploy Script**
-We'll create a proper deployment script with:
-- Contract compilation
-- Declaration
-- Deployment
-- Address saving to `.env.local`
-
-### 4. Update Frontend Config
-Once deployed, update `/opt/obsqra.starknet/frontend/.env.local` with real addresses.
+Files ready:
+- ✅ README.md (professional, dev-focused)
+- ✅ ROADMAP_V1.3_CURRENT.md (complete existing system)
+- ✅ ROADMAP_PRODUCT.md (privacy pool vision)
+- ✅ V1.3_IMPLEMENTATION.md (detailed plan)
+- ✅ PRODUCT_VISION.md (for grants)
 
 ---
 
-## 🧪 **Phase 3: Test Contract Interactions** (30 minutes)
+## Immediate Action (Today)
 
-### 1. Test Risk Engine
-- Call `calculate_allocation()` from the frontend
-- Verify risk scores are calculated
-- Check volatility metrics
+1. **Test current system**:
+   ```bash
+   curl https://starknet.obsqra.fi/api/v1/risk-engine/orchestrate-allocation \
+     -X POST -d @test_metrics.json
+   ```
 
-### 2. Test Strategy Router
-- Execute a strategy
-- Verify routing logic
-- Check gas estimates
+2. **Add proof generation** (2 hours):
+   - Edit `backend/app/api/routes/risk_engine.py`
+   - Add luminair call + database storage
+   - Test locally
 
-### 3. Test DAO Constraints
-- Set risk thresholds
-- Verify constraint enforcement
-- Test governance controls
+3. **Show in UI** (1 hour):
+   - Edit `frontend/src/components/Dashboard.tsx`
+   - Display proof_hash from response
+   - Deploy
 
----
-
-## 🎨 **Phase 4: Enhance Frontend** (1-2 hours)
-
-### Priority Improvements:
-1. **Real-time Data**: Connect to live contract state
-2. **Transaction Feedback**: Show pending/confirmed status
-3. **Error Handling**: Better user messages for failed txs
-4. **Portfolio View**: Show user's positions
-5. **Strategy Visualization**: Charts for risk/return
+**By EOD**: Proofs visible in production
 
 ---
 
-## 🤖 **Phase 5: AI Integration** (1 hour)
-
-Connect the AI service to provide:
-- Risk recommendations
-- Strategy suggestions
-- Market analysis
-- Portfolio optimization
-
-### Update AI Service Endpoint
-In `/opt/obsqra.starknet/frontend/.env.local`:
-```
-NEXT_PUBLIC_AI_SERVICE_URL=http://localhost:8001
-```
-
----
-
-## 🧪 **Phase 6: End-to-End Testing** (1 hour)
-
-### Test Scenarios:
-1. **User Onboarding**: Connect wallet → View dashboard
-2. **Risk Assessment**: Submit portfolio → Get allocation
-3. **Strategy Execution**: Choose strategy → Execute on-chain
-4. **DAO Voting**: Propose constraint → Vote → Execute
-5. **Emergency Stop**: Test circuit breakers
-
----
-
-## 🚢 **Phase 7: Deploy to Testnet** (2 hours)
-
-When local testing is complete:
-
-### 1. Configure Testnet
-- Switch to Sepolia or Goerli
-- Get testnet ETH from faucet
-- Update RPC endpoints
-
-### 2. Deploy Contracts
-```bash
-# Deploy to Starknet Sepolia
-starkli declare <contract> --network sepolia
-starkli deploy <class_hash> --network sepolia
-```
-
-### 3. Update Frontend
-- Point to testnet contracts
-- Update RPC to public endpoint
-- Test with real testnet transactions
-
-### 4. Verify on Explorer
-- Check contracts on Voyager/Starkscan
-- Verify source code
-- Test transactions publicly
-
----
-
-## 📊 **Current Status**
-
-✅ **Completed:**
-- Frontend running on port 3002
-- Katana devnet running on port 5050
-- CORS configured
-- Test accounts with ETH
-- Basic UI scaffolding
-- Wallet integration (Argent X, Braavos)
-
-⏳ **In Progress:**
-- Real contract deployment
-- Contract interaction from frontend
-
-🔜 **Next Up:**
-- Compile and deploy real contracts
-- Test risk engine calculations
-- Connect AI service
-
----
-
-## 🛠️ **Quick Commands**
-
-### Start All Services
-```bash
-# Terminal 1: Katana
-cd /opt/obsqra.starknet
-katana --dev --http.cors_origins "*"
-
-# Terminal 2: Frontend
-cd /opt/obsqra.starknet/frontend
-PORT=3002 npm run dev
-
-# Terminal 3: AI Service
-cd /opt/obsqra.starknet/ai-service
-AI_SERVICE_PORT=8001 python main.py
-```
-
-### Check Status
-```bash
-# Check running processes
-ps aux | grep -E "(katana|next|python)" | grep -v grep
-
-# Check ports
-netstat -tlnp | grep -E "(3002|5050|8001)"
-
-# Test connectivity
-curl http://localhost:3002
-curl http://localhost:5050
-curl http://localhost:8001/health
-```
-
-### Rebuild Contracts
-```bash
-cd /opt/obsqra.starknet
-scarb clean
-scarb build
-```
-
----
-
-## 📝 **Documentation to Create**
-
-1. **User Guide**: How to use the dApp
-2. **Developer Guide**: How to extend functionality
-3. **Contract Docs**: Function signatures and usage
-4. **API Docs**: AI service endpoints
-5. **Deployment Guide**: Mainnet deployment checklist
-
----
-
-## 🎯 **Success Criteria**
-
-By the end of development, you should have:
-
-- ✅ Fully functional local testnet environment
-- ✅ Deployed and tested smart contracts
-- ✅ Working frontend with wallet integration
-- ✅ AI-powered risk recommendations
-- ✅ End-to-end transaction flow
-- ✅ Ready for testnet deployment
-
----
-
-## 🆘 **Need Help?**
-
-- **Contracts not compiling?** Check Scarb version and Cairo syntax
-- **Frontend errors?** Check browser console and RPC connection
-- **Wallet not connecting?** Verify network settings and CORS
-- **Transactions failing?** Check gas fees and account balance
-
----
-
-**Ready to start? Let's deploy those contracts! **
+**Current Focus**: Complete V1.3 (finish 90% → 100%)  
+**Next MVP**: V1.4 privacy pools with MIST  
+**Timeline**: V1.3 in 2-3 weeks, V1.4 starts after
