@@ -167,26 +167,27 @@ export function useRiskEngineOrchestration(): UseRiskEngineOrchestrationReturn {
           account as unknown as AccountInterface
         );
 
-        // Prepare metrics structs - Starknet.js expects structs as objects with field names matching ABI
-        const jediswapMetricsStruct = {
-          utilization: jediswapMetrics.utilization,
-          volatility: jediswapMetrics.volatility,
-          liquidity: jediswapMetrics.liquidity,
-          audit_score: jediswapMetrics.auditScore,  // ABI uses snake_case
-          age_days: jediswapMetrics.ageDays,        // ABI uses snake_case
-        };
+        // Prepare metrics structs - Starknet.js expects structs as arrays in ABI member order
+        // ABI order: utilization, volatility, liquidity, audit_score, age_days
+        const jediswapMetricsStruct = [
+          jediswapMetrics.utilization,
+          jediswapMetrics.volatility,
+          jediswapMetrics.liquidity,
+          jediswapMetrics.auditScore,
+          jediswapMetrics.ageDays,
+        ];
 
-        const ekuboMetricsStruct = {
-          utilization: ekuboMetrics.utilization,
-          volatility: ekuboMetrics.volatility,
-          liquidity: ekuboMetrics.liquidity,
-          audit_score: ekuboMetrics.auditScore,      // ABI uses snake_case
-          age_days: ekuboMetrics.ageDays,            // ABI uses snake_case
-        };
+        const ekuboMetricsStruct = [
+          ekuboMetrics.utilization,
+          ekuboMetrics.volatility,
+          ekuboMetrics.liquidity,
+          ekuboMetrics.auditScore,
+          ekuboMetrics.ageDays,
+        ];
 
         console.log('🤖 RiskEngine Orchestration: Proposing and executing allocation...');
-        console.log('📊 JediSwap metrics struct:', jediswapMetricsStruct);
-        console.log('📊 Ekubo metrics struct:', ekuboMetricsStruct);
+        console.log('📊 JediSwap metrics struct (array):', jediswapMetricsStruct);
+        console.log('📊 Ekubo metrics struct (array):', ekuboMetricsStruct);
 
         // Call propose_and_execute_allocation
         const response = await contract.invoke('propose_and_execute_allocation', [
