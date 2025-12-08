@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
 
-import { ReactNode, useMemo } from 'react';
+import { ReactNode, useEffect, useMemo } from 'react';
 import { StarknetConfig, argent, braavos, jsonRpcProvider, useInjectedConnectors } from '@starknet-react/core';
 import { Chain } from '@starknet-react/chains';
 import { WalletKitStateProvider } from './useWalletKit';
@@ -46,6 +46,10 @@ export function WalletKitProvider({
   expectedChainId,
   expectedChainName,
 }: WalletKitProviderProps) {
+  useEffect(() => {
+    console.info('[obsqra.kit] WalletKitProvider mounted (Argent/Braavos, Sepolia preset)');
+  }, []);
+
   const { connectors: injectedConnectors } = useInjectedConnectors({
     recommended: [argent(), braavos()],
     includeRecommended: 'onlyIfNoConnectors',

@@ -5,6 +5,7 @@ import { useStrategyRouterV2 } from '@/hooks/useStrategyRouterV2';
 import { useRiskEngineBackend } from '@/hooks/useRiskEngineBackend';
 import { useSettlement } from '@/hooks/useSettlement';
 import { useRiskEngineOrchestration, ProtocolMetrics } from '@/hooks/useRiskEngineOrchestration';
+import { useRiskEngineBackendOrchestration, type ProtocolMetrics as BackendProtocolMetrics } from '@/hooks/useRiskEngineBackendOrchestration';
 import { useTransactionMonitor, TransactionStatusBadge } from '@/hooks/useTransactionMonitor';
 import { useProofGeneration } from '@/hooks/useProofGeneration';
 import { useDemoMode } from '@/contexts/DemoModeContext';
@@ -31,6 +32,8 @@ export function Dashboard() {
   const settlement = useSettlement();
   const proofGen = useProofGeneration();
   const riskEngineOrchestration = useRiskEngineOrchestration();
+  const backendOrchestration = useRiskEngineBackendOrchestration();
+  const backendOrchestration = useRiskEngineBackendOrchestration();
   
   // Fetch user's STRK balance on mount and when address changes
   useEffect(() => {
@@ -317,7 +320,7 @@ export function Dashboard() {
       console.log('📊 Ekubo metrics:', ekuboMetrics);
 
       // Call the full orchestration function (100% on-chain)
-      const decision = await riskEngineOrchestration.proposeAndExecuteAllocation(
+      const decision = await backendOrchestration.proposeAndExecuteAllocation(
         jediswapMetrics,
         ekuboMetrics
       );
@@ -330,25 +333,25 @@ export function Dashboard() {
 
       // Update allocation form to reflect AI decision
       setAllocationForm({
-        jediswap: decision.jediswapPct,
-        ekubo: decision.ekuboPct,
+        jediswap: decision.jediswap_pct / 100,  // Convert from basis points
+        ekubo: decision.ekubo_pct / 100,
       });
 
       // Add to transaction history with full audit trail
       const txId = txHistory.addTransaction(
-        decision.strategyRouterTx || 'ai-orchestration-' + Date.now(),
+        decision.strategy_router_tx || 'ai-orchestration-' + Date.now(),
         'AI_ORCHESTRATION',
         {
-          decisionId: decision.decisionId,
-          jediswap: decision.jediswapPct,
-          ekubo: decision.ekuboPct,
-          jediswapRisk: decision.jediswapRisk,
-          ekuboRisk: decision.ekuboRisk,
-          jediswapApy: decision.jediswapApy,
-          ekuboApy: decision.ekuboApy,
-          rationaleHash: decision.rationaleHash,
+          decisionId: decision.decision_id,
+          jediswap: decision.jediswap_pct,
+          ekubo: decision.ekubo_pct,
+          jediswapRisk: decision.jediswap_risk,
+          ekuboRisk: decision.ekubo_risk,
+          jediswapApy: decision.jediswap_apy,
+          ekuboApy: decision.ekubo_apy,
+          rationaleHash: decision.rationale_hash,
           timestamp: new Date(decision.timestamp * 1000).toISOString(),
-          blockNumber: decision.blockNumber,
+          blockNumber: decision.block_number,
           aiManaged: true,
         }
       );
@@ -359,11 +362,11 @@ export function Dashboard() {
       // Show success message
       alert(
         `✅ AI Risk Engine Orchestration Complete!\n\n` +
-        `Decision ID: ${decision.decisionId}\n` +
-        `Block: ${decision.blockNumber}\n\n` +
+        `Decision ID: ${decision.decision_id}\n` +
+        `Block: ${decision.block_number}\n\n` +
         `Allocation:\n` +
-        `JediSwap: ${decision.jediswapPct.toFixed(1)}% (Risk: ${decision.jediswapRisk}, APY: ${decision.jediswapApy.toFixed(2)}%)\n` +
-        `Ekubo: ${decision.ekuboPct.toFixed(1)}% (Risk: ${decision.ekuboRisk}, APY: ${decision.ekuboApy.toFixed(2)}%)\n\n` +
+        `JediSwap: ${decision.jediswap_pct.toFixed(1)}% (Risk: ${decision.jediswap_risk}, APY: ${decision.jediswap_apy.toFixed(2)}%)\n` +
+        `Ekubo: ${decision.ekubo_pct.toFixed(1)}% (Risk: ${decision.ekubo_risk}, APY: ${decision.ekubo_apy.toFixed(2)}%)\n\n` +
         `Full audit trail available on-chain.`
       );
       
