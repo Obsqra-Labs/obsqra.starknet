@@ -1,20 +1,16 @@
-# Obsqra Kit — Starknet Wallet UX
+# Obsqra Kit — Starknet wallet toolkit
 
-Open-source wallet kit from Obsqra Labs. It powers the Starknet experience on `starknet.obsqra.fi` and is ready for any dApp that wants a consistent, proof-friendly wallet flow.
+Open-source, app-agnostic wallet kit for Starknet. Built to be the RainbowKit-style starting point the ecosystem is missing—plug it into any dApp, or theme it to your design system.
 
 - Headless hooks on `@starknet-react/core` / `starknet`
-- Optional Rainbow-style modal for Argent X and Braavos (extensible)
-- Presets for Starknet Sepolia/Mainnet RPC + expected-network guard rails
-- Persistence for last-used connector + friendly error states
+- Lightweight modal + plug-and-play buttons for Argent X and Braavos (extensible)
+- Presets for Starknet Sepolia/Mainnet RPC and expected-network guard rails
+- Persists last-used connector; exposes normalized errors and wrong-network state
 
-We’re grateful to the Starknet community—contributions and forks welcome.
-
-## Why this exists
-Starknet has great primitives but no widely adopted, polished multi-wallet UX (RainbowKit equivalent). This kit packages the basics so teams can ship faster and keep users in flow.
+Built by Obsqra Labs for the community; contributions and forks welcome.
 
 ## Install
 ```bash
-# from your app
 npm install obsqra.kit @starknet-react/core @starknet-react/chains starknet react
 # or
 pnpm add obsqra.kit @starknet-react/core @starknet-react/chains starknet react
@@ -36,9 +32,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
 }
 ```
 
-Consume in a component:
+Use the headless hook or the prebuilt button/modal:
 ```tsx
-import { useWalletKit, WalletModal } from 'obsqra.kit';
+import { useWalletKit, WalletModal, ConnectButton, AccountChip } from 'obsqra.kit';
 import { useState } from 'react';
 
 export function ConnectButton() {
@@ -47,17 +43,16 @@ export function ConnectButton() {
 
   if (status === 'connected') {
     return (
-      <button onClick={disconnect}>
-        Disconnect {address?.slice(0, 6)}...
-      </button>
+      <>
+        <AccountChip />
+        <button onClick={disconnect}>Disconnect {address?.slice(0, 6)}...</button>
+      </>
     );
   }
 
   return (
     <>
-      <button onClick={() => (preferredConnector ? connect(preferredConnector) : setOpen(true))}>
-        {status === 'connecting' ? 'Connecting…' : 'Connect wallet'}
-      </button>
+      <ConnectButton />
       <WalletModal open={open} onClose={() => setOpen(false)} />
     </>
   );
@@ -71,6 +66,7 @@ export function ConnectButton() {
 - `connectors`: provide your own connectors; otherwise Argent/Braavos injected are used
 - `autoConnect`: default `true` (reconnects using last connector if available)
 - `expectedChainId` / `expectedChainName`: set the network you expect; the hook surfaces `wrongNetwork` for UX prompts
+- `onConnect` / `onDisconnect` (coming soon): side-effect callbacks
 
 Example with custom RPC:
 ```tsx
@@ -87,11 +83,16 @@ Example with custom RPC:
 - `preferredConnector`: best available (last used > available > first)
 - `lastConnectorId`: id stored in `localStorage`
 - `chainId`, `chainName`, `expectedChainId`, `expectedChainName`, `wrongNetwork`
+- `canSwitchNetwork`, `switchNetwork(targetId?)`, `switchNetworkAsync(targetId?)`
 - `error`: last connect error (normalized string)
 
 `WalletModal`:
 - Props: `open: boolean`, `onClose: () => void`, optional `title?: string`, `description?: string`
-- Renders available connectors, shows availability and errors.
+- Renders available connectors, shows availability and errors, and offers network switch when `expectedChainId` is set.
+
+UI helpers:
+- `ConnectButton`: one-line “connect” that auto-uses preferred connector or opens the modal.
+- `AccountChip`: shows address + network badge, with wrong-network switch prompt and a disconnect button.
 
 ## Extending
 - Add more connectors (hardware/embedded/QR) by passing `connectors` into the provider.
@@ -99,8 +100,9 @@ Example with custom RPC:
 - Build proof-aware UX: subscribe to contract events and show SHARP proof hashes next to wallet state (we’ll add helpers in follow-ups).
 
 ## Roadmap
-- QR / deep-link flows when Starknet kit support lands
-- Network switch prompt + chain guard rails (in progress)
+- Theming tokens + light/dark presets
+- QR / deep-link flows (WalletConnect when Starknet support is stable)
+- Network switch prompt (shipping now) + chain selector presets
 - Storybook examples + unit tests
 - Proof helpers for Cairo/SHARP display
 

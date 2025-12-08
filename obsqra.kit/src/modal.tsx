@@ -26,6 +26,8 @@ export function WalletModal({
     wrongNetwork,
     chainName,
     expectedChainName,
+    canSwitchNetwork,
+    switchNetwork,
   } = useWalletKit();
 
   if (!open) return null;
@@ -99,9 +101,32 @@ export function WalletModal({
               color: '#92400e',
               fontSize: '13px',
               border: '1px solid rgba(234,179,8,0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '10px',
             }}
           >
-            You&apos;re on {chainName || 'an unknown network'}. Please switch to {expectedChainName || 'the expected network'}.
+            <span>
+              You&apos;re on {chainName || 'an unknown network'}. Please switch to {expectedChainName || 'the expected network'}.
+            </span>
+            {canSwitchNetwork && (
+              <button
+                onClick={() => switchNetwork()}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(234,179,8,0.3)',
+                  background: '#fef3c7',
+                  color: '#92400e',
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                  fontSize: '12px',
+                }}
+              >
+                Switch
+              </button>
+            )}
           </div>
         )}
 

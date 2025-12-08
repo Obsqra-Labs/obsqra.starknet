@@ -75,13 +75,17 @@ export function useRiskEngineBackendOrchestration(): UseRiskEngineBackendOrchest
         const config = getConfig();
         const backendUrl = config.backendUrl;
 
-        if (!backendUrl) {
-          throw new Error('Backend URL not configured');
-        }
-
         console.log('🤖 Backend Orchestration: Proposing and executing allocation...');
         console.log('📊 JediSwap metrics:', jediswapMetrics);
         console.log('📊 Ekubo metrics:', ekuboMetrics);
+
+        // Use relative path if no backend URL configured (Nginx will proxy to /api/...)
+        // Otherwise use the configured backend URL
+        const apiUrl = backendUrl 
+          ? `${backendUrl}/api/v1/risk-engine/orchestrate-allocation`
+          : '/api/v1/risk-engine/orchestrate-allocation';
+
+        console.log('📍 API URL:', apiUrl);
 
         // Call backend orchestration endpoint
         // The backend will:
@@ -89,7 +93,7 @@ export function useRiskEngineBackendOrchestration(): UseRiskEngineBackendOrchest
         // 2. Call propose_and_execute_allocation on RiskEngine (via user wallet or backend account)
         // 3. Read the on-chain decision
         // 4. Return the decision data
-        const response = await fetch(`${backendUrl}/api/v1/risk-engine/orchestrate-allocation`, {
+        const response = await fetch(apiUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

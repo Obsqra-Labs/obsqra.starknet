@@ -2,7 +2,7 @@ const path = require('path');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
+  reactStrictMode: false, // Disabled: obsqra.kit has compatibility issues with strict mode in dev
   experimental: {
     // Allow importing the local obsqra.kit package from outside the app directory.
     externalDir: true,

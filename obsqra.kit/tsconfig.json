@@ -11,8 +11,7 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true,
-    "types": ["react/experimental", "react-dom/experimental"]
+    "noEmit": true
   },
   "include": ["src"]
 }

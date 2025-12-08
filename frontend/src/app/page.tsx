@@ -4,7 +4,7 @@ import { Dashboard } from '@/components/Dashboard';
 import { DemoModeToggle } from '@/components/DemoModeToggle';
 import { DemoModeProvider } from '@/contexts/DemoModeContext';
 import { useEffect, useState } from 'react';
-import { useWalletKit, WalletModal } from 'obsqra.kit';
+import { useWallet } from '@/hooks/useWallet';
 
 const DOCS_URL = 'https://github.com/obsqra-labs/obsqra.starknet/tree/main/docs';
 
@@ -22,7 +22,7 @@ export default function Home() {
     wrongNetwork,
     chainName,
     expectedChainName,
-  } = useWalletKit();
+  } = useWallet();
   const [mounted, setMounted] = useState(false);
   const [showWalletModal, setShowWalletModal] = useState(false);
 
@@ -94,19 +94,39 @@ export default function Home() {
           expectedChainName={expectedChainName}
         />
       )}
-      <WalletModal
-        open={showWalletModal}
-        onClose={() => {
-          clearWalletError();
-          setShowWalletModal(false);
-        }}
-      />
+      {showWalletModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 shadow-lg max-w-sm">
+            <h2 className="text-lg font-semibold mb-4 text-ink">Connect Wallet</h2>
+            <div className="space-y-2">
+              {connectors.map((connector) => (
+                <button
+                  key={connector.id}
+                  onClick={async () => {
+                    await connect(connector);
+                    setShowWalletModal(false);
+                  }}
+                  className="w-full px-4 py-2 bg-mint-500 text-white rounded hover:bg-mint-600 transition"
+                >
+                  {connector.name || connector.id}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowWalletModal(false)}
+              className="w-full mt-4 px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 transition"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </DemoModeProvider>
   );
 }
 
 type Accent = 'mint' | 'lagoon' | 'ink';
-type WalletConnector = ReturnType<typeof useWalletKit>['connectors'][number];
+type WalletConnector = ReturnType<typeof useWallet>['connectors'][number];
 
 function Landing({
   connectors,

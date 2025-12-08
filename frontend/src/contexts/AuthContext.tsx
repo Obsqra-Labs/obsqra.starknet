@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useWalletKit } from 'obsqra.kit';
+import { useWallet } from '@/hooks/useWallet';
 
 export interface User {
   id: string;
@@ -30,7 +30,7 @@ export interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { address: walletAddress, disconnect } = useWalletKit();
+  const { address: walletAddress, disconnect } = useWallet();
 
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);

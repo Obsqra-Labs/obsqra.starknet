@@ -1,12 +1,7 @@
 // @ts-nocheck
 'use client';
 
-import {
-  useAccount,
-  useConnect,
-  useDisconnect,
-  useNetwork,
-} from '@starknet-react/core';
+import { useAccount, useConnect, useDisconnect, useNetwork, useSwitchChain } from '@starknet-react/core';
 import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 type Connector = ReturnType<typeof useConnect>['connectors'][number];
@@ -26,6 +21,9 @@ export interface WalletKitValue {
   connectors: Connector[];
   preferredConnector?: Connector;
   lastConnectorId: string | null;
+  canSwitchNetwork: boolean;
+  switchNetwork: (chainId?: bigint) => void;
+  switchNetworkAsync: (chainId?: bigint) => Promise<void>;
   connect: (connector?: Connector) => Promise<void>;
   disconnect: () => Promise<void>;
   error: string | null;
@@ -59,6 +57,13 @@ export function WalletKitStateProvider({
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
   const { chain } = useNetwork();
+  const { switchChain, switchChainAsync } = useSwitchChain({
+    params: expectedChainId
+      ? {
+          chainId: `0x${expectedChainId.toString(16)}`,
+        }
+      : undefined,
+  });
 
   const [error, setError] = useState<string | null>(null);
   const [lastConnectorId, setLastConnectorId] = useState<string | null>(null);
@@ -114,6 +119,7 @@ export function WalletKitStateProvider({
   const chainId = chain?.id;
   const chainName = chain?.name;
   const wrongNetwork = expectedChainId ? !!chainId && chainId !== expectedChainId : false;
+  const canSwitchNetwork = !!expectedChainId;
 
   const value: WalletKitValue = useMemo(
     () => ({
@@ -129,6 +135,21 @@ export function WalletKitStateProvider({
       connectors,
       preferredConnector,
       lastConnectorId,
+      canSwitchNetwork,
+      switchNetwork: (targetId?: bigint) => {
+        const target = targetId ?? expectedChainId;
+        if (!target) return;
+        switchChain({
+          chainId: `0x${target.toString(16)}`,
+        });
+      },
+      switchNetworkAsync: async (targetId?: bigint) => {
+        const target = targetId ?? expectedChainId;
+        if (!target) return;
+        await switchChainAsync({
+          chainId: `0x${target.toString(16)}`,
+        });
+      },
       connect: connectWallet,
       disconnect: disconnectWallet,
       error,
@@ -145,6 +166,10 @@ export function WalletKitStateProvider({
       connectors,
       preferredConnector,
       lastConnectorId,
+      canSwitchNetwork,
+      expectedChainId,
+      switchChain,
+      switchChainAsync,
       connectWallet,
       disconnectWallet,
       error,

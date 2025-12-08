@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useWalletKit } from 'obsqra.kit';
+import { useWallet } from '@/hooks/useWallet';
 
 interface AuthFormProps {
   mode: 'signup' | 'login';
@@ -11,7 +11,7 @@ interface AuthFormProps {
 
 export function AuthForm({ mode, onSuccess }: AuthFormProps) {
   const { signup, login, isLoading, error, clearError } = useAuth();
-  const { address: walletAddress, connectors, connect, isConnecting } = useWalletKit();
+  const { address: walletAddress, connectors, connect, isConnecting } = useWallet();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

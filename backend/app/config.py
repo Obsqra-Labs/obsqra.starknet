@@ -52,6 +52,10 @@ class Settings(BaseSettings):
     RISK_ENGINE_ADDRESS: str = "0x0751c85290c660d738236a12bb362bf64c0a8ef4b1a9cc05dc7000d14fd44d31"  # v2 with orchestration
     STRATEGY_ROUTER_ADDRESS: str = "0x0539d5611c6158a4234f7c4e8e7fe50af7b9502314ca95409f5106ee2f6741d6"  # v2 with deposit/withdraw
     
+    # Backend Wallet (for automated execution)
+    BACKEND_WALLET_ADDRESS: str = ""  # Set in .env
+    BACKEND_WALLET_PRIVATE_KEY: str = ""  # Set in .env - KEEP SECRET!
+    
     # ML Models
     MODEL_VERSION: str = "v1"
     PREDICTION_WINDOW_DAYS: int = 7

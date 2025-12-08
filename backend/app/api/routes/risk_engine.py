@@ -6,6 +6,9 @@ from pydantic import BaseModel, Field
 import logging
 from starknet_py.contract import Contract
 from starknet_py.net.full_node_client import FullNodeClient
+from starknet_py.net.account.account import Account
+from starknet_py.net.signer.stark_curve_signer import KeyPair
+from starknet_py.net.models import StarknetChainId
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -181,67 +184,133 @@ class OrchestrationResponse(BaseModel):
 @router.post("/orchestrate-allocation", response_model=OrchestrationResponse, tags=["Risk Engine"])
 async def orchestrate_allocation(request: OrchestrationRequest):
     """
-    Backend-driven full on-chain orchestration: RiskEngine calculates, validates, and executes allocation
+    🤖 AI-Driven Orchestration: Backend executes verified allocation decision
     
-    Uses starknet.py to properly serialize Cairo structs, ensuring 100% auditable flow.
+    This is the CORE of verifiable AI:
+    1. AI proposes allocation based on protocol metrics
+    2. Generates proof that decision respects constraints
+    3. Backend EXECUTES the transaction on-chain
+    4. Returns decision + proof for audit trail
     
-    This endpoint triggers the complete on-chain flow:
-    1. Calculate risk scores (on-chain)
-    2. Query protocol APY (on-chain)  
-    3. Calculate allocation (on-chain)
-    4. Validate with DAO constraints (on-chain)
-    5. Execute on StrategyRouter (on-chain)
-    6. Emit audit trail events (on-chain)
-    
-    NOTE: Since propose_and_execute_allocation is an invoke operation, 
-    this endpoint provides a read view of the decision after it's been executed on-chain.
-    The actual invoke should be called from the frontend with the user's wallet.
-    For MVP, this returns the latest decision from the contract.
+    The backend signs and submits the transaction using its authorized account.
+    This enables fully automated AI execution without user wallet interaction.
     """
     try:
-        logger.info(f"🤖 Orchestration request received:")
-        logger.info(f"   JediSwap: util={request.jediswap_metrics.utilization}, vol={request.jediswap_metrics.volatility}, "
-                   f"liq={request.jediswap_metrics.liquidity}, audit={request.jediswap_metrics.audit_score}, "
-                   f"age={request.jediswap_metrics.age_days}")
-        logger.info(f"   Ekubo: util={request.ekubo_metrics.utilization}, vol={request.ekubo_metrics.volatility}, "
-                   f"liq={request.ekubo_metrics.liquidity}, audit={request.ekubo_metrics.audit_score}, "
-                   f"age={request.ekubo_metrics.age_days}")
+        logger.info(f"🤖 AI Orchestration Starting...")
+        logger.info(f"📊 JediSwap metrics: util={request.jediswap_metrics.utilization}, "
+                   f"vol={request.jediswap_metrics.volatility}, liq={request.jediswap_metrics.liquidity}, "
+                   f"audit={request.jediswap_metrics.audit_score}, age={request.jediswap_metrics.age_days}")
+        logger.info(f"📊 Ekubo metrics: util={request.ekubo_metrics.utilization}, "
+                   f"vol={request.ekubo_metrics.volatility}, liq={request.ekubo_metrics.liquidity}, "
+                   f"audit={request.ekubo_metrics.audit_score}, age={request.ekubo_metrics.age_days}")
+        
+        # Validate backend wallet is configured
+        if not settings.BACKEND_WALLET_PRIVATE_KEY or not settings.BACKEND_WALLET_ADDRESS:
+            raise HTTPException(
+                status_code=500,
+                detail="Backend wallet not configured. Set BACKEND_WALLET_PRIVATE_KEY in .env"
+            )
         
         # Initialize RPC client
         rpc_client = FullNodeClient(node_url=settings.STARKNET_RPC_URL)
         
-        # Load Risk Engine contract
-        contract = await Contract.from_address(
-            address=int(settings.RISK_ENGINE_ADDRESS, 16),
-            provider=rpc_client
+        # Create backend account (AI orchestrator account)
+        key_pair = KeyPair.from_private_key(int(settings.BACKEND_WALLET_PRIVATE_KEY, 16))
+        account = Account(
+            address=int(settings.BACKEND_WALLET_ADDRESS, 16),
+            client=rpc_client,
+            key_pair=key_pair,
+            chain=StarknetChainId.SEPOLIA
         )
         
-        # ===== FOR MVP =====
-        # Since propose_and_execute_allocation is an INVOKE (write operation),
-        # it must be called from the frontend with the user's wallet account.
-        # This backend endpoint can:
-        # 1. Validate the metrics (done above via Pydantic)
-        # 2. Call the CONTRACT VIEW to get the latest decision
-        # 3. Return that decision to the frontend for display
+        logger.info(f"✅ Backend account initialized: {settings.BACKEND_WALLET_ADDRESS}")
         
-        logger.info("📖 Fetching latest decision from RiskEngine contract (read-only)...")
+        # Load Risk Engine contract with the account (for invoke operations)
+        contract = await Contract.from_address(
+            address=int(settings.RISK_ENGINE_ADDRESS, 16),
+            provider=account
+        )
         
-        # Get decision count (read operation)
+        # Prepare protocol metrics as Python dicts (starknet.py maps to Cairo structs)
+        jediswap_metrics = {
+            'utilization': request.jediswap_metrics.utilization,
+            'volatility': request.jediswap_metrics.volatility,
+            'liquidity': request.jediswap_metrics.liquidity,
+            'audit_score': request.jediswap_metrics.audit_score,
+            'age_days': request.jediswap_metrics.age_days,
+        }
+        
+        ekubo_metrics = {
+            'utilization': request.ekubo_metrics.utilization,
+            'volatility': request.ekubo_metrics.volatility,
+            'liquidity': request.ekubo_metrics.liquidity,
+            'audit_score': request.ekubo_metrics.audit_score,
+            'age_days': request.ekubo_metrics.age_days,
+        }
+        
+        logger.info(f"🚀 EXECUTING propose_and_execute_allocation on-chain...")
+        logger.info(f"   Contract: {settings.RISK_ENGINE_ADDRESS}")
+        logger.info(f"   Caller: {settings.BACKEND_WALLET_ADDRESS}")
+        
+        # Get function selector
+        from starknet_py.hash.selector import get_selector_from_name
+        from starknet_py.cairo.felt import encode_shortstring
+        
+        selector = get_selector_from_name("propose_and_execute_allocation")
+        
+        # Serialize structs to calldata manually
+        # ProtocolMetrics struct: (utilization, volatility, liquidity, audit_score, age_days)
+        calldata = [
+            # jediswap_metrics struct
+            jediswap_metrics['utilization'],
+            jediswap_metrics['volatility'],
+            jediswap_metrics['liquidity'],
+            jediswap_metrics['audit_score'],
+            jediswap_metrics['age_days'],
+            # ekubo_metrics struct
+            ekubo_metrics['utilization'],
+            ekubo_metrics['volatility'],
+            ekubo_metrics['liquidity'],
+            ekubo_metrics['audit_score'],
+            ekubo_metrics['age_days'],
+        ]
+        
+        logger.info(f"📝 Calldata: {calldata}")
+        
+        # Execute via account
+        from starknet_py.net.client_models import Call
+        
+        call = Call(
+            to_addr=int(settings.RISK_ENGINE_ADDRESS, 16),
+            selector=selector,
+            calldata=calldata
+        )
+        
+        invoke_result = await account.execute_v3(
+            calls=[call],
+            auto_estimate=True
+        )
+        
+        logger.info(f"📤 Transaction submitted: {hex(invoke_result.transaction_hash)}")
+        logger.info(f"⏳ Waiting for acceptance...")
+        
+        # Wait for transaction to be accepted
+        await invoke_result.wait_for_acceptance()
+        
+        logger.info(f"✅ Transaction accepted on-chain!")
+        
+        # Now fetch the decision that was just created
         decision_count_result = await contract.functions["get_decision_count"].call()
         decision_count = int(decision_count_result[0]) if decision_count_result else 0
         
-        logger.info(f"📊 Total decisions on-chain: {decision_count}")
-        
         if decision_count > 0:
-            # Get the latest decision (read operation)
             latest_decision_result = await contract.functions["get_decision"].call(decision_count)
             decision_data = latest_decision_result[0] if latest_decision_result else None
             
             if decision_data:
-                logger.info(f"✅ Retrieved latest decision #{decision_count}:")
-                logger.info(f"   JediSwap: {int(decision_data.jediswap_pct)} bps")
-                logger.info(f"   Ekubo: {int(decision_data.ekubo_pct)} bps")
-                logger.info(f"   Block: {int(decision_data.block_number)}")
+                logger.info(f"✅ AI Decision #{decision_count} executed:")
+                logger.info(f"   JediSwap: {int(decision_data.jediswap_pct)/100}%")
+                logger.info(f"   Ekubo: {int(decision_data.ekubo_pct)/100}%")
                 
                 return OrchestrationResponse(
                     decision_id=int(decision_data.decision_id),
@@ -255,21 +324,19 @@ async def orchestrate_allocation(request: OrchestrationRequest):
                     ekubo_apy=int(decision_data.ekubo_apy),
                     rationale_hash=str(decision_data.rationale_hash),
                     strategy_router_tx=str(decision_data.strategy_router_tx),
-                    message="Latest decision retrieved from on-chain"
+                    message=f"✅ AI executed decision #{decision_count} on-chain (tx: {hex(invoke_result.transaction_hash)})"
                 )
         
-        logger.warning("⚠️ No decisions found on-chain yet")
         raise HTTPException(
-            status_code=404,
-            detail="No orchestration decisions found on-chain. "
-                   "Frontend must first call propose_and_execute_allocation via user wallet."
+            status_code=500,
+            detail="Transaction succeeded but failed to retrieve decision"
         )
         
     except HTTPException as e:
         raise e
     except Exception as e:
-        logger.error(f"❌ Orchestration failed: {str(e)}", exc_info=True)
+        logger.error(f"❌ AI Orchestration failed: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Orchestration failed: {str(e)}"
+            detail=f"AI execution failed: {str(e)}"
         )
