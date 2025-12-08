@@ -15,6 +15,7 @@ import { ProofDisplay } from './ProofDisplay';
 import { TransactionHistory } from './TransactionHistory';
 import { AnalyticsDashboard } from './AnalyticsDashboard';
 import { RebalanceHistory } from './RebalanceHistory';
+import { DepositAllocationPreview } from './DepositAllocationPreview';
 import { categorizeError } from '@/services/errorHandler';
 import { useState, useMemo, useEffect } from 'react';
 import { getConfig } from '@/lib/config';
@@ -110,11 +111,19 @@ export function Dashboard() {
       console.log('Transaction added with ID:', txId);
       console.log('Full txHistory state:', txHistory.transactions);
 
-      // Show immediate feedback
+      // Show immediate feedback with allocation breakdown
+      const depositAmt = parseFloat(depositAmount);
+      const jediswapAmt = (depositAmt * allocation.jediswap) / 100;
+      const ekuboAmt = (depositAmt * allocation.ekubo) / 100;
+      
       setDepositAmount('');
       alert(
         '✅ Deposit Submitted!\n\n' +
-        '💰 Amount: ' + depositAmount + ' STRK\n' +
+        '💰 Amount: ' + depositAmount + ' STRK\n\n' +
+        '📊 Allocation (AI Recommended):\n' +
+        '  JediSwap: ' + allocation.jediswap.toFixed(2) + '% (' + jediswapAmt.toFixed(4) + ' STRK)\n' +
+        '  Ekubo: ' + allocation.ekubo.toFixed(2) + '% (' + ekuboAmt.toFixed(4) + ' STRK)\n\n' +
+        (latestDecision?.decisionId ? `✅ Based on AI Decision #${latestDecision.decisionId}\n` : '') +
         '🔗 Tx Hash: ' + txHash.slice(0, 10) + '...\n\n' +
         '⏳ Waiting for confirmation on Starknet...\n\n' +
         'Check History tab to see transaction (should appear as "pending")'
@@ -576,6 +585,18 @@ export function Dashboard() {
                 max={strategyDeposit.userBalance}
                 className="w-full p-3 mb-4 bg-slate-900/70 border border-green-500/30 rounded-lg text-white placeholder-gray-500"
               />
+              
+              {/* Show allocation preview when amount is entered */}
+              {depositAmount && parseFloat(depositAmount) > 0 && (
+                <DepositAllocationPreview
+                  depositAmount={parseFloat(depositAmount)}
+                  jediswapPct={allocation.jediswap}
+                  ekuboPct={allocation.ekubo}
+                  latestDecisionId={latestDecision?.decisionId}
+                  proofHash={latestDecision?.proofHash}
+                />
+              )}
+              
               <button
                 onClick={handleDeposit}
                 disabled={isDepositing || !depositAmount || parseFloat(depositAmount) <= 0 || strategyDeposit.contractVersion === 'v1'}
