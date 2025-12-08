@@ -1,6 +1,10 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { useStrategyRouterV2 } from '@/hooks/useStrategyRouterV2';
+import { useStrategyDeposit } from '@/hooks/useStrategyDeposit';
+import { getConfig } from '@/lib/config';
+import { useAccount } from '@starknet-react/core';
 
 interface ProtocolStats {
   name: string;
@@ -18,33 +22,64 @@ interface AnalyticsDashboardProps {
 }
 
 export function AnalyticsDashboard({ allocation }: AnalyticsDashboardProps) {
+  const { address } = useAccount();
+  const routerV2 = useStrategyRouterV2();
+  const strategyDeposit = useStrategyDeposit(getConfig().strategyRouterAddress);
+  
+  // Fetch real portfolio data
+  const [protocolAPYs, setProtocolAPYs] = useState<{ jediswap: number; ekubo: number }>({
+    jediswap: 5.2, // Default, will fetch real data
+    ekubo: 8.5,
+  });
+
+  // Fetch APY data from backend (or protocol contracts)
+  useEffect(() => {
+    const fetchAPYs = async () => {
+      try {
+        // TODO: Replace with real APY fetching from protocols or backend
+        // For now, use defaults or fetch from backend API
+        const response = await fetch('/api/v1/analytics/protocol-apys');
+        if (response.ok) {
+          const data = await response.json();
+          setProtocolAPYs({
+            jediswap: data.jediswap || 5.2,
+            ekubo: data.ekubo || 8.5,
+          });
+        }
+      } catch (err) {
+        console.warn('Failed to fetch APY data, using defaults:', err);
+      }
+    };
+    fetchAPYs();
+  }, []);
+
   const protocolStats: ProtocolStats[] = useMemo(() => {
-    const jediAlloc = allocation?.jediswap ?? 50;
-    const ekuboAlloc = allocation?.ekubo ?? 50;
+    const jediAlloc = allocation?.jediswap ?? routerV2.jediswapAllocation ?? 50;
+    const ekuboAlloc = allocation?.ekubo ?? routerV2.ekuboAllocation ?? 50;
 
     return [
       {
         name: 'JediSwap',
         icon: '🔄',
         allocation: jediAlloc,
-        apy: 5.2,
-        tvl: '$1.8M',
+        apy: protocolAPYs.jediswap,
+        tvl: routerV2.totalValueLocked ? `${(parseFloat(routerV2.totalValueLocked) / 1e18).toFixed(2)} STRK` : 'Loading...',
         risk: 'low',
-        change24h: 1.1,
+        change24h: 1.1, // TODO: Calculate from historical data
         color: 'blue',
       },
       {
         name: 'Ekubo',
         icon: '🌀',
         allocation: ekuboAlloc,
-        apy: 8.5,
-        tvl: '$2.1M',
+        apy: protocolAPYs.ekubo,
+        tvl: routerV2.totalValueLocked ? `${(parseFloat(routerV2.totalValueLocked) / 1e18).toFixed(2)} STRK` : 'Loading...',
         risk: 'medium',
-        change24h: 2.4,
+        change24h: 2.4, // TODO: Calculate from historical data
         color: 'orange',
       },
     ];
-  }, [allocation]);
+  }, [allocation, routerV2, protocolAPYs]);
 
   const totalAPY = useMemo(() => {
     return protocolStats.reduce((sum, protocol) => {
@@ -52,7 +87,15 @@ export function AnalyticsDashboard({ allocation }: AnalyticsDashboardProps) {
     }, 0);
   }, [protocolStats]);
 
-  const portfolioValue = 100; // Real portfolio value from on-chain data
+  // Real portfolio value from contract
+  const portfolioValue = useMemo(() => {
+    if (address && strategyDeposit.contractBalance > 0) {
+      return strategyDeposit.contractBalance;
+    }
+    // Fallback to TVL if user balance not available
+    const tvl = parseFloat(routerV2.totalValueLocked || '0') / 1e18;
+    return tvl > 0 ? tvl : 0;
+  }, [address, strategyDeposit.contractBalance, routerV2.totalValueLocked]);
 
   const getRiskBadge = (risk: string) => {
     switch (risk) {

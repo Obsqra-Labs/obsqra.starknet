@@ -271,3 +271,24 @@ async def get_proof_performance(
         "max_generation_time": round(max(generation_times), 2) if generation_times else 0,
     }
 
+
+@router.get("/protocol-apys")
+async def get_protocol_apys():
+    """
+    Get current APY rates for protocols.
+    
+    TODO: Fetch from actual protocol contracts or external APIs.
+    For now, returns default values.
+    """
+    # TODO: Implement real APY fetching from:
+    # - JediSwap: Query pool contracts for current rates
+    # - Ekubo: Query pool contracts for current rates
+    # - Or: Use external APIs (DefiLlama, etc.)
+    
+    return {
+        "jediswap": 5.2,  # Default, replace with real data
+        "ekubo": 8.5,     # Default, replace with real data
+        "source": "default",  # Will be "on-chain" or "api" when implemented
+        "last_updated": datetime.utcnow().isoformat(),
+    }
+
