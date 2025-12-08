@@ -1,10 +1,10 @@
 'use client';
 
-import { StarknetConfig, argent, braavos, useInjectedConnectors, jsonRpcProvider } from '@starknet-react/core';
 import { Chain } from '@starknet-react/chains';
-import { ReactNode } from 'react';
+import { ReactNode, useMemo } from 'react';
+import { WalletKitProvider } from 'obsqra.kit';
 
-// Define custom Sepolia chain with Alchemy RPC to avoid CORS issues
+// Default Sepolia chain (can be overridden via prop)
 const sepoliaCustom: Chain = {
   id: BigInt('0x534e5f5345504f4c4941'), // SN_SEPOLIA
   network: 'sepolia',
@@ -27,34 +27,17 @@ const sepoliaCustom: Chain = {
 };
 
 export function StarknetProvider({ children }: { children: ReactNode }) {
-  const { connectors } = useInjectedConnectors({
-    recommended: [argent(), braavos()],
-    includeRecommended: 'onlyIfNoConnectors',
-    order: 'random',
-  });
-
-  // Provider factory function - use local proxy to avoid CORS issues
-  const provider = jsonRpcProvider({
-    rpc: (chain) => {
-      // In production, use local proxy endpoint; in dev, use direct RPC
-      const isProduction = typeof window !== 'undefined' && window.location.protocol === 'https:';
-      const nodeUrl = isProduction
-        ? '/api/rpc'  // Local proxy endpoint
-        : 'https://starknet-sepolia.g.alchemy.com/v2/EvhYN6geLrdvbYHVRgPJ7'; // Direct RPC for local dev
-      
-      return { nodeUrl };
-    },
-  });
+  // Prefer production proxy when served over https to avoid CORS; otherwise use env or fallback RPC.
+  const rpcUrl = useMemo(() => {
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+      return '/api/rpc';
+    }
+    return process.env.NEXT_PUBLIC_STARKNET_RPC || 'https://starknet-sepolia.g.alchemy.com/v2/EvhYN6geLrdvbYHVRgPJ7';
+  }, []);
 
   return (
-    <StarknetConfig
-      chains={[sepoliaCustom]}
-      provider={provider}
-      connectors={connectors}
-      autoConnect
-    >
+    <WalletKitProvider chains={[sepoliaCustom]} rpcUrl={rpcUrl} autoConnect>
       {children}
-    </StarknetConfig>
+    </WalletKitProvider>
   );
 }
-

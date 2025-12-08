@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useAccount, useConnect, useDisconnect } from '@starknet-react/core';
+import { useWalletKit } from 'obsqra.kit';
 
 export interface User {
   id: string;
@@ -30,9 +30,7 @@ export interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { address: walletAddress } = useAccount();
-  const { connect, connectors } = useConnect();
-  const { disconnect } = useDisconnect();
+  const { address: walletAddress, disconnect } = useWalletKit();
 
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -205,4 +203,3 @@ export function useAuth() {
   }
   return context;
 }
-

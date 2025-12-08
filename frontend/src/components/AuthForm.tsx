@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useAccount, useConnect } from '@starknet-react/core';
+import { useWalletKit } from 'obsqra.kit';
 
 interface AuthFormProps {
   mode: 'signup' | 'login';
@@ -11,8 +11,7 @@ interface AuthFormProps {
 
 export function AuthForm({ mode, onSuccess }: AuthFormProps) {
   const { signup, login, isLoading, error, clearError } = useAuth();
-  const { address: walletAddress } = useAccount();
-  const { connect, connectors } = useConnect();
+  const { address: walletAddress, connectors, connect, isConnecting } = useWalletKit();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -185,11 +184,11 @@ export function AuthForm({ mode, onSuccess }: AuthFormProps) {
             {connectors.map((connector) => (
               <button
                 key={connector.id}
-                onClick={() => connect({ connector })}
-                disabled={isLoading}
+                onClick={() => connect(connector)}
+                disabled={isLoading || isConnecting || !connector.available()}
                 className="w-full py-3 bg-slate-800/50 hover:bg-slate-800 border border-blue-400/20 rounded-lg text-gray-300 hover:text-white font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
-                🔗 {connector.name}
+                {connector.available() ? `🔗 ${connector.name}` : `${connector.name} not installed`}
               </button>
             ))}
           </div>
@@ -201,4 +200,3 @@ export function AuthForm({ mode, onSuccess }: AuthFormProps) {
     </div>
   );
 }
-

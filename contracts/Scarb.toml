@@ -13,7 +13,7 @@ snforge_std = { git = "https://github.com/foundry-rs/starknet-foundry.git", tag 
 # Enable Sierra codegen (default: true)
 sierra = true
 # Enable CASM codegen (default: false)
-casm = false
+casm = true
 # Enable allowed libfuncs validation (default: true)
 allowed-libfuncs = true
 # Raise errors instead of warnings if disallowed libfuncs are found (default: false)

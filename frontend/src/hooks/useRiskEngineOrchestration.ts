@@ -204,11 +204,19 @@ export function useRiskEngineOrchestration(): UseRiskEngineOrchestrationReturn {
 
         // Fetch the decision (using latest decision_id)
         const decisionCount = await contract.call('get_decision_count', []);
-        const latestDecisionId = Number(decisionCount[0]);
+        const latestDecisionId = Number(
+          (decisionCount as any)?.[0] ??
+            (decisionCount as any)?.decision_count ??
+            0,
+        );
 
         if (latestDecisionId > 0) {
           const decisionResult = await contract.call('get_decision', [latestDecisionId]);
-          const decisionData = decisionResult[0];
+          const decisionData =
+            (decisionResult as any)?.[0] ??
+            (decisionResult as any)?.decision ??
+            (decisionResult as any) ??
+            {};
 
           const decision: AllocationDecision = {
             decisionId: Number(decisionData.decision_id),
@@ -267,7 +275,11 @@ export function useRiskEngineOrchestration(): UseRiskEngineOrchestrationReturn {
         );
 
         const decisionResult = await contract.call('get_decision', [decisionId]);
-        const decisionData = decisionResult[0];
+        const decisionData =
+          (decisionResult as any)?.[0] ??
+          (decisionResult as any)?.decision ??
+          (decisionResult as any) ??
+          {};
 
         const decision: AllocationDecision = {
           decisionId: Number(decisionData.decision_id),
@@ -313,7 +325,11 @@ export function useRiskEngineOrchestration(): UseRiskEngineOrchestrationReturn {
       );
 
       const result = await contract.call('get_decision_count', []);
-      return Number(result[0]);
+      return Number(
+        (result as any)?.[0] ??
+          (result as any)?.decision_count ??
+          0,
+      );
     } catch (err) {
       console.error('❌ Error fetching decision count:', err);
       return null;
@@ -330,4 +346,3 @@ export function useRiskEngineOrchestration(): UseRiskEngineOrchestrationReturn {
     clearError,
   };
 }
-

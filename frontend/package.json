@@ -9,17 +9,29 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@mistcash/config": "^0.2.0-beta.1",
-    "@mistcash/crypto": "^0.2.0-beta.1",
-    "@mistcash/react": "^0.2.0-beta.1",
-    "@mistcash/sdk": "^0.2.0-beta.1",
+    "@mistcash/config": "0.2.0-beta.1",
+    "@mistcash/crypto": "0.2.0-beta.1",
+    "@mistcash/react": "0.2.0-beta.1",
+    "@mistcash/sdk": "0.2.0-beta.1",
     "@starknet-react/chains": "^0.1.7",
     "@starknet-react/core": "^3.6.0",
     "get-starknet-core": "^4.0.0",
     "next": "^14.0.0",
+    "obsqra.kit": "file:../obsqra.kit",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
     "starknet": "^6.11.0"
+  },
+  "overrides": {
+    "@mistcash/react": {
+      "@mistcash/sdk": "0.2.0-beta.1",
+      "@mistcash/config": "0.2.0-beta.1",
+      "@mistcash/crypto": "0.2.0-beta.1"
+    },
+    "@mistcash/sdk": {
+      "@mistcash/config": "0.2.0-beta.1",
+      "@mistcash/crypto": "0.2.0-beta.1"
+    }
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

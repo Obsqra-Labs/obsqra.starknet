@@ -1,0 +1,49 @@
+{
+  "name": "obsqra.kit",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Obsqra Labs wallet kit for Starknet — headless hooks plus a modal for Argent/Braavos and beyond.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/obsqra-labs/obsqra.starknet"
+  },
+  "bugs": {
+    "url": "https://github.com/obsqra-labs/obsqra.starknet/issues"
+  },
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "sideEffects": false,
+  "scripts": {
+    "lint": "echo \"No lint configured yet\"",
+    "build": "echo \"Bundle with your preferred tool (tsup/tsc)\""
+  },
+  "dependencies": {
+    "@starknet-react/core": "^3.6.0",
+    "@starknet-react/chains": "^0.1.7",
+    "starknet": "^6.11.0",
+    "react": "^18.0.0"
+  },
+  "peerDependencies": {
+    "@starknet-react/core": "^3.6.0",
+    "@starknet-react/chains": "^0.1.7",
+    "react": "^18.0.0",
+    "starknet": "^6.11.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "starknet",
+    "wallet",
+    "obsqra",
+    "argent",
+    "braavos",
+    "connector",
+    "modal",
+    "sdk"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

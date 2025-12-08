@@ -1,7 +1,19 @@
+const path = require('path');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  experimental: {
+    // Allow importing the local obsqra.kit package from outside the app directory.
+    externalDir: true,
+  },
+  transpilePackages: ['obsqra.kit'],
   webpack: (config) => {
+    // Ensure modules resolve from this app's node_modules when importing externalDir packages.
+    config.resolve.modules = [
+      ...(config.resolve.modules || []),
+      path.resolve(__dirname, 'node_modules'),
+    ];
     config.resolve.fallback = {
       ...config.resolve.fallback,
       fs: false,
@@ -13,4 +25,3 @@ const nextConfig = {
 };
 
 module.exports = nextConfig;
-

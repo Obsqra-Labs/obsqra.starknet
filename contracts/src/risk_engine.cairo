@@ -124,7 +124,7 @@ mod RiskEngine {
     use core::traits::Into;
     use core::traits::TryInto;
     use core::option::OptionTrait;
-    use core::num::traits::DivRem;
+    // Removed DivRem import - using simpler division
     
     // Import interfaces
     use super::super::strategy_router_v2::IStrategyRouterV2Dispatcher;
@@ -285,10 +285,12 @@ mod RiskEngine {
     
     // Helper: Division using u256
     fn felt252_div(lhs: felt252, rhs: felt252) -> felt252 {
+        if rhs == 0 {
+            return 0;
+        }
         let lhs_u256: u256 = lhs.into();
         let rhs_u256: u256 = rhs.into();
-        let rhs_nonzero = rhs_u256.try_into().unwrap();
-        let (quotient, _) = DivRem::div_rem(lhs_u256, rhs_nonzero);
+        let quotient = lhs_u256 / rhs_u256;
         u256_to_felt252(quotient)
     }
     

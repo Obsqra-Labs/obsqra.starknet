@@ -4,7 +4,14 @@ import { useAccount } from '@starknet-react/core';
 export interface Transaction {
   id: string;
   hash: string;
-  type: 'UPDATE_ALLOCATION' | 'SET_CONSTRAINTS' | 'ACCRUE_YIELDS' | 'DEPOSIT' | 'WITHDRAW' | 'UNKNOWN';
+  type:
+    | 'UPDATE_ALLOCATION'
+    | 'SET_CONSTRAINTS'
+    | 'ACCRUE_YIELDS'
+    | 'DEPOSIT'
+    | 'WITHDRAW'
+    | 'AI_ORCHESTRATION'
+    | 'UNKNOWN';
   status: 'pending' | 'confirmed' | 'failed';
   timestamp: number;
   details: any;

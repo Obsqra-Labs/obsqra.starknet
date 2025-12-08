@@ -9,6 +9,7 @@ const TX_TYPE_LABELS: Record<Transaction['type'], string> = {
   ACCRUE_YIELDS: 'Accrue Yields',
   DEPOSIT: 'Deposit STRK',
   WITHDRAW: 'Withdraw STRK',
+  AI_ORCHESTRATION: 'AI Orchestration',
   UNKNOWN: 'Unknown',
 };
 
@@ -185,4 +186,3 @@ export function TransactionHistory() {
     </div>
   );
 }
-
