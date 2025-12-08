@@ -117,11 +117,23 @@ export function ProofBadge({ hash, status, txHash, factHash, submittedAt }: Proo
 
             <div className="mt-3 pt-3 border-t border-white/10">
               <p className="text-xs text-gray-400">
-                {status === 'verified' && '✅ Proof verified on Ethereum L1'}
-                {status === 'verifying' && '⏳ Verification in progress (10-60 min)'}
-                {status === 'submitted' && '📡 Submitted to SHARP'}
-                {status === 'generated' && '🔐 Cryptographic proof generated'}
-                {status === 'failed' && '❌ Verification failed'}
+                {status === 'verified' && (
+                  <>
+                    ✅ <span className="text-green-400 font-semibold">Locally verified</span> (<1 second)
+                    <br />
+                    <span className="text-gray-500 text-[10px] mt-1 block">Cryptographic proof of computation integrity</span>
+                  </>
+                )}
+                {status === 'verifying' && '⏳ SHARP verification in progress (10-60 min)'}
+                {status === 'submitted' && (
+                  <>
+                    📡 On-chain execution succeeded
+                    <br />
+                    <span className="text-gray-500 text-[10px] mt-1 block">Proof verified locally before execution</span>
+                  </>
+                )}
+                {status === 'generated' && '🔐 Cryptographic proof generated (verification pending)'}
+                {status === 'failed' && '❌ Verification or execution failed'}
               </p>
             </div>
           </div>
