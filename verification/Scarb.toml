@@ -1,0 +1,30 @@
+[package]
+name = "obsqra_contracts"
+version = "0.1.0"
+edition = "2024_07"
+
+[dependencies]
+starknet = ">=2.0.0"
+
+[dev-dependencies]
+snforge_std = { git = "https://github.com/foundry-rs/starknet-foundry.git", tag = "v0.53.0" }
+
+[[target.starknet-contract]]
+# Enable Sierra codegen (default: true)
+sierra = true
+# Enable CASM codegen (default: false)
+casm = false
+# Enable allowed libfuncs validation (default: true)
+allowed-libfuncs = true
+# Raise errors instead of warnings if disallowed libfuncs are found (default: false)
+allowed-libfuncs-deny = false
+
+[tool.sncast.my_testnet]
+account = "my_testnet"
+accounts-file = "~/.starknet_accounts/starknet_open_zeppelin_accounts.json"
+network = "alpha-sepolia"
+
+[tool.sncast.sepolia_deploy]
+account = "sepolia_deploy"
+url = "https://starknet-sepolia.g.alchemy.com/v2/EvhYN6geLrdvbYHVRgPJ7"
+

@@ -118,11 +118,13 @@ obsqra.starknet/
 
 | Document | Description |
 |----------|-------------|
-| [Dev Log](docs/DEV_LOG.md) | Development journey & lessons learned |
-| [Implementation Guide](docs/IMPLEMENTATION_GUIDE.md) | Setup & deployment guide |
-| [Architecture](docs/ARCHITECTURE.md) | System design |
-| [API Reference](docs/API.md) | Contract interfaces |
-| [Starknet Protocols](docs/STARKNET_PROTOCOLS.md) | Native protocol integration |
+| [**Quick Reference**](docs/QUICK_REFERENCE.md) | ⚡ Common commands & workflows |
+| [**Lessons Learned**](docs/LESSONS_LEARNED.md) | 🎓 Key insights from EVM → Starknet migration |
+| [Implementation Guide](docs/IMPLEMENTATION_GUIDE.md) |  Setup & deployment guide |
+| [Dev Log](docs/DEV_LOG.md) | 📝 Development journey |
+| [API Reference](docs/API.md) | 📚 Contract interfaces |
+| [Starknet Protocols](docs/STARKNET_PROTOCOLS.md) | 🔗 Native protocol integration |
+| [Architecture](docs/ARCHITECTURE.md) | 🏗️ System design |
 
 ---
 

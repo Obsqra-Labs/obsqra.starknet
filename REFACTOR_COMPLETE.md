@@ -145,7 +145,7 @@ interface Allocation {
 
 ---
 
-## 🚀 Next Steps
+##  Next Steps
 
 ### Immediate
 1. **Research protocol addresses** for Sepolia testnet
@@ -240,5 +240,5 @@ For questions or issues:
 **Integration:** ✅ READY  
 **Documentation:** ✅ COMPLETE  
 
-**The Obsqra.starknet project is now a true Starknet-native application!** 🚀
+**The Obsqra.starknet project is now a true Starknet-native application!** 
 

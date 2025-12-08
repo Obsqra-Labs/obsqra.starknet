@@ -47,7 +47,7 @@ export interface DAOConstraints {
   min_liquidity: bigint;
 }
 
-export function useDAOConstraints(contractAddress: string) {
+export function useDAOConstraints(contractAddress?: `0x${string}`) {
   const { account } = useAccount();
   const [isUpdating, setIsUpdating] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
@@ -118,7 +118,7 @@ export function useDAOConstraints(contractAddress: string) {
     setIsValidating(true);
     try {
       // Use read contract to validate
-      const result = await account?.provider.callContract({
+      const result = await account?.callContract({
         contractAddress,
         entrypoint: 'validate_allocation',
         calldata: [nostra.toString(), zklend.toString(), ekubo.toString()],
@@ -143,4 +143,3 @@ export function useDAOConstraints(contractAddress: string) {
     refetch,
   };
 }
-

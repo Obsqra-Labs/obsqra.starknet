@@ -331,7 +331,7 @@ NEXT_PUBLIC_RISK_ENGINE_ADDRESS=<deployed_address>
 8. **Update AI Service** → Fix starknet_py imports
 9. **Test AI → Contract** → Automated rebalancing
 
-### 🚀 Medium Term (Next Week)
+###  Medium Term (Next Week)
 10. **Deploy to Sepolia Testnet**
 11. **Public Demo**
 12. **Security Review**
@@ -395,4 +395,4 @@ cd /opt/obsqra.starknet/ai-service && AI_SERVICE_PORT=8001 ./venv/bin/python3 ma
 katana --accounts 10 --seed 0
 ```
 
-Then let me know when it's running, and we'll deploy the contracts! 🚀
+Then let me know when it's running, and we'll deploy the contracts! 

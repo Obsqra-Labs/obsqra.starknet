@@ -26,7 +26,7 @@ python3 test_integration.py
 
 ---
 
-## 🚀 Quick Start Guide
+##  Quick Start Guide
 
 ### For Developers
 
@@ -359,7 +359,7 @@ python3 test_contracts.py
 3. ✅ **Run integration tests** (Done)
 4. 🔄 **Test with wallet** (User responsibility)
 5. 📈 **Monitor on-chain activity** (View in Voyager/Starkscan)
-6. 🚀 **Add write operations** (Coming next)
+6.  **Add write operations** (Coming next)
 
 ---
 

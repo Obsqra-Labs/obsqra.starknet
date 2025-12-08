@@ -21,7 +21,7 @@ RPC_URL = "https://starknet-sepolia.g.alchemy.com/v2/EvhYN6geLrdvbYHVRgPJ7"
 
 async def main():
     print("=" * 70)
-    print("🚀 DEPLOYING ACCOUNT + CONTRACTS TO SEPOLIA")
+    print(" DEPLOYING ACCOUNT + CONTRACTS TO SEPOLIA")
     print("=" * 70)
     print()
     

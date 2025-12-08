@@ -24,7 +24,9 @@ account = "my_testnet"
 accounts-file = "~/.starknet_accounts/starknet_open_zeppelin_accounts.json"
 network = "alpha-sepolia"
 
-[tool.sncast.sepolia_deploy]
-account = "sepolia_deploy"
-url = "https://starknet-sepolia.g.alchemy.com/v2/EvhYN6geLrdvbYHVRgPJ7"
+[tool.sncast.deployer]
+account = "deployer"
+accounts-file = "~/.starknet_accounts/starknet_open_zeppelin_accounts.json"
+url = "https://starknet-sepolia-rpc.publicnode.com"
+network = "alpha-sepolia"
 

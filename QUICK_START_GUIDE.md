@@ -1,4 +1,4 @@
-# 🚀 Quick Start: Build & Deploy Your Starknet POC
+#  Quick Start: Build & Deploy Your Starknet POC
 
 ## 📋 What You Have
 

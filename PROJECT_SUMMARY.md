@@ -20,7 +20,7 @@ This project successfully:
 
 ---
 
-## 🚀 What's Deployed
+##  What's Deployed
 
 ### Smart Contracts (3/3 Live)
 
@@ -310,7 +310,7 @@ obsqra.starknet/
 
 ---
 
-## 🚀 Next Steps & Future Improvements
+##  Next Steps & Future Improvements
 
 ### Short Term (1-2 weeks)
 1. [ ] Launch on Starknet mainnet
@@ -420,7 +420,7 @@ All systems are verified operational. The project successfully demonstrates:
 - Backend service integration
 - Comprehensive testing and documentation
 
-**Ready for production use! 🚀**
+**Ready for production use! **
 
 ---
 

@@ -6,7 +6,7 @@
 
 ---
 
-## 🚀 Live Deployment
+##  Live Deployment
 
 Contracts are deployed on **Starknet Sepolia Testnet**:
 

@@ -2,7 +2,7 @@
 set -e
 
 echo "════════════════════════════════════════════════════════"
-echo "🚀 Starknet Contract Deployment - Step by Step"
+echo " Starknet Contract Deployment - Step by Step"
 echo "════════════════════════════════════════════════════════"
 echo ""
 echo "Wallet: 0x07933ED0d1c5eD8976e18301921AAcbdd3abc48065c85c292B998f0e72a7F027"

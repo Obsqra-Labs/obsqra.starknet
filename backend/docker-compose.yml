@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: obsqra-postgres
+    environment:
+      POSTGRES_USER: obsqra
+      POSTGRES_PASSWORD: obsqra
+      POSTGRES_DB: obsqra_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U obsqra"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: .
+    container_name: obsqra-backend
+    environment:
+      DATABASE_URL: postgresql://obsqra:obsqra@postgres:5432/obsqra_db
+      ENVIRONMENT: production
+      DEBUG: "false"
+      STARKNET_RPC_URL: https://starknet-sepolia.public.blastapi.io
+      RISK_ENGINE_ADDRESS: 0x008c3eff435e859e3b8e5cb12f837f4dfa77af25c473fb43067adf9f557a3d80
+      STRATEGY_ROUTER_ADDRESS: 0x01fa59cf9a28d97fd9ab5db1e21f9dd6438af06cc535bccdb58962518cfdf53a
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./app:/app/app
+    command: sh -c "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000"
+
+volumes:
+  postgres_data:
+

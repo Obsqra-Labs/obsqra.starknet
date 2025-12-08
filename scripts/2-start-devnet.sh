@@ -16,7 +16,7 @@ if lsof -i:5050 -sTCP:LISTEN > /dev/null 2>&1; then
     exit 1
 fi
 
-echo "🚀 Starting Katana (Starknet devnet)..."
+echo " Starting Katana (Starknet devnet)..."
 echo ""
 echo "Configuration:"
 echo "  • Port: 5050"

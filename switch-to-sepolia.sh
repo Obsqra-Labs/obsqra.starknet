@@ -23,7 +23,7 @@ pkill -f "PORT=3002" 2>/dev/null || echo "No old process found"
 sleep 2
 
 echo ""
-echo "🚀 Starting frontend on Sepolia..."
+echo " Starting frontend on Sepolia..."
 PORT=3002 npm run dev > /tmp/frontend-sepolia.log 2>&1 &
 
 sleep 5

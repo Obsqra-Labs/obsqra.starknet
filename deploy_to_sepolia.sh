@@ -2,7 +2,7 @@
 set -e
 
 echo "========================================"
-echo "🚀 DEPLOYING OBSQRA CONTRACTS TO SEPOLIA"
+echo " DEPLOYING OBSQRA CONTRACTS TO SEPOLIA"
 echo "========================================"
 echo ""
 
@@ -34,7 +34,7 @@ fi
 echo "✅ RiskEngine class hash: $RISK_ENGINE_CLASS"
 echo ""
 
-echo "🚀 Deploying RiskEngine..."
+echo " Deploying RiskEngine..."
 RISK_ENGINE_ADDR=$(sncast --profile default deploy --class-hash $RISK_ENGINE_CLASS \
   --network $NETWORK 2>&1 | grep -oP 'contract_address: \K[0-9x]+' || echo "")
 

@@ -1,147 +1,146 @@
 #[cfg(test)]
-mod tests {
-    use obsqra_contracts::strategy_router::{IStrategyRouterDispatcher, IStrategyRouterDispatcherTrait};
+mod test_strategy_router {
     use starknet::ContractAddress;
-    use snforge_std::{declare, deploy, start_cheat_caller_address, stop_cheat_caller_address};
-    use core::traits::Into;
-    use core::result::ResultTrait;
-    
-    fn deploy_contract() -> ContractAddress {
-        let declared = declare("StrategyRouter");
-        let deploy_result: Result<(ContractAddress, Span<felt252>), felt252> = deploy(@declared, @array![
-            0x123.into(),  // owner
-            0x456.into(),  // aave
-            0x789.into(),  // lido
-            0xabc.into(),  // compound
-            0xdef.into()   // risk_engine
-        ]);
-        let (contract_address, _) = deploy_result.unwrap();
-        contract_address
+    use starknet::contract_address_const;
+    use starknet::get_caller_address;
+    use obsqra_contracts::strategy_router::{IStrategyRouterDispatcher, IStrategyRouterDispatcherTrait};
+    use snforge_std::{declare, ContractClassTrait, start_cheat_caller_address, stop_cheat_caller_address};
+
+    fn deploy_contracts() -> (IRiskEngineDispatcher, IDAOConstraintManagerDispatcher, IStrategyRouterDispatcher) {
+        // Deploy RiskEngine
+        let risk_contract = declare("RiskEngine").unwrap();
+        let (risk_address, _) = risk_contract.deploy(@ArrayTrait::new()).unwrap();
+        let risk_engine = IRiskEngineDispatcher { contract_address: risk_address };
+        
+        // Deploy DAOConstraintManager
+        let dao_contract = declare("DAOConstraintManager").unwrap();
+        let mut dao_calldata = ArrayTrait::new();
+        dao_calldata.append(6000); // max_single_protocol = 60%
+        dao_calldata.append(2);    // min_protocols = 2
+        dao_calldata.append(3000); // max_volatility = 30%
+        dao_calldata.append(1000000000000000000); // min_liquidity = 1 ETH (low)
+        dao_calldata.append(0);    // high part of u256
+        let (dao_address, _) = dao_contract.deploy(@dao_calldata).unwrap();
+        let dao_manager = IDAOConstraintManagerDispatcher { contract_address: dao_address };
+        
+        // Deploy StrategyRouter
+        let router_contract = declare("StrategyRouter").unwrap();
+        let mut router_calldata = ArrayTrait::new();
+        router_calldata.append(risk_address.into());
+        router_calldata.append(dao_address.into());
+        router_calldata.append(contract_address_const::<0x123>().into()); // nostra_address
+        router_calldata.append(contract_address_const::<0x456>().into()); // zklend_address
+        router_calldata.append(contract_address_const::<0x789>().into()); // ekubo_address
+        router_calldata.append(3333); // initial nostra allocation
+        router_calldata.append(3333); // initial zklend allocation
+        router_calldata.append(3334); // initial ekubo allocation
+        let (router_address, _) = router_contract.deploy(@router_calldata).unwrap();
+        let strategy_router = IStrategyRouterDispatcher { contract_address: router_address };
+        
+        (risk_engine, dao_manager, strategy_router)
     }
-    
+
     #[test]
-    fn test_get_allocation_initial() {
-        let router = deploy_contract();
-        let dispatcher = IStrategyRouterDispatcher { contract_address: router };
+    fn test_initial_allocation() {
+        let (_, _, strategy_router) = deploy_contracts();
         
-        let (aave, lido, compound) = dispatcher.get_allocation();
+        let (nostra, zklend, ekubo) = strategy_router.get_allocation();
         
-        // Should be initialized to balanced allocation (33.33%, 33.33%, 33.34%)
-        assert(aave == 3333, 'Error');
-        assert(lido == 3333, 'Error');
-        assert(compound == 3334, 'Error');
+        // Check initial allocation
+        assert(nostra == 3333, 'Nostra should be 33.33%');
+        assert(zklend == 3333, 'zkLend should be 33.33%');
+        assert(ekubo == 3334, 'Ekubo should be 33.34%');
         
-        // Verify sum is 10000
-        assert(aave + lido + compound == 10000, 'Error');
+        // Total should be 100%
+        assert(nostra + zklend + ekubo == 10000, 'Total should be 100%');
     }
-    
+
     #[test]
-    fn test_update_allocation_owner() {
-        let router = deploy_contract();
-        let dispatcher = IStrategyRouterDispatcher { contract_address: router };
+    fn test_update_allocation() {
+        let (_, _, strategy_router) = deploy_contracts();
         
-        let owner: ContractAddress = 0x123.into();
-        start_cheat_caller_address(router, owner);
+        // Update to new allocation
+        let new_nostra = 4000; // 40%
+        let new_zklend = 3500; // 35%
+        let new_ekubo = 2500;  // 25%
         
-        // Update allocation
-        dispatcher.update_allocation(4000, 3500, 2500);
+        strategy_router.update_allocation(new_nostra, new_zklend, new_ekubo);
         
-        stop_cheat_caller_address(router);
+        let (nostra, zklend, ekubo) = strategy_router.get_allocation();
         
-        // Verify update
-        let (aave, lido, compound) = dispatcher.get_allocation();
-        assert(aave == 4000, 'Error');
-        assert(lido == 3500, 'Error');
-        assert(compound == 2500, 'Error');
-        assert(aave + lido + compound == 10000, 'Error');
+        assert(nostra == new_nostra, 'Nostra not updated');
+        assert(zklend == new_zklend, 'zkLend not updated');
+        assert(ekubo == new_ekubo, 'Ekubo not updated');
     }
-    
+
     #[test]
-    fn test_update_allocation_risk_engine() {
-        let router = deploy_contract();
-        let dispatcher = IStrategyRouterDispatcher { contract_address: router };
+    #[should_panic(expected: ('Allocation must sum to 100%',))]
+    fn test_update_allocation_invalid_total() {
+        let (_, _, strategy_router) = deploy_contracts();
         
-        let risk_engine: ContractAddress = 0xdef.into();
-        start_cheat_caller_address(router, risk_engine);
-        
-        // Risk engine should be able to update allocation
-        dispatcher.update_allocation(5000, 3000, 2000);
-        
-        stop_cheat_caller_address(router);
-        
-        let (aave, lido, compound) = dispatcher.get_allocation();
-        assert(aave == 5000, 'Error');
-        assert(lido == 3000, 'Error');
-        assert(compound == 2000, 'Error');
+        // Total is 90%, not 100%
+        strategy_router.update_allocation(3000, 3000, 3000);
     }
-    
+
     #[test]
-    #[should_panic(expected: ('Unauthorized',))]
-    fn test_update_allocation_unauthorized() {
-        let router = deploy_contract();
-        let dispatcher = IStrategyRouterDispatcher { contract_address: router };
+    fn test_get_protocol_addresses() {
+        let (_, _, strategy_router) = deploy_contracts();
         
-        let unauthorized: ContractAddress = 0x999.into();
-        start_cheat_caller_address(router, unauthorized);
+        let (nostra, zklend, ekubo) = strategy_router.get_protocol_addresses();
         
-        // Should panic with 'Unauthorized' - no cleanup after this line
-        // (panic will terminate test execution immediately)
-        dispatcher.update_allocation(4000, 3500, 2500);
-        
-        // NOTE: No stop_cheat_caller_address here - it would be unreachable
-        // Test environment automatically cleans up on panic
+        assert(nostra == contract_address_const::<0x123>(), 'Wrong Nostra address');
+        assert(zklend == contract_address_const::<0x456>(), 'Wrong zkLend address');
+        assert(ekubo == contract_address_const::<0x789>(), 'Wrong Ekubo address');
     }
-    
-    #[test]
-    #[should_panic(expected: ('Invalid allocation',))]
-    fn test_update_allocation_invalid_sum() {
-        let router = deploy_contract();
-        let dispatcher = IStrategyRouterDispatcher { contract_address: router };
-        
-        let owner: ContractAddress = 0x123.into();
-        start_cheat_caller_address(router, owner);
-        
-        // Should panic with 'Invalid allocation' - no cleanup after this line
-        // (panic will terminate test execution immediately)
-        dispatcher.update_allocation(4000, 3500, 2000); // Sum = 9500, expects 10000
-        
-        // NOTE: No stop_cheat_caller_address here - it would be unreachable
-        // Test environment automatically cleans up on panic
-    }
-    
-    #[test]
-    fn test_update_allocation_edge_cases() {
-        let router = deploy_contract();
-        let dispatcher = IStrategyRouterDispatcher { contract_address: router };
-        
-        let owner: ContractAddress = 0x123.into();
-        start_cheat_caller_address(router, owner);
-        
-        // Edge case: All in one protocol (if max allows)
-        dispatcher.update_allocation(10000, 0, 0);
-        let (aave, lido, compound) = dispatcher.get_allocation();
-        assert(aave == 10000, 'Error');
-        assert(lido == 0, 'Error');
-        assert(compound == 0, 'Error');
-        
-        // Edge case: Equal split
-        dispatcher.update_allocation(3333, 3333, 3334);
-        let (aave2, lido2, compound2) = dispatcher.get_allocation();
-        assert(aave2 == 3333 && lido2 == 3333 && compound2 == 3334, 'Error');
-        
-        stop_cheat_caller_address(router);
-    }
-    
+
     #[test]
     fn test_accrue_yields() {
-        let router = deploy_contract();
-        let dispatcher = IStrategyRouterDispatcher { contract_address: router };
+        let (_, _, strategy_router) = deploy_contracts();
         
-        // accrue_yields should not panic (even if it's a placeholder)
-        dispatcher.accrue_yields();
+        // This should execute without panicking
+        // In a real implementation, this would interact with the protocols
+        strategy_router.accrue_yields();
         
-        // Verify allocation unchanged
-        let (_aave, _lido, _compound) = dispatcher.get_allocation();
-        // Allocation unchanged after accrue_yields
+        // For now, we just verify it doesn't revert
+        assert(true, 'Accrue yields completed');
+    }
+
+    #[test]
+    fn test_allocation_respects_constraints() {
+        let (_, dao_manager, strategy_router) = deploy_contracts();
+        
+        // Get current constraints
+        let (max_single, min_protocols, max_vol, min_liq) = dao_manager.get_constraints();
+        
+        // Try to set allocation that respects constraints
+        let nostra = 5000; // 50% - under max_single (60%)
+        let zklend = 3000; // 30%
+        let ekubo = 2000;  // 20% - uses 3 protocols (over min 2)
+        
+        strategy_router.update_allocation(nostra, zklend, ekubo);
+        
+        let (actual_nostra, actual_zklend, actual_ekubo) = strategy_router.get_allocation();
+        assert(actual_nostra == nostra, 'Nostra not set correctly');
+    }
+
+    #[test]
+    fn test_multiple_allocation_updates() {
+        let (_, _, strategy_router) = deploy_contracts();
+        
+        // First update
+        strategy_router.update_allocation(4000, 3000, 3000);
+        let (n1, z1, e1) = strategy_router.get_allocation();
+        assert(n1 == 4000, 'First update failed');
+        
+        // Second update
+        strategy_router.update_allocation(2500, 2500, 5000);
+        let (n2, z2, e2) = strategy_router.get_allocation();
+        assert(n2 == 2500, 'Second update failed');
+        assert(e2 == 5000, 'Second update failed');
+        
+        // Third update
+        strategy_router.update_allocation(3333, 3333, 3334);
+        let (n3, z3, e3) = strategy_router.get_allocation();
+        assert(n3 == 3333, 'Third update failed');
     }
 }

@@ -227,7 +227,7 @@ All TypeScript types updated, no compilation errors expected.
 
 ---
 
-## 🚀 Next Steps
+##  Next Steps
 
 ### Immediate
 - [x] Refactor contracts ✅

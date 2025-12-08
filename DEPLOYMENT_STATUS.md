@@ -1,4 +1,4 @@
-# 🚀 Obsqra.starknet - Deployment Status
+#  Obsqra.starknet - Deployment Status
 
 **Date:** December 5, 2025  
 **Network:** Starknet Sepolia Testnet  

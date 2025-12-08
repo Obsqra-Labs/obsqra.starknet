@@ -7,7 +7,7 @@
 
 ---
 
-## 🚀 Method 1: Simple Python Script (EASIEST)
+##  Method 1: Simple Python Script (EASIEST)
 
 ### Step 1: Start Katana
 
@@ -51,7 +51,7 @@ Or just refresh your Argent X wallet (make sure you're on Local Katana network)!
 
 ---
 
-## 🚀 Method 2: Using Starknet Foundry (sncast)
+##  Method 2: Using Starknet Foundry (sncast)
 
 If Python fails, use sncast:
 
@@ -83,7 +83,7 @@ sncast --account katana-dev \
 
 ---
 
-## 🚀 Method 3: Direct RPC Call (Advanced)
+##  Method 3: Direct RPC Call (Advanced)
 
 If both above fail, here's a direct approach:
 

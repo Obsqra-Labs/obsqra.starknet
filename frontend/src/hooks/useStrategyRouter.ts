@@ -40,7 +40,7 @@ export interface Allocation {
   ekubo_pct: bigint;
 }
 
-export function useStrategyRouter(contractAddress: string) {
+export function useStrategyRouter(contractAddress?: `0x${string}`) {
   const { account } = useAccount();
   const [isUpdating, setIsUpdating] = useState(false);
   const [isAccruing, setIsAccruing] = useState(false);
@@ -128,4 +128,3 @@ export function useStrategyRouter(contractAddress: string) {
     refetch,
   };
 }
-

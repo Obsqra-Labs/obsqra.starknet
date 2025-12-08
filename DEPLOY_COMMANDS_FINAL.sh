@@ -3,7 +3,7 @@
 # Copy and paste these commands into your terminal
 
 echo "════════════════════════════════════════════════════════"
-echo "🚀 Starknet Contract Deployment"
+echo " Starknet Contract Deployment"
 echo "════════════════════════════════════════════════════════"
 echo "Account: 0x01cf4C4a9e8E138f70318af37CEb7E63B95EBCDFEb28bc7FeC966a250df1c6Bd"
 echo ""

@@ -1,0 +1,16 @@
+{
+  "name": "Obsqra Starknet",
+  "short_name": "Obsqra",
+  "description": "Verifiable AI Infrastructure for Private DeFi on Starknet",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#8b5cf6",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}

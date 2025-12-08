@@ -225,3 +225,175 @@ The initial friction is real, but the architecture is genuinely better for compl
 
 **The learning curve is steep. The view from the top is worth it.** 🔺
 
+---
+
+## December 2025: Full On-Chain Orchestration Implementation
+
+### The Vision: 100% On-Chain Auditability
+
+After initial deployment, we realized a critical gap: **users were directly updating allocations**, which bypassed the AI Risk Engine entirely. This broke the core value proposition: **verifiable AI decisions from computation to settlement**.
+
+### The Problem
+
+The original flow was:
+```
+User → Frontend → StrategyRouter.update_allocation()
+```
+
+This meant:
+- ❌ No AI involvement
+- ❌ No risk calculation
+- ❌ No DAO validation
+- ❌ No audit trail
+- ❌ Users could set arbitrary allocations
+
+### The Solution: RiskEngine Orchestration
+
+We implemented `RiskEngine.propose_and_execute_allocation()` - a single function that orchestrates the **entire flow on-chain**:
+
+```cairo
+fn propose_and_execute_allocation(
+    jediswap_metrics: ProtocolMetrics,
+    ekubo_metrics: ProtocolMetrics,
+) -> AllocationDecision
+```
+
+**The Complete Flow:**
+1. **Calculate Risk Scores** (on-chain Cairo computation)
+   - JediSwap risk: utilization, volatility, liquidity, audit, age
+   - Ekubo risk: same factors
+   - Emits: `ProtocolMetricsQueried` events
+
+2. **Query Protocol APY** (on-chain)
+   - JediSwap APY from stored values (ready for oracle integration)
+   - Ekubo APY from stored values (ready for oracle integration)
+   - Emits: `APYQueried` events
+
+3. **Calculate Allocation** (on-chain Cairo computation)
+   - Risk-adjusted score = (APY * 10000) / (Risk + 1)
+   - Allocates based on risk-adjusted returns
+   - Emits: `DecisionRationale` event with calculation hash
+
+4. **Validate with DAO** (on-chain)
+   - Checks max single protocol constraint
+   - Checks minimum diversification
+   - Emits: `ConstraintsValidated` event
+
+5. **Execute on StrategyRouter** (on-chain)
+   - RiskEngine calls `StrategyRouter.update_allocation()`
+   - RiskEngine is authorized caller (no user permissions needed)
+   - Emits: `AllocationProposed` and `AllocationExecuted` events
+
+6. **Store Decision** (on-chain)
+   - Full decision record with all inputs/outputs
+   - Links to block number and timestamp
+   - Emits: Complete audit trail
+
+### Audit Trail Events
+
+Every step emits an event, creating a **complete on-chain audit trail**:
+
+- `ProtocolMetricsQueried` - Risk scores calculated
+- `APYQueried` - APY values fetched
+- `DecisionRationale` - Calculation details and hash
+- `ConstraintsValidated` - DAO validation results
+- `AllocationProposed` - Decision proposed
+- `AllocationExecuted` - Execution confirmed
+- `PerformanceRecorded` - Performance linked to decision
+
+### Performance Tracking
+
+Added `record_performance_snapshot()` to link performance to decisions:
+- Tracks total value, protocol values, yields
+- Calculates performance delta vs previous snapshot
+- Links to `decision_id` for full traceability
+
+**Result:** You can now see "Decision #5 → +5% yield" or "Decision #7 → -2% yield"
+
+### Frontend Integration
+
+Created `useRiskEngineOrchestration()` hook:
+- Calls `propose_and_execute_allocation()` directly from frontend
+- Handles transaction signing and confirmation
+- Fetches decision record after execution
+- Updates UI with AI-managed allocation
+
+**Changed UI:**
+- Removed manual allocation sliders (for AI-managed mode)
+- Added "🤖 AI Risk Engine: Orchestrate Allocation" button
+- Shows decision history with full audit trail
+- Displays performance linked to decisions
+
+### Backend API Updates
+
+Added `/orchestrate-allocation` endpoint:
+- Accepts protocol metrics
+- Returns orchestration response structure
+- Note: Actual execution happens on-chain via frontend (requires account)
+
+### What's Next
+
+1. **On-Chain APY Queries:**
+   - Integrate JediSwap pool contracts for real-time APY
+   - Integrate Ekubo Price Fetcher/Oracle for real-time APY
+   - Currently using stored values updated by keepers
+
+2. **Keeper Service:**
+   - Periodically call `propose_and_execute_allocation()`
+   - Update APY values via `update_protocol_apy()`
+   - Monitor performance and trigger rebalancing
+
+3. **Full Decision History:**
+   - Currently storing latest decision (MVP)
+   - Can expand to full history with Map storage
+   - Index by block number for efficient queries
+
+4. **Performance Analytics:**
+   - Link decisions to performance changes
+   - Show "what decision caused this performance"
+   - Build recommendation engine based on historical decisions
+
+### Key Learnings
+
+1. **On-Chain Orchestration is Powerful:**
+   - Every step is auditable
+   - No trust required in backend
+   - SHARP automatically proves computations
+
+2. **Events are Your Friend:**
+   - Rich event structure enables full audit trail
+   - Can reconstruct entire flow from events
+   - Perfect for analytics and debugging
+
+3. **User Experience Matters:**
+   - Users shouldn't need to understand Cairo
+   - Hide complexity behind simple "AI Orchestrate" button
+   - Show results in human-readable format
+
+4. **Storage Trade-offs:**
+   - Map storage is complex in Cairo
+   - For MVP, storing latest is sufficient
+   - Can expand to full history later
+
+### Files Changed
+
+**Contracts:**
+- `contracts/src/risk_engine.cairo` - Added orchestration function and events
+- `contracts/src/strategy_router_v2.cairo` - Added performance tracking
+
+**Frontend:**
+- `frontend/src/hooks/useRiskEngineOrchestration.ts` - New orchestration hook
+- `frontend/src/components/Dashboard.tsx` - Updated to use AI orchestration
+
+**Backend:**
+- `backend/app/api/routes/risk_engine.py` - Added orchestration endpoint
+
+**Documentation:**
+- `docs/DEV_LOG.md` - This entry
+
+---
+
+*Updated December 2025*
+
+**From computation to settlement, everything is on-chain and auditable.** 🔺
+

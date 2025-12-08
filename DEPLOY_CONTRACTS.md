@@ -1,4 +1,4 @@
-# 🚀 Deploy Contracts to Sepolia
+#  Deploy Contracts to Sepolia
 
 **Account:** 0x01cf4C4a9e8E138f70318af37CEb7E63B95EBCDFEb28bc7FeC966a250df1c6Bd
 

@@ -67,7 +67,7 @@ Balance:     ~1000 ETH (on Katana devnet)
 
 ---
 
-## 🚀 **Next Steps**
+##  **Next Steps**
 
 1. Import Account #0 using the steps above
 2. Connect your wallet to http://localhost:3002

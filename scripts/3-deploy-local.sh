@@ -27,7 +27,7 @@ fi
 echo "✅ Contracts compiled"
 echo ""
 
-echo "🚀 Deploying contracts..."
+echo " Deploying contracts..."
 echo ""
 
 # For now, we'll use sncast to declare and deploy

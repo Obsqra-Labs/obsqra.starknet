@@ -3,5 +3,5 @@ account = "deployer"
 url = "https://starknet-sepolia.g.alchemy.com/v2/EvhYN6geLrdvbYHVRgPJ7"
 
 [sncast.deployer.accounts.deployer]
-address = "0x05fe812551bec726f1bf5026d5fb88f06ed411a753fb4468f9e19ebf8ced1b3d"
-private_key = "0x07fd44d52324945e2d9f2e62bd2dadb794e2274dbd0955251aeca6cc96153afc"
+address = "0x6b407e0b8cf645a32fd2ccef47c74c9fb7f44c3cd09041ea263a945ce29442b"
+private_key = "0xf4506f978f613c4f3d8934b4bf5c3459fba3a16fbc479d5f7dee8e3832404aab"

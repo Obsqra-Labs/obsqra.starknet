@@ -1,4 +1,4 @@
-# 🚀 Starknet POC - Next Steps
+#  Starknet POC - Next Steps
 
 You now have test ETH! Here's what to do next:
 
@@ -242,4 +242,4 @@ By the end of development, you should have:
 
 ---
 
-**Ready to start? Let's deploy those contracts! 🚀**
+**Ready to start? Let's deploy those contracts! **

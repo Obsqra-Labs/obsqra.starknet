@@ -3,12 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3003",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 3003",
     "lint": "next lint"
   },
   "dependencies": {
+    "@mistcash/config": "^0.2.0-beta.1",
+    "@mistcash/crypto": "^0.2.0-beta.1",
+    "@mistcash/react": "^0.2.0-beta.1",
+    "@mistcash/sdk": "^0.2.0-beta.1",
     "@starknet-react/chains": "^0.1.7",
     "@starknet-react/core": "^3.6.0",
     "get-starknet-core": "^4.0.0",

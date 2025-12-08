@@ -1,4 +1,4 @@
-# 🚀 Obsqra.starknet - Ready to Deploy
+#  Obsqra.starknet - Ready to Deploy
 
 **Date:** December 5, 2025  
 **Status:** ✅ INTEGRATION COMPLETE  
@@ -277,7 +277,7 @@ Compound: ██░░░░░░░░░░░░░░░░░░ 10.00%
 
 ---
 
-## 🚀 Quick Start Commands
+##  Quick Start Commands
 
 ```bash
 # Build contracts
@@ -369,5 +369,5 @@ npm install && npm run dev
 
 **Estimated Time:** 10 minutes from start to running dashboard
 
-**Let's deploy! 🚀**
+**Let's deploy! **
 

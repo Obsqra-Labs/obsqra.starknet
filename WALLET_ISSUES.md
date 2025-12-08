@@ -88,6 +88,6 @@ Argent X testnets sometimes have temporary cosigner issues. Try again in a few h
 
 ---
 
-## 🚀 **Ready to Continue?**
+##  **Ready to Continue?**
 
 Pick a solution and let me know! I recommend **Solution 3** (local deployer account).

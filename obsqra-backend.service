@@ -1,0 +1,21 @@
+[Unit]
+Description=Obsqra Backend (FastAPI)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/var/www/obsqra/backend
+ExecStart=/usr/bin/python3 main.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=obsqra-backend
+Environment="API_PORT=8001"
+Environment="ENVIRONMENT=production"
+Environment="DEBUG=false"
+
+[Install]
+WantedBy=multi-user.target
+

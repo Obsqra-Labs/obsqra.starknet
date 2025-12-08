@@ -1,4 +1,4 @@
-# 🚀 Complete Deployment Guide - Sepolia Testnet
+#  Complete Deployment Guide - Sepolia Testnet
 
 ## ✅ Current Status
 - Your wallet: `0x07933ED0d1c5eD8976e18301921AAcbdd3abc48065c85c292B998f0e72a7F027`
@@ -105,7 +105,7 @@ starkli signer keystore from-key ~/.starkli-wallets/deployer/keystore.json
 
 ---
 
-## 🚀 Step 4: Deploy RiskEngine (5 minutes)
+##  Step 4: Deploy RiskEngine (5 minutes)
 
 ### Declare the contract
 ```bash
@@ -144,7 +144,7 @@ Contract deployed: 0xabcdef1234567890...
 
 ---
 
-## 🚀 Step 5: Deploy StrategyRouter (5 minutes)
+##  Step 5: Deploy StrategyRouter (5 minutes)
 
 ### Declare
 ```bash
@@ -171,7 +171,7 @@ starkli deploy \
 
 ---
 
-## 🚀 Step 6: Deploy DAOConstraintManager (5 minutes)
+##  Step 6: Deploy DAOConstraintManager (5 minutes)
 
 ### Declare
 ```bash
@@ -365,4 +365,4 @@ chmod +x DEPLOY_TO_SEPOLIA.sh
 ./DEPLOY_TO_SEPOLIA.sh
 ```
 
-Then follow the manual steps it provides! 🚀
+Then follow the manual steps it provides! 

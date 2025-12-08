@@ -1,0 +1,22 @@
+{
+  "ekubo": {
+    "core": "0x0444a09d96389aa7148f1aada508e30b71299ffe650d9c97fdaae38cb9a23384",
+    "positions": "0x06a2aee84bb0ed5dded4384ddd0e40e9c1372b818668375ab8e3ec08807417e5",
+    "positions_nft": "0x04afc78d6fec3b122fc1f60276f074e557749df1a77a93416451be72c435120f",
+    "router_v3": "0x0045f933adf0607292468ad1c1dedaa74d5ad166392590e72676a34d01d7b763",
+    "router_legacy": "0x02a3328b7f0f83c3ca23149623b6cee9e7fddb5e591d36d52c77d2a9302d221d0",
+    "token_registry": "0x04484f91f0d2482bad844471ca8dc8e846d3a0211792322e72f21f0f44be63e5",
+    "price_fetcher": "0x04613bee55d8a37adfa249b24c6b13451dedf7cf4f02d01de859579119de3add"
+  },
+  "jediswap": {
+    "factory": "0x050d3df81b920d3e608c4f7aeb67945a830413f618a1cf486bdcce66a395109c",
+    "swap_router": "0x03c8e56d7f6afccb775160f1ae3b69e3db31b443e544e56bd845d8b3b3a87a21",
+    "nft_router": "0x024fd9721eea36cf8cebc226fd9414057bbf895b47739822f849f622029f9399",
+    "pool_class_hash": "0x2cd3c16a0112b22ded4903707f268125fcf46fd7733761e62c13fc0157afd8d"
+  },
+  "tokens": {
+    "strk": "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f36c338bb1",
+    "eth": "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7"
+  }
+}
+

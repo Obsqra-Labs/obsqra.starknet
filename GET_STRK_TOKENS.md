@@ -118,7 +118,7 @@ Once you have STRK tokens:
 1. ✅ Verify balance in Argent X
 2. 📦 Install Scarb and Starkli tools
 3. 🔨 Compile contracts
-4. 🚀 Deploy to Sepolia
+4.  Deploy to Sepolia
 5. 🎉 Test your dApp!
 
 See: `/opt/obsqra.starknet/COMPLETE_DEPLOYMENT_GUIDE.md`

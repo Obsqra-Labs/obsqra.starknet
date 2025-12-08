@@ -83,4 +83,4 @@ These have been updated and should work:
 - ✅ src/hooks/useMistCash.ts (recreated)
 - ✅ src/providers/StarknetProvider.tsx
 
-Just need to start the server manually! 🚀
+Just need to start the server manually! 

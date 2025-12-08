@@ -1,0 +1,22 @@
+[Unit]
+Description=Obsqra Frontend (Next.js)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/obsqra.starknet/frontend
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=obsqra-frontend
+Environment="PORT=3003"
+Environment="NODE_ENV=production"
+Environment="NEXT_PUBLIC_BACKEND_URL=https://starknet.obsqra.fi/api"
+Environment="NEXT_PUBLIC_RPC_URL=https://starknet-sepolia.public.blastapi.io"
+
+[Install]
+WantedBy=multi-user.target
+

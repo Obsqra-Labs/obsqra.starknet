@@ -1,5 +1,17 @@
 import './globals.css';
 import { StarknetProvider } from '@/providers/StarknetProvider';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { Inter, Space_Grotesk } from 'next/font/google';
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ['latin'],
+  variable: '--font-display',
+});
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-body',
+});
 
 export default function RootLayout({
   children,
@@ -8,13 +20,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>
+      <body className={`${spaceGrotesk.variable} ${inter.variable} font-sans bg-sand text-ink`}>
         <StarknetProvider>
-          {children}
+          <AuthProvider>
+            {children}
+          </AuthProvider>
         </StarknetProvider>
       </body>
     </html>
   );
 }
-
 
