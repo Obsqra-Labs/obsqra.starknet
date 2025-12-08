@@ -18,6 +18,8 @@ interface RebalanceRecord {
   submitted_at: string | null;
   verified_at: string | null;
   proof_job_id?: string;
+  proof_generation_time?: number | null;
+  proof_size_bytes?: number | null;
 }
 
 export function RebalanceHistory() {
@@ -174,6 +176,8 @@ export function RebalanceHistory() {
                     submittedAt={record.submitted_at}
                     verifiedAt={record.verified_at}
                     proofJobId={record.proof_job_id || record.id}
+                    generationTime={record.proof_generation_time}
+                    proofSize={record.proof_size_bytes}
                   />
                 </td>
 
@@ -223,6 +227,8 @@ export function RebalanceHistory() {
                 submittedAt={record.submitted_at}
                 verifiedAt={record.verified_at}
                 proofJobId={record.proof_job_id || record.id}
+                generationTime={record.proof_generation_time}
+                proofSize={record.proof_size_bytes}
               />
             </div>
 

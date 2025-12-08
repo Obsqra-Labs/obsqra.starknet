@@ -1,11 +1,13 @@
 """Analytics endpoints - Historical data and trends"""
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import desc
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
+import uuid
 
 from app.database import get_db
 from app.db.session import get_db as get_sync_db
@@ -178,16 +180,13 @@ async def get_rebalance_history(
 @router.get("/proof/{proof_job_id}/download")
 async def download_proof(
     proof_job_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_sync_db)
 ):
     """
     Download proof binary data for a specific proof job
     
     Returns the STARK proof binary file for verification or archival purposes.
     """
-    from fastapi.responses import Response
-    from app.models import ProofJob
-    import uuid
     
     try:
         job_uuid = uuid.UUID(proof_job_id)

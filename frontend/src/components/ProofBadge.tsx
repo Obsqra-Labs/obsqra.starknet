@@ -13,7 +13,7 @@ interface ProofBadgeProps {
   verifiedAt?: string | null;
 }
 
-export function ProofBadge({ hash, status, txHash, factHash, submittedAt, verifiedAt, proofJobId }: ProofBadgeProps) {
+export function ProofBadge({ hash, status, txHash, factHash, submittedAt, verifiedAt, proofJobId, generationTime, proofSize }: ProofBadgeProps) {
   const [showDetails, setShowDetails] = useState(false);
 
   const statusConfig = {
@@ -106,6 +106,20 @@ export function ProofBadge({ hash, status, txHash, factHash, submittedAt, verifi
               <div>
                 <p className="text-xs text-gray-400 mb-1">Fact Hash (L1):</p>
                 <code className="text-xs text-green-400 break-all">{factHash}</code>
+              </div>
+            )}
+
+            {generationTime && (
+              <div>
+                <p className="text-xs text-gray-400 mb-1">Generation Time:</p>
+                <p className="text-xs text-white">{generationTime.toFixed(2)}s</p>
+              </div>
+            )}
+
+            {proofSize && (
+              <div>
+                <p className="text-xs text-gray-400 mb-1">Proof Size:</p>
+                <p className="text-xs text-white">{(proofSize / 1024).toFixed(2)} KB</p>
               </div>
             )}
 

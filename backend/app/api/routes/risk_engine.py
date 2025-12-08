@@ -239,7 +239,9 @@ async def orchestrate_allocation(
                 "jediswap": request.jediswap_metrics.dict(),
                 "ekubo": request.ekubo_metrics.dict(),
                 "jediswap_risk": proof.output_score_jediswap,
-                "ekubo_risk": proof.output_score_ekubo
+                "ekubo_risk": proof.output_score_ekubo,
+                "proof_generation_time_seconds": proof_generation_time,
+                "proof_data_size_bytes": len(proof.proof_data) if proof.proof_data else 0
             },
             proof_data=proof.proof_data
         )
