@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ProofBadge, type ProofStatus } from './ProofBadge';
+import { TableSkeleton } from './LoadingSkeleton';
 
 interface RebalanceRecord {
   id: string;
@@ -53,9 +54,12 @@ export function RebalanceHistory() {
 
   if (loading && history.length === 0) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
-        <p className="ml-3 text-gray-400">Loading rebalance history...</p>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold text-white">Recent Rebalances</h3>
+          <div className="text-xs text-gray-500">Loading...</div>
+        </div>
+        <TableSkeleton rows={5} />
       </div>
     );
   }
@@ -98,8 +102,8 @@ export function RebalanceHistory() {
         </button>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto">
+      {/* Desktop Table */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b border-white/10">
@@ -188,6 +192,72 @@ export function RebalanceHistory() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile Cards */}
+      <div className="md:hidden space-y-3">
+        {history.map((record) => (
+          <div
+            key={record.id}
+            className="bg-white/5 rounded-lg p-4 border border-white/10"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <div className="text-sm text-white font-medium">
+                  {formatTimeAgo(record.timestamp)}
+                </div>
+                <div className="text-xs text-gray-500">
+                  {new Date(record.timestamp).toLocaleString()}
+                </div>
+              </div>
+              <ProofBadge
+                hash={record.proof_hash}
+                status={record.proof_status}
+                txHash={record.tx_hash}
+                factHash={record.fact_hash}
+                submittedAt={record.submitted_at}
+              />
+            </div>
+
+            {/* Allocation */}
+            <div className="space-y-2 mb-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-blue-400">🔄 JediSwap</span>
+                <span className="text-sm font-mono text-white">{record.jediswap_pct.toFixed(1)}%</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-orange-400">🌀 Ekubo</span>
+                <span className="text-sm font-mono text-white">{record.ekubo_pct.toFixed(1)}%</span>
+              </div>
+            </div>
+
+            {/* Risk Scores */}
+            <div className="flex items-center justify-between text-xs mb-3">
+              <span className="text-gray-400">Risk Scores:</span>
+              <div className="flex gap-3">
+                <span>
+                  Jedi: <span className={`font-mono ${getRiskColor(record.jediswap_risk)}`}>{record.jediswap_risk}</span>
+                </span>
+                <span>
+                  Ekubo: <span className={`font-mono ${getRiskColor(record.ekubo_risk)}`}>{record.ekubo_risk}</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Transaction */}
+            {record.tx_hash && (
+              <a
+                href={`https://sepolia.voyager.online/tx/${record.tx_hash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-center py-2 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded text-xs text-purple-300 transition-colors"
+              >
+                View Transaction ↗
+              </a>
+            )}
+          </div>
+        ))}
       </div>
 
       {/* Footer */}

@@ -1,6 +1,7 @@
 'use client';
 
 import { Dashboard } from '@/components/Dashboard';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useEffect, useState } from 'react';
 import { useWallet } from '@/hooks/useWallet';
 
@@ -520,7 +521,9 @@ function ConnectedApp({
           <h3 className="font-display text-2xl text-white">Your Obsqra dashboard</h3>
         </div>
         <div className="bg-slate-900/80 border border-white/10 rounded-3xl shadow-lift backdrop-blur-lg p-4">
-          <Dashboard />
+          <ErrorBoundary>
+            <Dashboard />
+          </ErrorBoundary>
         </div>
       </main>
     </div>

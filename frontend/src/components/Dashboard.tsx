@@ -440,7 +440,7 @@ export function Dashboard() {
       {activeTab === 'overview' && (
         <div className="space-y-6">
           {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="bg-gradient-to-br from-purple-900/60 via-slate-900/70 to-slate-900/80 border border-purple-400/30 rounded-xl p-5 shadow-lg">
               <p className="text-sm text-purple-200 mb-1">Total Value Locked</p>
               <p className="text-3xl font-bold text-white">{tvlDisplay} <span className="text-lg text-purple-200">STRK</span></p>
