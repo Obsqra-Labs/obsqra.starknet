@@ -153,6 +153,7 @@ mod StrategyRouterV3 {
         last_decision_id: felt252,  // Links to RiskEngine decision
         jediswap_position_value: u256,
         ekubo_position_value: u256,
+        total_yield_accrued: u256,  // Total yield accrued over time
     }
     
     #[event]
@@ -245,6 +246,7 @@ mod StrategyRouterV3 {
         self.jediswap_allocation.write(jediswap_pct.into());
         self.ekubo_allocation.write(ekubo_pct.into());
         self.total_deposits.write(0);
+        self.total_yield_accrued.write(0);  // Initialize yield tracking
         // Initialize slippage tolerance (default: 1% for swaps, 0.5% for liquidity)
         self.swap_slippage_bps.write(100);  // 1% = 100 basis points
         self.liquidity_slippage_bps.write(50);  // 0.5% = 50 basis points
@@ -397,12 +399,13 @@ mod StrategyRouterV3 {
             };
             
             // Calculate minimum output with slippage protection
-            // We'll estimate output as input (1:1 for now, actual would use oracle/quote)
-            // In production, you'd get a quote first, then apply slippage
+            // For JediSwap, we need to be more lenient with slippage since we don't have a quote
+            // Using a more conservative approach: assume we get at least 80% of input value
+            // Then apply slippage tolerance on top of that
             let swap_slippage_bps = self.swap_slippage_bps.read();
-            // For now, we'll use a conservative estimate: assume we get at least 95% of input value
-            // In production, use a quote from the router first
-            let estimated_output = swap_amount * 95 / 100; // Conservative 95% estimate
+            // Use a more conservative estimate (80% instead of 95%) to account for price differences
+            // In production, you'd get a quote from the router first, then apply slippage
+            let estimated_output = swap_amount * 80 / 100; // Conservative 80% estimate
             let slippage_amount = estimated_output * swap_slippage_bps / 10000;
             let amount_out_minimum = if estimated_output > slippage_amount {
                 estimated_output - slippage_amount
@@ -798,6 +801,10 @@ mod StrategyRouterV3 {
         let current_deposits = self.total_deposits.read();
         self.total_deposits.write(current_deposits + total_yield);
         
+        // Update total yield accrued tracking
+        let current_total_yield = self.total_yield_accrued.read();
+        self.total_yield_accrued.write(current_total_yield + total_yield);
+        
         self.emit(YieldsAccrued {
             total_yield,
             timestamp: get_block_timestamp(),
@@ -848,6 +855,10 @@ mod StrategyRouterV3 {
         // Update total deposits to include yields (reinvestment strategy)
         let current_deposits = self.total_deposits.read();
         self.total_deposits.write(current_deposits + jedi_fees_0);
+        
+        // Update total yield accrued tracking
+        let current_total_yield = self.total_yield_accrued.read();
+        self.total_yield_accrued.write(current_total_yield + jedi_fees_0);
         
         self.emit(YieldsAccrued {
             total_yield: jedi_fees_0,
@@ -917,6 +928,10 @@ mod StrategyRouterV3 {
         let current_deposits = self.total_deposits.read();
         self.total_deposits.write(current_deposits + ekubo_fees_0);
         
+        // Update total yield accrued tracking
+        let current_total_yield = self.total_yield_accrued.read();
+        self.total_yield_accrued.write(current_total_yield + ekubo_fees_0);
+        
         self.emit(YieldsAccrued {
             total_yield: ekubo_fees_0,
             timestamp: get_block_timestamp(),
@@ -981,6 +996,28 @@ mod StrategyRouterV3 {
     #[external(v0)]
     fn get_ekubo_position_count(self: @ContractState) -> u256 {
         self.ekubo_position_count.read()
+    }
+    
+    // Yield tracking getters
+    #[external(v0)]
+    fn get_total_yield_accrued(self: @ContractState) -> u256 {
+        self.total_yield_accrued.read()
+    }
+    
+    // Protocol metrics getters
+    #[external(v0)]
+    fn get_protocol_tvl(self: @ContractState) -> (u256, u256) {
+        (self.jediswap_position_value.read(), self.ekubo_position_value.read())
+    }
+    
+    #[external(v0)]
+    fn get_jediswap_tvl(self: @ContractState) -> u256 {
+        self.jediswap_position_value.read()
+    }
+    
+    #[external(v0)]
+    fn get_ekubo_tvl(self: @ContractState) -> u256 {
+        self.ekubo_position_value.read()
     }
     
     // ============================================

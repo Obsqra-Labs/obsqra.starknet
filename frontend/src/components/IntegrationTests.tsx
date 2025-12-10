@@ -37,6 +37,34 @@ const STRATEGY_ROUTER_V2_ABI = [
     state_mutability: 'view',
   },
   {
+    name: 'get_total_yield_accrued',
+    type: 'function',
+    inputs: [],
+    outputs: [{ type: 'core::integer::u256' }],
+    state_mutability: 'view',
+  },
+  {
+    name: 'get_protocol_tvl',
+    type: 'function',
+    inputs: [],
+    outputs: [{ type: 'core::integer::u256' }, { type: 'core::integer::u256' }],
+    state_mutability: 'view',
+  },
+  {
+    name: 'get_jediswap_tvl',
+    type: 'function',
+    inputs: [],
+    outputs: [{ type: 'core::integer::u256' }],
+    state_mutability: 'view',
+  },
+  {
+    name: 'get_ekubo_tvl',
+    type: 'function',
+    inputs: [],
+    outputs: [{ type: 'core::integer::u256' }],
+    state_mutability: 'view',
+  },
+  {
     name: 'deploy_to_protocols',
     type: 'function',
     inputs: [],
@@ -78,6 +106,16 @@ export function IntegrationTests() {
   const [devLogLoading, setDevLogLoading] = useState(true);
   const [useOwnerWallet, setUseOwnerWallet] = useState(false);
   const [depositing, setDepositing] = useState(false);
+  const [totalYield, setTotalYield] = useState<string>('0');
+  const [yieldLoading, setYieldLoading] = useState(false);
+  const [protocolStats, setProtocolStats] = useState<{
+    jediswap: { tvl: string; apy: string };
+    ekubo: { tvl: string; apy: string };
+  }>({
+    jediswap: { tvl: '0', apy: '0' },
+    ekubo: { tvl: '0', apy: '0' },
+  });
+  const [statsLoading, setStatsLoading] = useState(false);
 
   const config = getConfig();
   const contractAddress = config.strategyRouterAddress;
@@ -133,6 +171,94 @@ export function IntegrationTests() {
   };
 
   // Fetch dev log on component mount
+  // Fetch total yield accrued
+  const fetchYield = async () => {
+    if (!contractAddress) return;
+    
+    setYieldLoading(true);
+    try {
+      const provider = new RpcProvider({ nodeUrl: config.rpcUrl });
+      const contract = new Contract(STRATEGY_ROUTER_V2_ABI, contractAddress, provider);
+      const result = await contract.call('get_total_yield_accrued', []);
+      // Handle both U256 format and direct bigint
+      let yieldAmount: bigint;
+      if (typeof result === 'bigint') {
+        yieldAmount = result;
+      } else if (result && typeof result === 'object' && 'low' in result && 'high' in result) {
+        yieldAmount = uint256.uint256ToBN(result as any);
+      } else {
+        yieldAmount = BigInt(String(result));
+      }
+      const yieldStrk = (Number(yieldAmount) / 1e18).toFixed(6);
+      setTotalYield(yieldStrk);
+    } catch (error) {
+      console.error('Error fetching yield:', error);
+      setTotalYield('Error');
+    } finally {
+      setYieldLoading(false);
+    }
+  };
+
+  // Fetch protocol statistics (TVL, APY)
+  const fetchProtocolStats = async () => {
+    if (!contractAddress) return;
+    
+    setStatsLoading(true);
+    try {
+      const provider = new RpcProvider({ nodeUrl: config.rpcUrl });
+      const contract = new Contract(STRATEGY_ROUTER_V2_ABI, contractAddress, provider);
+      
+      // Fetch TVL for both protocols
+      const [jediTvlResult, ekuboTvlResult, totalYieldResult] = await Promise.all([
+        contract.call('get_jediswap_tvl', []),
+        contract.call('get_ekubo_tvl', []),
+        contract.call('get_total_yield_accrued', []),
+      ]);
+      
+      // Parse TVL values
+      const parseU256 = (result: any): bigint => {
+        if (typeof result === 'bigint') return result;
+        if (result && typeof result === 'object' && 'low' in result && 'high' in result) {
+          return uint256.uint256ToBN(result as any);
+        }
+        return BigInt(String(result));
+      };
+      
+      const jediTvl = parseU256(jediTvlResult);
+      const ekuboTvl = parseU256(ekuboTvlResult);
+      const totalYield = parseU256(totalYieldResult);
+      
+      const jediTvlStrk = Number(jediTvl) / 1e18;
+      const ekuboTvlStrk = Number(ekuboTvl) / 1e18;
+      const totalYieldStrk = Number(totalYield) / 1e18;
+      const totalTvl = jediTvlStrk + ekuboTvlStrk;
+      
+      // Calculate APY (simplified: yield as % of TVL, annualized)
+      // This is a rough estimate - in production you'd track yield over time
+      const jediApy = jediTvlStrk > 0 ? ((totalYieldStrk * (jediTvlStrk / totalTvl)) / jediTvlStrk * 100).toFixed(2) : '0.00';
+      const ekuboApy = ekuboTvlStrk > 0 ? ((totalYieldStrk * (ekuboTvlStrk / totalTvl)) / ekuboTvlStrk * 100).toFixed(2) : '0.00';
+      
+      setProtocolStats({
+        jediswap: {
+          tvl: jediTvlStrk.toFixed(4),
+          apy: jediApy,
+        },
+        ekubo: {
+          tvl: ekuboTvlStrk.toFixed(4),
+          apy: ekuboApy,
+        },
+      });
+    } catch (error) {
+      console.error('Error fetching protocol stats:', error);
+      setProtocolStats({
+        jediswap: { tvl: 'Error', apy: 'Error' },
+        ekubo: { tvl: 'Error', apy: 'Error' },
+      });
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetch('/api/integration-tests/dev-log')
       .then(res => res.json())
@@ -149,7 +275,11 @@ export function IntegrationTests() {
         setDevLog('# Integration Tests Development Log\n\nError loading log file.');
         setDevLogLoading(false);
       });
-  }, []);
+    
+    // Fetch yield and protocol stats on mount
+    fetchYield();
+    fetchProtocolStats();
+  }, [contractAddress]);
 
   const checklist: IntegrationChecklistItem[] = [
     // Core Functionality
@@ -918,6 +1048,14 @@ export function IntegrationTests() {
             receipt: receipt,
           }
         }));
+        
+        // Refresh yield and protocol stats after successful yield accrual
+        if (item.testFunction === 'accrue_yields' || item.testFunction === 'accrue_jediswap_yields' || item.testFunction === 'accrue_ekubo_yields') {
+          setTimeout(() => {
+            fetchYield();
+            fetchProtocolStats();
+          }, 3000); // Wait 3 seconds for transaction to be indexed
+        }
       } catch (waitError: any) {
         // Transaction was submitted but receipt waiting/parsing failed
         // Still show the transaction hash so user can verify on-chain
@@ -1206,6 +1344,81 @@ export function IntegrationTests() {
             <span className="text-slate-700">Status:</span>{' '}
             <span className="text-slate-900">{routerV2.isLoading ? 'Loading...' : 'Connected'}</span>
           </div>
+          <div>
+            <span className="text-slate-700">Total Yield Accrued:</span>{' '}
+            <span className="text-slate-900 font-semibold">
+              {yieldLoading ? 'Loading...' : `${totalYield} STRK`}
+            </span>
+            <button
+              onClick={() => { fetchYield(); fetchProtocolStats(); }}
+              className="ml-2 px-2 py-1 text-xs bg-slate-200 hover:bg-slate-300 rounded transition-colors"
+              title="Refresh stats"
+            >
+              🔄
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Protocol Statistics */}
+      <div className="border-2 border-purple-200 rounded-xl p-5 bg-purple-50 shadow-sm mt-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-purple-900">Protocol Statistics</h3>
+          <button
+            onClick={fetchProtocolStats}
+            disabled={statsLoading}
+            className="px-3 py-1 text-sm bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50 transition-colors"
+          >
+            {statsLoading ? 'Loading...' : 'Refresh'}
+          </button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* JediSwap Stats */}
+          <div className="bg-white rounded-lg p-4 border border-purple-200">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-md font-semibold text-purple-800">JediSwap</h4>
+              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">DEX</span>
+            </div>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-slate-600">TVL:</span>
+                <span className="font-semibold text-slate-900">
+                  {statsLoading ? 'Loading...' : `${protocolStats.jediswap.tvl} STRK`}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-600">Estimated APY:</span>
+                <span className="font-semibold text-green-600">
+                  {statsLoading ? 'Loading...' : `${protocolStats.jediswap.apy}%`}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Ekubo Stats */}
+          <div className="bg-white rounded-lg p-4 border border-purple-200">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-md font-semibold text-purple-800">Ekubo</h4>
+              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">DEX</span>
+            </div>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-slate-600">TVL:</span>
+                <span className="font-semibold text-slate-900">
+                  {statsLoading ? 'Loading...' : `${protocolStats.ekubo.tvl} STRK`}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-600">Estimated APY:</span>
+                <span className="font-semibold text-green-600">
+                  {statsLoading ? 'Loading...' : `${protocolStats.ekubo.apy}%`}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="mt-3 text-xs text-slate-500 italic">
+          Note: APY is estimated based on total yield accrued. Actual APY may vary based on market conditions and time period.
         </div>
       </div>
 
