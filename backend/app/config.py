@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     # Starknet
     STARKNET_RPC_URL: str = "https://starknet-sepolia-rpc.publicnode.com"
     RISK_ENGINE_ADDRESS: str = "0x007c2463376a0d21dbccde4c6d59bf8b0649973ca1f88865466b58d81dcbe86d"  # v2.2 with fixed 2-protocol allocation
-    STRATEGY_ROUTER_ADDRESS: str = "0x0539d5611c6158a4234f7c4e8e7fe50af7b9502314ca95409f5106ee2f6741d6"  # v2 with deposit/withdraw
+    STRATEGY_ROUTER_ADDRESS: str = "0x01888e3f3d6cd137e63ff1a090a1e2c9ed5754162a8d5739364aba657fab20e4"  # v2 with ETH + protocol integration + deposit function (redeployed 2025-12-09 with new class hash)
     
     # Backend Wallet (for automated execution)
     BACKEND_WALLET_ADDRESS: str = ""  # Set in .env

@@ -16,11 +16,12 @@ import { TransactionHistory } from './TransactionHistory';
 import { AnalyticsDashboard } from './AnalyticsDashboard';
 import { RebalanceHistory } from './RebalanceHistory';
 import { DepositAllocationPreview } from './DepositAllocationPreview';
+import { IntegrationTests } from './IntegrationTests';
 import { categorizeError } from '@/services/errorHandler';
 import { useState, useMemo, useEffect } from 'react';
 import { getConfig } from '@/lib/config';
 
-type TabType = 'overview' | 'analytics' | 'history';
+type TabType = 'overview' | 'analytics' | 'history' | 'integration-tests';
 
 export function Dashboard() {
   // ⚠️ CRITICAL: All useState MUST be called FIRST, in same order every render
@@ -75,11 +76,11 @@ export function Dashboard() {
   const tvlDisplay = useMemo(() => {
     if (routerV2.isLoading) return '...';
     const tvl = BigInt(routerV2.totalValueLocked || '0');
-    const tvlStrk = Number(tvl) / 1e18;
-    return tvlStrk.toFixed(2);
+    const tvlEth = Number(tvl) / 1e18;
+    return tvlEth.toFixed(2);
   }, [routerV2.isLoading, routerV2.totalValueLocked]);
 
-  // Handle deposit - simplified STRK transfer
+  // Handle deposit - STRK deposit
   const handleDeposit = async () => {
     if (!depositAmount || parseFloat(depositAmount) <= 0) {
       alert('Please enter a valid deposit amount');
@@ -274,21 +275,32 @@ export function Dashboard() {
         ekubo: allocationForm.ekubo,
       });
 
-      if (result) {
+      if (result && result.status === 'success') {
         const txId = txHistory.addTransaction(result.txHash, 'UPDATE_ALLOCATION', {
           jediswap: allocationForm.jediswap,
           ekubo: allocationForm.ekubo,
         });
         txHistory.confirmTransaction(txId);
 
-        alert('✅ Allocation updated on-chain!\nTx: ' + result.txHash.slice(0, 10) + '...\n\nJediSwap: ' + allocationForm.jediswap + '%\nEkubo: ' + allocationForm.ekubo + '%');
-      } else {
-        const errorMsg = settlement.error || 'Settlement failed';
-        setSettlementError(errorMsg);
+        alert('✅ Allocation updated on-chain!\nTx: ' + result.txHash.slice(0, 10) + '...\n\nJediSwap: ' + allocationForm.jediswap + '%\nEkubo: ' + allocationForm.ekubo + '%\n\nRefreshing display...');
+        setSettlementError(null);
         
-        // Show user-friendly error message for authorization issues
-        if (errorMsg.includes('Unauthorized') || errorMsg.includes('permission')) {
-          alert('❌ Authorization Error\n\nThe contract rejected the allocation update. This function may require admin/owner privileges.\n\nPlease contact the contract administrator or check if your account has the necessary permissions.');
+        // Wait for transaction to be included, then refresh
+        setTimeout(() => {
+          console.log('🔄 Refreshing allocation display...');
+          routerV2.refetch();
+        }, 5000);
+      } else {
+        // Transaction failed or returned null
+        const errorMsg = settlement.error || 'Settlement failed - transaction may have been rejected';
+        setSettlementError(errorMsg);
+        console.error('❌ Allocation update failed:', errorMsg);
+        
+        // Show clear error message
+        if (errorMsg.includes('Unauthorized') || errorMsg.includes('permission') || errorMsg.includes('ENTRYPOINT_FAILED')) {
+          alert('❌ Authorization Error\n\nOnly the contract owner or RiskEngine can update allocations.\n\nTo update allocations, use the "AI Risk Engine: Orchestrate Allocation" button, which will update via RiskEngine.');
+        } else {
+          alert('❌ Update Failed\n\n' + errorMsg + '\n\nPlease try again or use the AI Risk Engine to update allocations.');
         }
       }
     } catch (error) {
@@ -412,6 +424,20 @@ export function Dashboard() {
         jediswap_pct: decision.jediswap_pct / 100, // Convert from basis points to percentage
         ekubo_pct: decision.ekubo_pct / 100,
       });
+
+      // Refresh allocation display after AI orchestration completes
+      // RiskEngine should have updated the contract, so wait a bit longer for confirmation
+      console.log('🔄 Scheduling allocation refresh after AI orchestration...');
+      setTimeout(() => {
+        console.log('🔄 Refreshing allocation after AI orchestration...');
+        routerV2.refetch();
+      }, 8000); // Wait 8 seconds for RiskEngine transaction to be confirmed
+      
+      // Also refresh again after a longer delay to catch any delayed updates
+      setTimeout(() => {
+        console.log('🔄 Second refresh after AI orchestration...');
+        routerV2.refetch();
+      }, 20000); // Wait 20 seconds for final confirmation
       
       // Show success message with proof
       const proofStatus = decision.proof_status || 'generated';
@@ -476,7 +502,7 @@ export function Dashboard() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 bg-white/5 p-1 rounded-xl border border-white/10">
-        {(['overview', 'analytics', 'history'] as TabType[]).map((tab) => (
+        {(['overview', 'analytics', 'history', 'integration-tests'] as TabType[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -485,12 +511,20 @@ export function Dashboard() {
             {tab === 'overview' && '📊 Overview'}
             {tab === 'analytics' && '📈 Analytics'}
             {tab === 'history' && ('📜 History' + (txHistory.transactions.length > 0 ? ' (' + txHistory.transactions.length + ')' : ''))}
+            {tab === 'integration-tests' && '🧪 Integration Tests'}
           </button>
         ))}
       </div>
 
       {/* Analytics Tab */}
       {activeTab === 'analytics' && <AnalyticsDashboard allocation={allocation} />}
+
+      {/* Integration Tests Tab */}
+      {activeTab === 'integration-tests' && (
+        <div className="bg-slate-900/70 border border-white/10 rounded-xl p-6 shadow-lg">
+          <IntegrationTests />
+        </div>
+      )}
 
       {/* History Tab */}
       {activeTab === 'history' && (
@@ -520,25 +554,55 @@ export function Dashboard() {
 
           {/* Allocation Bar */}
           <div className="bg-slate-900/70 border border-white/10 rounded-xl p-6 shadow-lg">
-            <h2 className="text-xl font-bold text-white mb-4">Current Allocation</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-white">Current Allocation (On-Chain)</h2>
+              <button
+                onClick={() => {
+                  console.log('🔄 Manual refresh triggered');
+                  routerV2.refetch();
+                }}
+                className="px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors flex items-center gap-2"
+                title="Refresh allocation from contract"
+              >
+                🔄 Refresh
+              </button>
+            </div>
+            {routerV2.error && (
+              <div className="mb-2 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded p-2">
+                ⚠️ {routerV2.error}
+              </div>
+            )}
+            {routerV2.lastUpdated && (
+              <div className="mb-2 text-xs text-gray-400">
+                Last updated: {routerV2.lastUpdated.toLocaleTimeString()}
+              </div>
+            )}
             <div className="h-8 rounded-full overflow-hidden flex mb-4 bg-gray-800">
               <div className="bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center text-white text-sm font-bold" style={{ width: allocation.jediswap + '%' }}>
-                {allocation.jediswap >= 15 && allocation.jediswap.toFixed(0) + '%'}
+                {allocation.jediswap >= 15 && allocation.jediswap.toFixed(1) + '%'}
               </div>
               <div className="bg-gradient-to-r from-orange-500 to-orange-600 flex items-center justify-center text-white text-sm font-bold" style={{ width: allocation.ekubo + '%' }}>
-                {allocation.ekubo >= 15 && allocation.ekubo.toFixed(0) + '%'}
+                {allocation.ekubo >= 15 && allocation.ekubo.toFixed(1) + '%'}
               </div>
             </div>
-            <div className="flex justify-center gap-8">
+            <div className="flex justify-center gap-8 mb-3">
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 rounded bg-blue-500"></div>
-                <span className="text-gray-300">JediSwap</span>
+                <span className="text-gray-300">JediSwap: {allocation.jediswap.toFixed(2)}%</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 rounded bg-orange-500"></div>
-                <span className="text-gray-200">Ekubo</span>
+                <span className="text-gray-200">Ekubo: {allocation.ekubo.toFixed(2)}%</span>
               </div>
             </div>
+            {latestDecision && Math.abs(allocation.jediswap - (latestDecision.jediswap_pct || 0) * 100) > 0.1 && (
+              <div className="mt-3 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded text-sm">
+                <div className="text-yellow-400 font-semibold mb-1">📊 AI Proposed: JediSwap {((latestDecision.jediswap_pct || 0) * 100).toFixed(1)}% / Ekubo {((latestDecision.ekubo_pct || 0) * 100).toFixed(1)}%</div>
+                <div className="text-yellow-300 text-xs mt-1">
+                  ⚠️ On-chain allocation differs. Use "AI Risk Engine" button to update via RiskEngine.
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Pool Selection - Coming Soon */}
@@ -587,7 +651,7 @@ export function Dashboard() {
               {strategyDeposit.contractVersion === 'v2' && (
                 <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 mb-4">
                   <p className="text-green-400 text-xs">
-                    ✓ <strong>Direct Deposit</strong> — Your STRK goes directly to the Strategy Router for yield optimization.
+                    ✓ <strong>Direct Deposit</strong> — Your STRK goes directly to the Strategy Router.
                     <br/>
                     <span className="text-green-300/70">🔒 Optional privacy adapter coming soon.</span>
                   </p>
@@ -595,18 +659,38 @@ export function Dashboard() {
               )}
               
               <p className="text-sm text-gray-300 mb-2">Deposit STRK to earn optimized yields across DeFi protocols</p>
-              <div className="text-xs text-gray-400 mb-4 flex items-center justify-between">
-                <span>Wallet Balance:</span>
-                <span className="font-mono text-green-400">
-                  {strategyDeposit.isLoadingBalance ? '...' : `${strategyDeposit.userBalance.toFixed(4)} STRK`}
-                </span>
+              <div className="text-xs text-gray-400 mb-4 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span>STRK Balance:</span>
+                  <span className="font-mono text-green-400">
+                    {strategyDeposit.isLoadingBalance ? '...' : `${strategyDeposit.userBalance.toFixed(4)} STRK`}
+                  </span>
+                </div>
+                {strategyDeposit.strkBalance !== undefined && (
+                  <div className="flex items-center justify-between">
+                    <span>STRK Balance (gas):</span>
+                    <span className={`font-mono ${strategyDeposit.strkBalance < 0.001 ? 'text-yellow-400' : 'text-green-400'}`}>
+                      {strategyDeposit.isLoadingBalance ? '...' : `${strategyDeposit.strkBalance.toFixed(6)} STRK`}
+                      {strategyDeposit.strkBalance < 0.001 && (
+                        <span className="ml-2 text-xs">⚠️ Low!</span>
+                      )}
+                    </span>
+                  </div>
+                )}
               </div>
               <input
                 type="number"
                 value={depositAmount}
-                onChange={(e) => setDepositAmount(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  // Only allow positive numbers
+                  if (val === '' || (!isNaN(parseFloat(val)) && parseFloat(val) >= 0)) {
+                    setDepositAmount(val);
+                  }
+                }}
                 placeholder="0.0 STRK"
                 step="0.01"
+                min="0"
                 max={strategyDeposit.userBalance}
                 className="w-full p-3 mb-4 bg-slate-900/70 border border-green-500/30 rounded-lg text-white placeholder-gray-500"
               />
@@ -835,3 +919,4 @@ export function Dashboard() {
     </div>
   );
 }
+

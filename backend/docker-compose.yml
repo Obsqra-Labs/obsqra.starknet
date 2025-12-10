@@ -27,7 +27,7 @@ services:
       DEBUG: "false"
       STARKNET_RPC_URL: https://starknet-sepolia-rpc.publicnode.com
       RISK_ENGINE_ADDRESS: 0x0751c85290c660d738236a12bb362bf64c0a8ef4b1a9cc05dc7000d14fd44d31
-      STRATEGY_ROUTER_ADDRESS: 0x0539d5611c6158a4234f7c4e8e7fe50af7b9502314ca95409f5106ee2f6741d6
+      STRATEGY_ROUTER_ADDRESS: 0x01888e3f3d6cd137e63ff1a090a1e2c9ed5754162a8d5739364aba657fab20e4
     ports:
       - "8000:8000"
     depends_on:

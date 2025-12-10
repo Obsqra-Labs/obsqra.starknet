@@ -20,11 +20,21 @@
    - Displays real or default values
    - Source indicator (on-chain vs default)
 
+## ✅ Completed (Updated)
+
+**Real APY Fetching via DefiLlama API**
+
+- ✅ Implemented DefiLlama API integration
+- ✅ Fetches real APY from JediSwap and Ekubo pools on Starknet
+- ✅ Proper error handling and fallback to defaults
+- ✅ Source tracking (defillama vs default)
+- ✅ Uses existing httpx dependency (no new deps)
+
 ## 🟡 In Progress
 
-**Real Protocol Contract Queries**
+**On-Chain Contract Queries (Future Enhancement)**
 
-Currently using default values (5.2% JediSwap, 8.5% Ekubo) but service structure is ready.
+Currently using DefiLlama API for reliable APY data. On-chain contract queries can be added as an enhancement.
 
 ### JediSwap APY Implementation Needed
 
@@ -117,9 +127,20 @@ async def get_jediswap_apy(self) -> float:
 - **Caching**: ✅ Complete
 - **Backend Integration**: ✅ Complete
 - **Frontend Integration**: ✅ Complete
-- **Real Contract Queries**: ❌ Pending (using defaults)
+- **Real APY Fetching**: ✅ Complete (via DefiLlama API)
+- **On-Chain Contract Queries**: ⏳ Future Enhancement
 
 ## 🎯 Priority
 
-**Medium** - Service is functional with defaults. Real implementation can be added incrementally without breaking changes.
+**✅ Complete** - APY fetching is now functional with real data from DefiLlama API. On-chain queries can be added as future enhancement for more direct data access.
+
+## 📝 Implementation Details
+
+**DefiLlama Integration:**
+- Uses `https://yields.llama.fi/pools` endpoint
+- Searches for Starknet pools matching JediSwap and Ekubo
+- Returns real APY percentages when available
+- Falls back to defaults (5.2% JediSwap, 8.5% Ekubo) if API fails
+- 5-minute cache to reduce API calls
+- Source tracking: "defillama" vs "default"
 

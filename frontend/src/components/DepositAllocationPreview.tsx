@@ -59,7 +59,7 @@ export function DepositAllocationPreview({
             <span className="text-xs font-medium text-blue-300">JediSwap</span>
           </div>
           <p className="text-lg font-bold text-white">{jediswapPct.toFixed(2)}%</p>
-          <p className="text-xs text-gray-400">{jediswapAmount.toFixed(4)} STRK</p>
+          <p className="text-xs text-gray-400">{jediswapAmount.toFixed(4)} ETH</p>
         </div>
 
         <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
@@ -68,7 +68,7 @@ export function DepositAllocationPreview({
             <span className="text-xs font-medium text-orange-300">Ekubo</span>
           </div>
           <p className="text-lg font-bold text-white">{ekuboPct.toFixed(2)}%</p>
-          <p className="text-xs text-gray-400">{ekuboAmount.toFixed(4)} STRK</p>
+          <p className="text-xs text-gray-400">{ekuboAmount.toFixed(4)} ETH</p>
         </div>
       </div>
 

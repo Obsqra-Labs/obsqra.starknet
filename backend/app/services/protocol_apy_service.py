@@ -2,6 +2,7 @@
 Protocol APY Service
 
 Fetches real APY rates from JediSwap and Ekubo protocols on Starknet.
+Uses DefiLlama API as primary source, with on-chain queries as future enhancement.
 """
 import asyncio
 import logging
@@ -11,6 +12,7 @@ from starknet_py.net import RpcClient
 from starknet_py.net.client import Client
 from starknet_py.contract import Contract
 import os
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -36,29 +38,76 @@ class ProtocolAPYService:
             self._client = await RpcClient.create(self.rpc_url)
         return self._client
     
+    async def _fetch_defillama_apy(self, protocol_id: str) -> Optional[float]:
+        """
+        Fetch APY from DefiLlama API for a given protocol.
+        
+        Args:
+            protocol_id: DefiLlama protocol identifier (e.g., 'jediswap', 'ekubo')
+        
+        Returns:
+            APY as float percentage, or None if fetch fails
+        """
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                # DefiLlama API endpoint for protocol yields
+                url = "https://yields.llama.fi/pools"
+                
+                response = await client.get(url)
+                if response.status_code == 200:
+                    data = response.json()
+                    
+                    # Search for Starknet pools matching our protocol
+                    pools = data.get("data", [])
+                    for pool in pools:
+                        chain = pool.get("chain", "").lower()
+                        project = pool.get("project", "").lower()
+                        
+                        # Match JediSwap on Starknet
+                        if protocol_id == "jediswap" and chain == "starknet" and "jedi" in project:
+                            apy = pool.get("apy", None)
+                            if apy is not None:
+                                logger.info(f"JediSwap APY from DefiLlama: {apy}%")
+                                return float(apy)
+                        
+                        # Match Ekubo on Starknet
+                        if protocol_id == "ekubo" and chain == "starknet" and "ekubo" in project:
+                            apy = pool.get("apy", None)
+                            if apy is not None:
+                                logger.info(f"Ekubo APY from DefiLlama: {apy}%")
+                                return float(apy)
+                    
+                    logger.warning(f"No {protocol_id} pool found in DefiLlama data")
+                    return None
+                else:
+                    logger.warning(f"DefiLlama API returned status {response.status_code}")
+                    return None
+                        
+        except httpx.TimeoutException:
+            logger.warning(f"DefiLlama API timeout for {protocol_id}")
+            return None
+        except Exception as e:
+            logger.error(f"DefiLlama API error for {protocol_id}: {e}")
+            return None
+    
     async def get_jediswap_apy(self) -> float:
         """
         Fetch current APY from JediSwap protocol.
         
-        TODO: Implement actual JediSwap contract query.
-        For now, returns a default value.
+        Strategy:
+        1. Try DefiLlama API (most reliable)
+        2. Fallback to default value
         
-        JediSwap typically provides APY through:
-        - Pool contract queries
-        - Router contract queries
-        - External APIs (DefiLlama, etc.)
+        Future enhancement: Query JediSwap pool contracts directly.
         """
         try:
-            client = await self._get_client()
+            # Try DefiLlama first
+            apy = await self._fetch_defillama_apy("jediswap")
+            if apy is not None:
+                return apy
             
-            # TODO: Query JediSwap router/pool contracts for real APY
-            # Example approach:
-            # 1. Get pool address from StrategyRouter
-            # 2. Query pool contract for current rate
-            # 3. Calculate APY from rate
-            
-            # For now, return default
-            logger.warning("JediSwap APY: Using default value (5.2%). Implement real fetching.")
+            # Fallback to default
+            logger.warning("JediSwap APY: Using default value (5.2%). DefiLlama fetch failed.")
             return 5.2
             
         except Exception as e:
@@ -69,25 +118,20 @@ class ProtocolAPYService:
         """
         Fetch current APY from Ekubo protocol.
         
-        TODO: Implement actual Ekubo contract query.
-        For now, returns a default value.
+        Strategy:
+        1. Try DefiLlama API (most reliable)
+        2. Fallback to default value
         
-        Ekubo typically provides APY through:
-        - Pool contract queries
-        - Core contract queries
-        - External APIs (DefiLlama, etc.)
+        Future enhancement: Query Ekubo core/pool contracts directly.
         """
         try:
-            client = await self._get_client()
+            # Try DefiLlama first
+            apy = await self._fetch_defillama_apy("ekubo")
+            if apy is not None:
+                return apy
             
-            # TODO: Query Ekubo core/pool contracts for real APY
-            # Example approach:
-            # 1. Get pool address from StrategyRouter
-            # 2. Query pool contract for current rate
-            # 3. Calculate APY from rate
-            
-            # For now, return default
-            logger.warning("Ekubo APY: Using default value (8.5%). Implement real fetching.")
+            # Fallback to default
+            logger.warning("Ekubo APY: Using default value (8.5%). DefiLlama fetch failed.")
             return 8.5
             
         except Exception as e:
@@ -125,10 +169,19 @@ class ProtocolAPYService:
                 logger.error(f"Ekubo APY fetch failed: {ekubo_apy}")
                 ekubo_apy = 8.5
             
+            # Determine source
+            jedi_is_real = not isinstance(jediswap_apy, Exception) and jediswap_apy != 5.2
+            ekubo_is_real = not isinstance(ekubo_apy, Exception) and ekubo_apy != 8.5
+            
+            if jedi_is_real or ekubo_is_real:
+                source = "defillama"
+            else:
+                source = "default"
+            
             result = {
                 "jediswap": float(jediswap_apy),
                 "ekubo": float(ekubo_apy),
-                "source": "on-chain" if not isinstance(jediswap_apy, Exception) and not isinstance(ekubo_apy, Exception) else "default",
+                "source": source,
             }
             
             # Update cache

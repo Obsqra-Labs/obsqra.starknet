@@ -1,20 +1,27 @@
 'use client';
 
 import { Chain, sepolia } from '@starknet-react/chains';
-import { ReactNode, useMemo } from 'react';
+import { ReactNode } from 'react';
 import { StarknetConfig, publicProvider, argent, braavos } from '@starknet-react/core';
 
-export function StarknetProvider({ children }: { children: ReactNode }) {
-  // Prefer production proxy when served over https to avoid CORS; otherwise use env or fallback RPC.
-  const rpcUrl = useMemo(() => {
-    if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
-      return '/api/rpc';
-    }
-    return process.env.NEXT_PUBLIC_STARKNET_RPC || 'https://starknet-sepolia.g.alchemy.com/v2/EvhYN6geLrdvbYHVRgPJ7';
-  }, []);
+// Create custom Sepolia chain with reliable Alchemy RPC
+// Use spread operator to preserve all properties, then override rpcUrls
+const sepoliaCustom: Chain = {
+  ...sepolia,
+  rpcUrls: {
+    default: {
+      http: ['https://starknet-sepolia.g.alchemy.com/v2/EvhYN6geLrdvbYHVRgPJ7'],
+    },
+    public: {
+      http: ['https://starknet-sepolia.g.alchemy.com/v2/EvhYN6geLrdvbYHVRgPJ7'],
+    },
+  },
+};
 
-  const chains = [sepolia];
+export function StarknetProvider({ children }: { children: ReactNode }) {
+  // Use custom chain with reliable Alchemy RPC
   const provider = publicProvider();
+  const chains = [sepoliaCustom];
   const connectors = [argent(), braavos()];
 
   return (

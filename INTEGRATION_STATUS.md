@@ -1,322 +1,468 @@
-# Obsqra.starknet Integration Status
+# Protocol Integration Status - Exhaustive Documentation
 
-**Last Updated:** December 5, 2025  
-**Network:** Starknet Sepolia Testnet  
-**Status:** 🟢 Integration Complete - Ready for Deployment
+**Last Updated**: December 10, 2025  
+**Network**: Starknet Sepolia Testnet  
+**Contract**: StrategyRouterV2 (`0x0146bb729339068bde94aa89c1668d898515a6df6cd7e2bd40543303abdee8f4`)
+
+---
 
 ## Executive Summary
 
-All components of the Obsqra.starknet MVP/POC have been successfully integrated and configured for Sepolia Testnet deployment. The project includes:
+We are building a multi-protocol yield aggregator on Starknet that deploys user deposits across multiple DeFi protocols (JediSwap and Ekubo) to maximize yield. The system separates deposit/withdrawal operations from protocol deployment to reduce transaction complexity and improve reliability.
 
-- ✅ 3 Cairo smart contracts (compiled and tested)
-- ✅ Complete frontend with React/Next.js
-- ✅ AI service for off-chain monitoring
-- ✅ Full integration between all components
-- ✅ Deployment automation for Sepolia
+### Current Status: **PARTIALLY OPERATIONAL**
 
-## Component Status
+- ✅ **STRK Deposits/Withdrawals**: Fully functional
+- ✅ **Ekubo Positions Integration**: Working (mint_and_deposit)
+- ⚠️ **JediSwap NFT Position Manager**: Implemented but not fully tested
+- ❌ **JediSwap V2 Router Swaps**: Failing with ENTRYPOINT_NOT_FOUND
+- ⚠️ **Protocol Deployment**: Works but skips swap step (STRK-only liquidity)
 
-### 1. Smart Contracts (Cairo) ✅
+---
 
-| Contract | Status | Features | Lines |
-|----------|--------|----------|-------|
-| RiskEngine | ✅ Complete | Risk calculation, Allocation logic | 220 |
-| StrategyRouter | ✅ Complete | Allocation management, Yield tracking | 130 |
-| DAOConstraintManager | ✅ Complete | Governance constraints, Validation | 155 |
+## Architecture Overview
 
-**Build Status:**
-```bash
-$ cd contracts && scarb build
-✅ Compiled successfully
-```
-
-**Test Coverage:** 31 unit tests (all passing)
-
-### 2. Frontend (Next.js + React) ✅
-
-| Component | Status | Description |
-|-----------|--------|-------------|
-| StarknetProvider | ✅ Complete | Wallet connection (Argent X, Braavos) |
-| Dashboard | ✅ Complete | Main UI with all integrations |
-| useRiskEngine | ✅ Complete | Hook for RiskEngine contract |
-| useStrategyRouter | ✅ Complete | Hook for StrategyRouter contract |
-| useDAOConstraints | ✅ Complete | Hook for DAO constraints |
-| useMistCash | ✅ Complete | Hook for privacy protocol |
-
-**Features Implemented:**
-- Real-time contract data display
-- Interactive allocation management
-- Transaction execution
-- DAO constraint visualization
-- MIST.cash deposit integration
-- Wallet connection with multiple providers
-
-### 3. AI Service (Python/FastAPI) ✅
-
-| Module | Status | Purpose |
-|--------|--------|---------|
-| main.py | ✅ Complete | FastAPI server with endpoints |
-| contract_client.py | ✅ Complete | Starknet contract interactions |
-| monitor.py | ✅ Complete | Protocol monitoring & rebalancing |
-| risk_model.py | ✅ Complete | AI risk assessment |
-| config.py | ✅ Complete | Configuration management |
-
-**API Endpoints:**
-- `GET /health` - Health check
-- `POST /trigger-rebalance` - Trigger AI rebalancing
-- `POST /accrue-yields` - Accrue protocol yields
-
-### 4. Integration Points ✅
-
-#### Frontend ↔ Contracts
-- ✅ Read contract state (allocations, constraints, risk scores)
-- ✅ Execute transactions (update allocations, set constraints)
-- ✅ Real-time updates via polling
-- ✅ Transaction confirmation handling
-
-#### AI Service ↔ Contracts
-- ✅ Read protocol data
-- ✅ Calculate optimal allocations
-- ✅ Validate against constraints
-- ✅ Execute rebalancing transactions
-
-#### Frontend ↔ AI Service
-- ✅ Trigger manual rebalancing
-- ✅ Display AI decisions
-- ✅ Health monitoring
-
-## Deployment Configuration
-
-### Network Settings
-
-**Sepolia Testnet:**
-- RPC: `https://starknet-sepolia.public.blastapi.io/rpc/v0_7`
-- Chain ID: `SN_SEPOLIA`
-- Network: `alpha-sepolia`
-
-### Configuration Files
-
-| File | Purpose | Status |
-|------|---------|--------|
-| `contracts/Scarb.toml` | Build & deployment config | ✅ Configured |
-| `frontend/.env.local` | Frontend environment | ⚠️ Update after deployment |
-| `ai-service/.env` | AI service config | ⚠️ Update after deployment |
-
-### Deployment Scripts
-
-| Script | Purpose | Status |
-|--------|---------|--------|
-| `scripts/deploy-testnet.sh` | Deploy to Sepolia | ✅ Ready |
-| `switch-to-sepolia.sh` | Switch frontend to Sepolia | ✅ Ready |
-| `scripts/1-compile-contracts.sh` | Compile contracts | ✅ Working |
-
-## Pre-Deployment Checklist
-
-### Prerequisites
-- [ ] ArgentX/Braavos wallet with Sepolia support
-- [ ] Testnet ETH (get from faucet: https://starknet-faucet.vercel.app/)
-- [ ] sncast CLI installed
-- [ ] Account imported to sncast
-
-### Deployment Steps
-
-1. **Build Contracts**
-   ```bash
-   cd /opt/obsqra.starknet/contracts
-   scarb build
-   ```
-   Status: ✅ Works
-
-2. **Deploy to Sepolia**
-   ```bash
-   cd /opt/obsqra.starknet
-   ./scripts/deploy-testnet.sh YOUR_WALLET_ADDRESS
-   ```
-   Status: ✅ Script ready
-
-3. **Update Frontend Config**
-   ```bash
-   cd frontend
-   # Edit .env.local with deployed addresses
-   ```
-   Status: ⏳ After deployment
-
-4. **Update AI Service Config**
-   ```bash
-   cd ai-service
-   # Edit .env with deployed addresses
-   ```
-   Status: ⏳ After deployment
-
-5. **Start Services**
-   ```bash
-   # Terminal 1: AI Service
-   cd ai-service && python main.py
-
-   # Terminal 2: Frontend
-   cd frontend && npm run dev
-   ```
-   Status: ✅ Ready
-
-## Testing Plan
-
-### Unit Tests (Contracts)
-```bash
-cd contracts
-snforge test
-```
-Expected: All 31 tests pass ✅
-
-### Integration Test (Frontend + Contracts)
-1. Connect wallet to Sepolia
-2. View dashboard (read contract data)
-3. Update allocation (write transaction)
-4. Verify on block explorer
-
-### E2E Test (Full Stack)
-1. AI service monitors protocols
-2. Calculates optimal allocation
-3. Validates against constraints
-4. Executes rebalancing transaction
-5. Frontend displays updated state
-
-## Known Limitations
-
-1. **MIST.cash Chamber**: Not yet deployed (placeholder integration ready)
-2. **Real Protocols**: Using placeholder addresses (Aave/Lido/Compound on Starknet mainnet)
-3. **Oracle Data**: Hardcoded APY/risk data (awaiting oracle integration)
-
-## Next Steps
-
-### Immediate (Ready Now)
-1. ✅ Deploy contracts to Sepolia
-2. ✅ Update environment configs
-3. ✅ Test frontend integration
-4. ✅ Verify AI service connectivity
-
-### Short Term (1-2 weeks)
-- Deploy MIST.cash chamber
-- Integrate real protocol addresses
-- Add oracle price feeds
-- Implement yield accrual
-
-### Medium Term (1 month)
-- Mainnet deployment
-- Multi-user support
-- Advanced analytics dashboard
-- Historical performance tracking
-
-## Architecture Diagram
+### Contract Structure
 
 ```
-┌──────────────────────────────────────────────────────┐
-│              Starknet Sepolia Testnet                 │
-│  ┌────────────┐  ┌──────────────┐  ┌──────────────┐ │
-│  │ RiskEngine │  │ StrategyRouter│  │DAOConstraints│ │
-│  │   0x...    │  │    0x...      │  │    0x...     │ │
-│  └────────────┘  └──────────────┘  └──────────────┘ │
-└──────────────────────────────────────────────────────┘
-         ▲                    ▲
-         │ Read/Write         │ Read/Write
-         │                    │
-┌────────┴──────────┐  ┌──────┴────────────────┐
-│   Frontend        │  │    AI Service         │
-│   (Port 3000)     │◄─┤    (Port 8001)        │
-│                   │  │                       │
-│ • Dashboard       │  │ • Risk Monitor        │
-│ • Wallet Connect  │  │ • Rebalancer          │
-│ • Transaction UI  │  │ • Contract Client     │
-└───────────────────┘  └───────────────────────┘
-```
-
-## File Structure
-
-```
-/opt/obsqra.starknet/
-├── contracts/
-│   ├── src/
-│   │   ├── risk_engine.cairo ✅
-│   │   ├── strategy_router.cairo ✅
-│   │   └── dao_constraint_manager.cairo ✅
-│   ├── Scarb.toml ✅ (Sepolia config)
-│   └── target/dev/ (compiled artifacts)
+StrategyRouterV2
+├── Deposit/Withdraw (User-facing)
+│   ├── deposit(amount: u256) ✅
+│   └── withdraw(amount: u256) ✅
 │
-├── frontend/
-│   ├── src/
-│   │   ├── hooks/
-│   │   │   ├── useRiskEngine.ts ✅
-│   │   │   ├── useStrategyRouter.ts ✅ NEW
-│   │   │   ├── useDAOConstraints.ts ✅ NEW
-│   │   │   └── useMistCash.ts ✅
-│   │   ├── components/
-│   │   │   └── Dashboard.tsx ✅ (Enhanced)
-│   │   └── providers/
-│   │       └── StarknetProvider.tsx ✅
-│   └── .env.local (to be configured)
+├── Protocol Deployment (Owner-only)
+│   └── deploy_to_protocols() ⚠️
+│       ├── JediSwap Integration
+│       │   ├── Swap STRK → ETH (❌ FAILING)
+│       │   └── Add Liquidity via NFT Position Manager (⚠️ UNTESTED)
+│       └── Ekubo Integration
+│           ├── Swap STRK → ETH (❌ FAILING - same router issue)
+│           └── Add Liquidity via Positions Contract (✅ WORKING)
 │
-├── ai-service/
-│   ├── main.py ✅
-│   ├── contract_client.py ✅
-│   ├── monitor.py ✅
-│   ├── risk_model.py ✅
-│   ├── config.py ✅ (Sepolia RPC)
-│   └── .env (to be configured)
-│
-├── scripts/
-│   ├── deploy-testnet.sh ✅
-│   └── switch-to-sepolia.sh ✅
-│
-└── docs/
-    ├── IMPLEMENTATION_GUIDE.md ✅ (Updated for Sepolia)
-    ├── SEPOLIA_MIGRATION_COMPLETE.md ✅ NEW
-    └── INTEGRATION_STATUS.md ✅ NEW (this file)
+└── Testing Functions (Owner-only)
+    ├── test_jediswap_only(amount: u256) ⚠️
+    └── test_ekubo_only(amount: u256) ✅
 ```
 
-## Verification Commands
+### Key Design Decisions
 
-### Check Contract Compilation
-```bash
-cd /opt/obsqra.starknet/contracts && scarb build
-# Expected: Compiling obsqra_contracts v0.1.0
-# Expected: Finished `dev` profile target(s)
+1. **Separated Deposit from Deployment**: Users deposit STRK, owner calls `deploy_to_protocols()` separately
+2. **Token Handling**: Contract accepts STRK deposits, swaps half to ETH for liquidity pairs
+3. **Protocol Selection**: Currently 50/50 split between JediSwap and Ekubo (configurable)
+
+---
+
+## Protocol Integrations - Detailed Status
+
+### 1. JediSwap Integration
+
+#### 1.1 JediSwap V2 Swap Router
+
+**Status**: ❌ **NOT WORKING**
+
+**Contract Address**: `0x03c8e56d7f6afccb775160f1ae3b69e3db31b443e544e56bd845d8b3b3a87a21`  
+**Network**: Sepolia  
+**Version**: V2 (V1 is only on Alpha Testnet)
+
+**Function Attempted**: `exact_input_single(ExactInputSingleParams)`
+
+**Error**: `ENTRYPOINT_NOT_FOUND`  
+**Selector**: `0x3276861cf5e05d6daf8f352cabb47df623eb10c383ab742fcc7abea94d5c5cc`
+
+**Interface Definition**:
+```cairo
+pub struct ExactInputSingleParams {
+    pub token_in: ContractAddress,
+    pub token_out: ContractAddress,
+    pub fee: u128,              // 3000 = 0.3%
+    pub recipient: ContractAddress,
+    pub deadline: u64,
+    pub amount_in: u256,
+    pub amount_out_minimum: u256,
+    pub sqrt_price_limit_x96: u256,
+}
 ```
 
-### Check Frontend Dependencies
-```bash
-cd /opt/obsqra.starknet/frontend && npm list @starknet-react/core
-# Expected: @starknet-react/core@3.6.0
+**Root Cause Analysis**:
+- The selector matches `exact_input_single`, so the function exists
+- Error suggests parameter serialization issue or struct field order mismatch
+- Possible issues:
+  1. Struct fields not in correct order for Cairo serialization
+  2. Missing or incorrect fee tier (3000 might not exist for STRK/ETH pair)
+  3. Router contract on Sepolia might have different interface than documented
+
+**Workaround**: Currently skipping swap, adding liquidity with STRK only
+
+**Next Steps**:
+1. Verify actual ABI of deployed router contract on Starkscan
+2. Check if fee tier 3000 exists for STRK/ETH pair
+3. Test with different fee tiers (500, 10000)
+4. Consider using JediSwap V1 router if available on Sepolia
+
+**Documentation Reference**: 
+- [JediSwap V2 Swap Router Docs](https://docs.jediswap.xyz/for-developers/jediswap-v2/periphery/jediswap_v2_swap_router)
+- [JediSwap Contract Addresses](https://docs.jediswap.xyz/for-developers/jediswap-v2/contract-addresses)
+
+---
+
+#### 1.2 JediSwap V2 NFT Position Manager
+
+**Status**: ⚠️ **IMPLEMENTED BUT UNTESTED**
+
+**Contract Address**: `0x024fd9721eea36cf8cebc226fd9414057bbf895b47739822f849f622029f9399`  
+**Network**: Sepolia
+
+**Function Used**: `mint(MintParams)`
+
+**Interface Definition**:
+```cairo
+pub struct MintParams {
+    pub token0: ContractAddress,
+    pub token1: ContractAddress,
+    pub fee: u32,                    // 3000 = 0.3%
+    pub tick_lower: i128,            // -887272 (full range)
+    pub tick_upper: i128,            // 887272 (full range)
+    pub amount0_desired: u256,
+    pub amount1_desired: u256,
+    pub amount0_min: u256,
+    pub amount1_min: u256,
+    pub recipient: ContractAddress,
+    pub deadline: u64,
+}
 ```
 
-### Check AI Service
-```bash
-cd /opt/obsqra.starknet/ai-service && python -c "import fastapi, starknet_py; print('OK')"
-# Expected: OK
+**Current Implementation**:
+- Adds liquidity with STRK only (amount1 = 0)
+- Position manager should handle swap internally if needed
+- Full range liquidity (-887272 to 887272 ticks)
+
+**Testing Status**: Not yet tested end-to-end
+
+**Known Issues**:
+- May fail if position manager requires both tokens
+- No slippage protection (amount0_min = 0, amount1_min = 0)
+
+**Next Steps**:
+1. Test `mint()` with STRK-only to verify behavior
+2. If fails, implement proper swap before mint
+3. Add slippage protection based on current pool price
+
+**Documentation Reference**:
+- [JediSwap V2 NFT Position Manager](https://docs.jediswap.xyz/for-developers/jediswap-v2/periphery/jediswap_v2_nft_position_manager)
+
+---
+
+### 2. Ekubo Integration
+
+#### 2.1 Ekubo Positions Contract
+
+**Status**: ✅ **WORKING**
+
+**Contract Address**: `0x06a2aee84bb0ed5dded4384ddd0e40e9c1372b818668375ab8e3ec08807417e5`  
+**Network**: Sepolia
+
+**Function Used**: `mint_and_deposit(PoolKey, Bounds, min_liquidity)`
+
+**Why This Works**:
+- Ekubo Positions contract handles Core's lock/callback pattern internally
+- No need to implement `locked()` callback in our contract
+- Simpler integration than direct Core interaction
+
+**Interface Definition**:
+```cairo
+pub struct PoolKey {
+    pub token0: ContractAddress,
+    pub token1: ContractAddress,
+    pub fee: u128,              // 3000 = 0.3%
+    pub tick_spacing: u128,     // 60
+    pub extension: ContractAddress,
+}
+
+pub struct Bounds {
+    pub lower: i129,            // -887280 (full range)
+    pub upper: i129,            // 887280 (full range)
+}
 ```
 
-## Support & Resources
+**Current Implementation**:
+- Adds liquidity with STRK only (ETH = 0)
+- Full range bounds
+- Positions contract handles Core interaction
 
-### Documentation
-- Implementation Guide: `docs/IMPLEMENTATION_GUIDE.md`
-- API Documentation: `docs/API.md`
-- Migration Guide: `docs/SEPOLIA_MIGRATION_COMPLETE.md`
+**Testing Status**: ✅ Successfully tested via `test_ekubo_only()`
 
-### Deployment
-- Testnet Script: `./scripts/deploy-testnet.sh`
-- Deployment Guide: `DEPLOY_TO_TESTNET.md`
+**Known Limitations**:
+- Currently adding STRK-only liquidity (may not work if pair requires both tokens)
+- No swap before liquidity provision
 
-### Block Explorers
-- Voyager: https://sepolia.voyager.online/
-- Starkscan: https://sepolia.starkscan.co/
+**Next Steps**:
+1. Test with actual STRK/ETH pair to verify behavior
+2. If fails, implement swap before `mint_and_deposit`
+3. Add proper token amount calculation based on pool price
 
-### Faucets
-- Starknet Faucet: https://starknet-faucet.vercel.app/
-- BlastAPI Faucet: https://blastapi.io/faucets/starknet-sepolia
+**Documentation Reference**:
+- [Ekubo Protocol GitHub](https://github.com/EkuboProtocol/starknet-contracts)
+- [Ekubo Positions Contract](https://docs.ekubo.org/)
 
-## Conclusion
+---
 
-The Obsqra.starknet project is **fully integrated and ready for Sepolia deployment**. All components have been built, tested, and configured. The migration from local devnet to Sepolia Testnet is complete.
+#### 2.2 Ekubo Core (Not Used)
 
-**Status:** 🟢 Ready to Deploy
+**Status**: ❌ **NOT USED** (by design)
 
-**Action Required:** Deploy contracts to Sepolia and update environment configurations with deployed addresses.
+**Contract Address**: `0x0444a09d96389aa7148f1aada508e30b71299ffe650d9c97fdaae38cb9a23384`  
+**Network**: Sepolia
 
+**Why Not Used**:
+- Ekubo Core uses lock/callback pattern requiring `locked()` implementation
+- Direct Core interaction is complex and error-prone
+- Ekubo Positions contract provides simpler interface
+
+**Previous Attempts**:
+- Tried implementing `locked()` callback in StrategyRouterV2
+- Failed with selector mismatch issues
+- Switched to Positions contract for simpler integration
+
+**Documentation Reference**:
+- [Ekubo Core Interface](https://github.com/EkuboProtocol/starknet-contracts/blob/main/src/interfaces/core.cairo)
+
+---
+
+## Token Support
+
+### STRK Token
+
+**Status**: ✅ **FULLY SUPPORTED**
+
+**Contract Address**: `0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d`  
+**Network**: Sepolia
+
+**Functions**:
+- ✅ `deposit(amount: u256)` - Accepts STRK deposits
+- ✅ `withdraw(amount: u256)` - Returns STRK to users
+- ✅ Balance tracking per user
+- ✅ ERC20 approval/transfer handling
+
+**Current Usage**: Primary deposit token
+
+---
+
+### ETH Token
+
+**Status**: ⚠️ **CONFIGURED BUT NOT FULLY INTEGRATED**
+
+**Contract Address**: `0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7`  
+**Network**: Sepolia
+
+**Purpose**: Used for liquidity pairs (STRK/ETH)
+
+**Current Status**:
+- Address stored in contract storage
+- Used in swap attempts (currently failing)
+- Not directly accepted as deposit token
+
+**Future Plans**:
+- Enable ETH deposits (users deposit ETH, contract swaps half to STRK)
+- Currently blocked by swap router issues
+
+---
+
+## Contract Functions - Complete Reference
+
+### User-Facing Functions
+
+#### `deposit(amount: u256)`
+- **Status**: ✅ Working
+- **Purpose**: Accept STRK deposits from users
+- **Behavior**: 
+  - Transfers STRK from user to contract
+  - Updates `pending_deposits` storage
+  - Does NOT deploy to protocols automatically
+- **Authorization**: Public (anyone can deposit)
+
+#### `withdraw(amount: u256) -> u256`
+- **Status**: ✅ Working
+- **Purpose**: Return STRK to users
+- **Behavior**: 
+  - Transfers STRK from contract to user
+  - Updates user balance
+  - Does NOT withdraw from protocols (funds must be in contract)
+- **Authorization**: Public (users can withdraw their own funds)
+
+#### `get_user_balance(user: ContractAddress) -> u256`
+- **Status**: ✅ Working
+- **Purpose**: Query user's deposited balance
+- **Authorization**: Public (view function)
+
+---
+
+### Owner-Only Functions
+
+#### `deploy_to_protocols()`
+- **Status**: ⚠️ Partially Working
+- **Purpose**: Deploy pending deposits to JediSwap and Ekubo
+- **Behavior**:
+  1. Calculates amounts for each protocol (based on allocation %)
+  2. Attempts to swap half STRK to ETH (❌ FAILING)
+  3. Adds liquidity to JediSwap via NFT Position Manager (⚠️ UNTESTED)
+  4. Adds liquidity to Ekubo via Positions Contract (✅ WORKING)
+  5. Clears `pending_deposits`
+- **Authorization**: Owner only
+- **Current Workaround**: Skips swap, adds STRK-only liquidity
+
+#### `update_allocation(jediswap_pct: felt252, ekubo_pct: felt252)`
+- **Status**: ✅ Working
+- **Purpose**: Update allocation percentages (basis points, e.g., 5000 = 50%)
+- **Authorization**: Owner or Risk Engine
+
+#### `test_jediswap_only(amount: u256)`
+- **Status**: ⚠️ Implemented but not tested
+- **Purpose**: Test JediSwap integration in isolation
+- **Behavior**: Similar to `deploy_to_protocols()` but only for JediSwap
+- **Authorization**: Owner only
+
+#### `test_ekubo_only(amount: u256)`
+- **Status**: ✅ Working
+- **Purpose**: Test Ekubo integration in isolation
+- **Behavior**: Adds liquidity to Ekubo only
+- **Authorization**: Owner only
+- **Test Result**: Successfully tested
+
+---
+
+## Deployment Information
+
+### Current Deployment
+
+**Contract Address**: `0x0146bb729339068bde94aa89c1668d898515a6df6cd7e2bd40543303abdee8f4`  
+**Class Hash**: `0x7af696ae8321e39a73ec85eed8fb6d3d0208cbf1b0776e0f7464df7b55b9d42`  
+**Network**: Sepolia  
+**Deployed**: December 10, 2025
+
+**Constructor Parameters**:
+- Owner: `0x05fe812551bec726f1bf5026d5fb88f06ed411a753fb4468f9e19ebf8ced1b3d`
+- JediSwap Router: `0x03c8e56d7f6afccb775160f1ae3b69e3db31b443e544e56bd845d8b3b3a87a21`
+- JediSwap NFT Manager: `0x024fd9721eea36cf8cebc226fd9414057bbf895b47739822f849f622029f9399`
+- Ekubo Core: `0x0444a09d96389aa7148f1aada508e30b71299ffe650d9c97fdaae38cb9a23384`
+- Ekubo Positions: `0x06a2aee84bb0ed5dded4384ddd0e40e9c1372b818668375ab8e3ec08807417e5`
+- Risk Engine: `0x008c3eff435e859e3b8e5cb12f837f4dfa77af25c473fb43067adf9f557a3d80`
+- DAO Manager: `0x010a3e7d3a824ea14a5901984017d65a733af934f548ea771e2a4ad792c4c856`
+- Asset Token (STRK): `0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d`
+- JediSwap Allocation: 5000 (50%)
+- Ekubo Allocation: 5000 (50%)
+
+**Explorer Links**:
+- [Contract on Starkscan](https://sepolia.starkscan.co/contract/0x0146bb729339068bde94aa89c1668d898515a6df6cd7e2bd40543303abdee8f4)
+- [Class on Starkscan](https://sepolia.starkscan.co/class/0x7af696ae8321e39a73ec85eed8fb6d3d0208cbf1b0776e0f7464df7b55b9d42)
+
+---
+
+## Known Issues & Limitations
+
+### Critical Issues
+
+1. **JediSwap V2 Router Swap Failing**
+   - **Impact**: Cannot swap STRK to ETH before adding liquidity
+   - **Workaround**: Adding STRK-only liquidity (may not work)
+   - **Priority**: HIGH
+   - **Next Steps**: Verify router ABI, test different fee tiers
+
+2. **JediSwap NFT Position Manager Untested**
+   - **Impact**: Unknown if STRK-only liquidity works
+   - **Priority**: HIGH
+   - **Next Steps**: Test `mint()` with STRK-only
+
+### Medium Priority Issues
+
+3. **No Slippage Protection**
+   - **Impact**: Vulnerable to front-running and price manipulation
+   - **Priority**: MEDIUM
+   - **Next Steps**: Add price oracle or off-chain price feed
+
+4. **Ekubo STRK-Only Liquidity**
+   - **Impact**: May fail if pair requires both tokens
+   - **Priority**: MEDIUM
+   - **Next Steps**: Test with actual pool, implement swap if needed
+
+### Low Priority Issues
+
+5. **No Position Tracking**
+   - **Impact**: Cannot withdraw from specific positions
+   - **Priority**: LOW
+   - **Next Steps**: Store NFT token IDs and position details
+
+6. **No Yield Accrual**
+   - **Impact**: Deposits don't earn yield yet
+   - **Priority**: LOW
+   - **Next Steps**: Implement `accrue_yields()` and `rebalance()`
+
+---
+
+## Testing Status
+
+### Completed Tests
+
+- ✅ STRK deposit
+- ✅ STRK withdrawal
+- ✅ Ekubo `test_ekubo_only()` (approval + mint_and_deposit)
+
+### Pending Tests
+
+- ⏳ JediSwap `test_jediswap_only()` (approval + mint)
+- ⏳ Full `deploy_to_protocols()` with both protocols
+- ⏳ JediSwap V2 Router swap (any swap function)
+- ⏳ Position withdrawal
+- ⏳ Rebalancing
+
+---
+
+## Roadmap
+
+### Phase 1: Fix Critical Issues (Current)
+- [ ] Fix JediSwap V2 Router swap integration
+- [ ] Test JediSwap NFT Position Manager
+- [ ] Verify end-to-end liquidity provision
+
+### Phase 2: Complete Core Functionality
+- [ ] Implement position tracking (NFT IDs)
+- [ ] Add slippage protection
+- [ ] Implement yield accrual
+- [ ] Add rebalancing logic
+
+### Phase 3: Enhancements
+- [ ] Support ETH deposits
+- [ ] Add more protocols (10KSwap, etc.)
+- [ ] Implement dynamic allocation based on APY
+- [ ] Add frontend UI for protocol testing
+
+---
+
+## Resources & Documentation
+
+### Protocol Documentation
+- [JediSwap V2 Docs](https://docs.jediswap.xyz/for-developers/jediswap-v2)
+- [Ekubo Protocol GitHub](https://github.com/EkuboProtocol/starknet-contracts)
+- [Starknet Book](https://book.starknet.io/)
+
+### Contract Addresses
+- [JediSwap Sepolia Addresses](https://docs.jediswap.xyz/for-developers/jediswap-v2/contract-addresses)
+- [Ekubo Sepolia Addresses](https://docs.ekubo.org/)
+
+### Tools
+- [Starkscan Explorer](https://sepolia.starkscan.co/)
+- [Starkli CLI](https://book.starknet.io/toolchain/starkli)
+- [Scarb (Cairo Package Manager)](https://docs.swmansion.com/scarb/)
+
+---
+
+## Contact & Support
+
+For issues or questions:
+- Check contract on Starkscan for latest state
+- Review error messages in transaction receipts
+- Test individual protocol functions before full integration
+
+---
+
+**Document Maintained By**: Development Team  
+**Last Review**: December 10, 2025

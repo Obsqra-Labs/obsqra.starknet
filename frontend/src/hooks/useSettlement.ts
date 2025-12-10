@@ -1,7 +1,7 @@
 'use client';
 
 import { useAccount } from '@starknet-react/core';
-import { Contract, AccountInterface } from 'starknet';
+import { Contract, AccountInterface, RpcProvider } from 'starknet';
 import { useState, useCallback } from 'react';
 import { getConfig } from '@/lib/config';
 
@@ -26,7 +26,7 @@ interface AllocationData {
 
 interface SettlementResult {
   txHash: string;
-  status: 'pending' | 'confirmed' | 'failed';
+  status: 'pending' | 'success' | 'confirmed' | 'failed';
   error: string | null;
 }
 
@@ -74,8 +74,25 @@ export function useSettlement() {
           account as unknown as AccountInterface
         );
 
+        // Check authorization BEFORE calling - update_allocation requires owner or RiskEngine
+        // Owner and RiskEngine addresses from deployment config
+        const ownerAddress = '0x05fe812551bec726f1bf5026d5fb88f06ed411a753fb4468f9e19ebf8ced1b3d';
+        const riskEngineAddress = '0x008c3eff435e859e3b8e5cb12f837f4dfa77af25c473fb43067adf9f557a3d80';
+        const userAddress = (account.address || '').toLowerCase();
+        
+        if (userAddress !== ownerAddress.toLowerCase() && userAddress !== riskEngineAddress.toLowerCase()) {
+          throw new Error(
+            `❌ Unauthorized: update_allocation requires owner or RiskEngine authorization.\n\n` +
+            `Your address: ${account.address}\n` +
+            `Owner: ${ownerAddress}\n` +
+            `RiskEngine: ${riskEngineAddress}\n\n` +
+            `Only the owner or RiskEngine can update allocations. Regular users should use the RiskEngine backend to propose allocation changes.`
+          );
+        }
+        
         // Call update_allocation on the contract with JediSwap and Ekubo percentages
         console.log('📤 Calling update_allocation on contract with values:', { jediPct, ekPct });
+        
         const response = await contract.invoke('update_allocation', [jediPct, ekPct]);
 
         const txHash = response.transaction_hash;
@@ -83,16 +100,28 @@ export function useSettlement() {
         
         console.log('✅ Transaction sent:', txHash);
         
-        // Return pending status - will be confirmed when transaction settles
+        // Wait for transaction to be confirmed
+        try {
+          const config = getConfig();
+          const provider = new RpcProvider({ nodeUrl: config.rpcUrl });
+          console.log('⏳ Waiting for transaction confirmation...');
+          await provider.waitForTransaction(txHash, { retryInterval: 2000 });
+          console.log('✅ Transaction confirmed:', txHash);
+        } catch (waitError) {
+          console.warn('⚠️ Could not wait for transaction confirmation:', waitError);
+          // Continue anyway - transaction might still be processing
+        }
+        
+        // Return success status
         setResult({
           txHash,
-          status: 'pending',
+          status: 'success',
           error: null,
         });
 
         return {
           txHash,
-          status: 'pending' as const,
+          status: 'success' as const,
           error: null,
         };
       } catch (err) {

@@ -28,7 +28,7 @@ Obsqura is a verifiable AI-powered yield optimizer on Starknet. Every allocation
 Once connected, you'll see:
 
 **Current Statistics**:
-- **Total Value Locked (TVL)** - Total STRK in the strategy
+- **Total Value Locked (TVL)** - Total ETH in the strategy
 - **JediSwap Allocation** - Current percentage allocated to JediSwap
 - **Ekubo Allocation** - Current percentage allocated to Ekubo
 

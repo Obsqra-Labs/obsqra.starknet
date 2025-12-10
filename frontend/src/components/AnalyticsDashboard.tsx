@@ -70,7 +70,7 @@ export function AnalyticsDashboard({ allocation }: AnalyticsDashboardProps) {
         icon: '🔄',
         allocation: jediAlloc,
         apy: protocolAPYs.jediswap,
-        tvl: routerV2.totalValueLocked ? `${(parseFloat(routerV2.totalValueLocked) / 1e18).toFixed(2)} STRK` : 'Loading...',
+        tvl: routerV2.totalValueLocked ? `${(parseFloat(routerV2.totalValueLocked) / 1e18).toFixed(2)} ETH` : 'Loading...',
         risk: 'low',
         change24h: 1.1, // TODO: Calculate from historical data
         color: 'blue',
@@ -80,7 +80,7 @@ export function AnalyticsDashboard({ allocation }: AnalyticsDashboardProps) {
         icon: '🌀',
         allocation: ekuboAlloc,
         apy: protocolAPYs.ekubo,
-        tvl: routerV2.totalValueLocked ? `${(parseFloat(routerV2.totalValueLocked) / 1e18).toFixed(2)} STRK` : 'Loading...',
+        tvl: routerV2.totalValueLocked ? `${(parseFloat(routerV2.totalValueLocked) / 1e18).toFixed(2)} ETH` : 'Loading...',
         risk: 'medium',
         change24h: 2.4, // TODO: Calculate from historical data
         color: 'orange',
@@ -149,7 +149,7 @@ export function AnalyticsDashboard({ allocation }: AnalyticsDashboardProps) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-gradient-to-br from-purple-600/20 to-purple-500/10 border border-purple-500/30 rounded-xl p-4">
           <p className="text-sm text-gray-400 mb-1">Portfolio Value</p>
-          <p className="text-2xl font-bold text-white">{portfolioValue.toFixed(2)} STRK</p>
+          <p className="text-2xl font-bold text-white">{portfolioValue.toFixed(2)} ETH</p>
         </div>
 
         <div className="bg-gradient-to-br from-blue-600/20 to-cyan-600/10 border border-blue-500/30 rounded-xl p-4">
@@ -160,7 +160,7 @@ export function AnalyticsDashboard({ allocation }: AnalyticsDashboardProps) {
         <div className="bg-gradient-to-br from-green-600/20 to-emerald-600/10 border border-green-500/30 rounded-xl p-4">
           <p className="text-sm text-gray-400 mb-1">Est. Daily Yield</p>
           <p className="text-2xl font-bold text-white">
-            {((portfolioValue * totalAPY / 100) / 365).toFixed(4)} STRK
+            {((portfolioValue * totalAPY / 100) / 365).toFixed(4)} ETH
           </p>
         </div>
 
@@ -224,7 +224,7 @@ export function AnalyticsDashboard({ allocation }: AnalyticsDashboardProps) {
                 <div>
                   <span className="text-gray-400">Est. Yield/Year</span>
                   <p className="text-white font-bold">
-                    {((portfolioValue * protocol.allocation / 100) * (protocol.apy / 100)).toFixed(2)} STRK
+                    {((portfolioValue * protocol.allocation / 100) * (protocol.apy / 100)).toFixed(2)} ETH
                   </p>
                 </div>
               </div>
@@ -284,19 +284,19 @@ export function AnalyticsDashboard({ allocation }: AnalyticsDashboardProps) {
         <div className="bg-black/30 border border-purple-500/20 rounded-xl p-4 text-center">
           <p className="text-sm text-gray-400 mb-1">7-Day Projection</p>
           <p className="text-2xl font-bold text-green-400">
-            +{((portfolioValue * totalAPY / 100) / 52).toFixed(4)} STRK
+            +{((portfolioValue * totalAPY / 100) / 52).toFixed(4)} ETH
           </p>
         </div>
         <div className="bg-black/30 border border-purple-500/20 rounded-xl p-4 text-center">
           <p className="text-sm text-gray-400 mb-1">30-Day Projection</p>
           <p className="text-2xl font-bold text-green-400">
-            +{((portfolioValue * totalAPY / 100) / 12).toFixed(4)} STRK
+            +{((portfolioValue * totalAPY / 100) / 12).toFixed(4)} ETH
           </p>
         </div>
         <div className="bg-black/30 border border-purple-500/20 rounded-xl p-4 text-center">
           <p className="text-sm text-gray-400 mb-1">Annual Projection</p>
           <p className="text-2xl font-bold text-purple-400">
-            +{(portfolioValue * totalAPY / 100).toFixed(2)} STRK
+            +{(portfolioValue * totalAPY / 100).toFixed(2)} ETH
           </p>
         </div>
       </div>
