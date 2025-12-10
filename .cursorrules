@@ -1,0 +1,47 @@
+# Cursor Project Rules
+
+## Integration Tests Development Log
+
+### Rule: Log Notable Findings
+
+**When**: After discovering any notable finding, issue, or solution during integration testing or development
+
+**Action**: 
+1. Add entry to `integration_tests/dev_log.md`
+2. Include:
+   - Date and title
+   - Issue description
+   - Root cause analysis
+   - Solution implemented
+   - Files modified
+   - Status (✅ Fixed, ⚠️ Known Issue, 🔄 In Progress, etc.)
+
+**Format**:
+```markdown
+### Finding: [Brief Title]
+
+**Issue**: [Description of the issue]
+
+**Root Cause**: [Why it happened]
+
+**Solution**: [How it was fixed]
+
+**Files Modified**:
+- [list of files]
+
+**Status**: [Status]
+```
+
+**Examples of Notable Findings**:
+- Bugs discovered and fixed
+- Performance issues
+- RPC/network issues
+- Contract limitations discovered
+- Error message improvements
+- Workarounds implemented
+- Breaking changes
+- Security considerations
+
+**Commit Message Format**: 
+`docs: integration test finding - [brief description]`
+

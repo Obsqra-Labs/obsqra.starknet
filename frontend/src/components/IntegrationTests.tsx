@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { useAccount, useContractWrite, useWaitForTransactionReceipt } from '@starknet-react/core';
+import { useState, useEffect } from 'react';
+import { useAccount } from '@starknet-react/core';
 import { useStrategyRouterV2 } from '@/hooks/useStrategyRouterV2';
 import { getConfig } from '@/lib/config';
-import { Call } from 'starknet';
+import { Call, RpcProvider } from 'starknet';
 
 interface IntegrationChecklistItem {
   id: string;
@@ -21,13 +21,30 @@ export function IntegrationTests() {
   const routerV2 = useStrategyRouterV2();
   const [testing, setTesting] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, any>>({});
-  const { writeAsync, data: txHash } = useContractWrite();
-  const { isLoading: isTxLoading, isSuccess: isTxSuccess, error: txError } = useWaitForTransactionReceipt({
-    hash: txHash,
-  });
+  const [devLog, setDevLog] = useState<string>('');
+  const [devLogLoading, setDevLogLoading] = useState(true);
 
   const config = getConfig();
   const contractAddress = config.strategyRouterAddress;
+
+  // Fetch dev log on component mount
+  useEffect(() => {
+    fetch('/api/integration-tests/dev-log')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setDevLog(data.content);
+        } else {
+          setDevLog('# Integration Tests Development Log\n\nError loading log file.');
+        }
+        setDevLogLoading(false);
+      })
+      .catch(error => {
+        console.error('Error fetching dev log:', error);
+        setDevLog('# Integration Tests Development Log\n\nError loading log file.');
+        setDevLogLoading(false);
+      });
+  }, []);
 
   const checklist: IntegrationChecklistItem[] = [
     // Core Functionality
@@ -198,6 +215,29 @@ export function IntegrationTests() {
     setTestResults(prev => ({ ...prev, [item.id]: { status: 'testing', message: 'Preparing transaction...' } }));
 
     try {
+      // Verify contract is accessible before attempting transaction
+      const provider = new RpcProvider({ nodeUrl: config.rpcUrl });
+      try {
+        // Try to get contract class to verify it exists
+        await provider.getClassAt(contractAddress);
+      } catch (verifyError: any) {
+        const errorMsg = verifyError.message || verifyError.toString();
+        if (errorMsg.includes('not found') || errorMsg.includes('not deployed')) {
+          setTestResults(prev => ({
+            ...prev,
+            [item.id]: {
+              status: 'error',
+              message: `Contract not found at ${contractAddress}. It may not be deployed yet or RPC hasn't indexed it. Please verify the contract address and try again.`,
+              timestamp: new Date().toISOString()
+            }
+          }));
+          setTesting(null);
+          return;
+        }
+        // If it's a different error, continue - might be a class hash issue but contract exists
+        console.warn('Contract verification warning:', verifyError);
+      }
+
       const calls: Call[] = [];
       
       if (item.testFunction === 'deploy_to_protocols') {
@@ -228,7 +268,8 @@ export function IntegrationTests() {
         throw new Error('No test function available');
       }
 
-      const result = await writeAsync({ calls });
+      // Execute transaction using account.execute()
+      const result = await account.execute(calls);
       
       setTestResults(prev => ({
         ...prev,
@@ -240,40 +281,75 @@ export function IntegrationTests() {
         }
       }));
 
-      // Wait for transaction to be confirmed
-      // The useWaitForTransactionReceipt hook will handle this
+      // Wait for transaction to be confirmed and fetch receipt for gas fees
+      // Reuse the provider we created earlier
+      try {
+        const receipt = await provider.waitForTransaction(result.transaction_hash, { retryInterval: 2000 });
+        
+        // Extract gas fees from receipt
+        let gasFee = '0';
+        let gasFeeWei = BigInt(0);
+        if (receipt.actual_fee) {
+          // Handle both string and U256 object formats
+          if (typeof receipt.actual_fee === 'string') {
+            gasFeeWei = BigInt(receipt.actual_fee);
+          } else if (receipt.actual_fee.low !== undefined && receipt.actual_fee.high !== undefined) {
+            // U256 format: {low: string, high: string}
+            const low = BigInt(receipt.actual_fee.low);
+            const high = BigInt(receipt.actual_fee.high);
+            gasFeeWei = low + (high * BigInt(2 ** 128));
+          } else {
+            gasFeeWei = BigInt(String(receipt.actual_fee));
+          }
+          // Convert to STRK (assuming 18 decimals)
+          const gasFeeStrk = Number(gasFeeWei) / 1e18;
+          gasFee = gasFeeStrk.toFixed(6);
+        }
+        
+        setTestResults(prev => ({
+          ...prev,
+          [item.id]: {
+            ...prev[item.id],
+            status: 'success',
+            message: `Transaction confirmed! Gas: ${gasFee} STRK`,
+            gasFee: gasFee,
+            gasFeeWei: gasFeeWei.toString(),
+            receipt: receipt,
+          }
+        }));
+      } catch (waitError: any) {
+        setTestResults(prev => ({
+          ...prev,
+          [item.id]: {
+            ...prev[item.id],
+            status: 'error',
+            message: waitError.message || 'Transaction confirmation failed',
+          }
+        }));
+      }
+      
+      setTesting(null);
     } catch (error: any) {
+      let errorMessage = error.message || 'Test failed';
+      
+      // Provide more helpful error messages
+      if (errorMessage.includes('ENTRYPOINT_NOT_FOUND')) {
+        errorMessage = `Function not found. The contract may not have this entrypoint, or the contract address is incorrect. Contract: ${contractAddress}`;
+      } else if (errorMessage.includes('not deployed') || errorMessage.includes('Contract not found')) {
+        errorMessage = `Contract not found at ${contractAddress}. Please verify the contract was deployed and the RPC has indexed it.`;
+      } else if (errorMessage.includes('Transaction was refused')) {
+        errorMessage = 'Transaction was refused by your wallet. Please check your wallet and try again.';
+      } else if (errorMessage.includes('Only owner') || errorMessage.includes('owner can')) {
+        errorMessage = `❌ Owner-only function. This test requires the contract owner's wallet. Your wallet (${address}) is not the contract owner. Only the owner can call: deploy_to_protocols, test_jediswap_only, test_ekubo_only`;
+      }
+      
       setTestResults(prev => ({
         ...prev,
         [item.id]: {
           status: 'error',
-          message: error.message || 'Test failed',
-          timestamp: new Date().toISOString()
-        }
-      }));
-      setTesting(null);
-    }
-  };
-
-  // Update test results when transaction status changes
-  if (txHash && testing) {
-    if (isTxSuccess) {
-      setTestResults(prev => ({
-        ...prev,
-        [testing]: {
-          ...prev[testing],
-          status: 'success',
-          message: 'Transaction confirmed successfully!',
-        }
-      }));
-      setTesting(null);
-    } else if (txError) {
-      setTestResults(prev => ({
-        ...prev,
-        [testing]: {
-          ...prev[testing],
-          status: 'error',
-          message: txError.message || 'Transaction failed',
+          message: errorMessage,
+          timestamp: new Date().toISOString(),
+          fullError: error.toString()
         }
       }));
       setTesting(null);
@@ -364,7 +440,19 @@ export function IntegrationTests() {
                           </div>
                           {testResults[item.id].txHash && (
                             <div className="text-xs font-mono opacity-70 mt-1 break-all">
-                              TX: {testResults[item.id].txHash.slice(0, 20)}...
+                              TX: <a 
+                                href={`https://sepolia.starkscan.co/tx/${testResults[item.id].txHash}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline"
+                              >
+                                {testResults[item.id].txHash.slice(0, 20)}...
+                              </a>
+                            </div>
+                          )}
+                          {testResults[item.id].gasFee && (
+                            <div className="text-xs opacity-70 mt-1">
+                              Gas Fee: <span className="font-semibold">{testResults[item.id].gasFee} STRK</span>
                             </div>
                           )}
                           {testResults[item.id].timestamp && (
@@ -378,10 +466,10 @@ export function IntegrationTests() {
                     {item.testFunction && item.status !== 'planned' && (
                       <button
                         onClick={() => handleTest(item)}
-                        disabled={testing === item.id || !account || isTxLoading}
+                        disabled={testing === item.id || !account}
                         className="ml-4 px-4 py-2 text-sm font-semibold bg-white border-2 border-slate-300 rounded-lg hover:bg-slate-50 hover:border-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
                       >
-                        {testing === item.id ? (isTxLoading ? 'Confirming...' : 'Testing...') : 'Test'}
+                        {testing === item.id ? 'Testing...' : 'Test'}
                       </button>
                     )}
                   </div>
