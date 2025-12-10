@@ -16,7 +16,7 @@ interface FrontendConfig {
 const REQUIRED_ENV_VARS = {
   NEXT_PUBLIC_RPC_URL: { default: 'https://starknet-sepolia.g.alchemy.com/v2/EvhYN6geLrdvbYHVRgPJ7', isDev: true },
   NEXT_PUBLIC_BACKEND_URL: { default: '', isDev: true }, // Empty = use relative path for Nginx proxy
-  NEXT_PUBLIC_STRATEGY_ROUTER_ADDRESS: { default: '', isDev: true }, // V2 not deployed yet - optional
+  NEXT_PUBLIC_STRATEGY_ROUTER_ADDRESS: { default: '', isDev: true }, // V3 contract address
   NEXT_PUBLIC_RISK_ENGINE_ADDRESS: { default: '', isDev: true }, // Optional for now
   NEXT_PUBLIC_NETWORK: { default: 'sepolia', isDev: true },
 };
