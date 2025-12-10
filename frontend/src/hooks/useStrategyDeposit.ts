@@ -179,10 +179,37 @@ export function useStrategyDeposit(strategyRouterAddress: string) {
         try {
           const routerContract = new Contract(STRATEGY_ROUTER_V2_ABI, strategyRouterAddress, provider);
           const depositedResult = await routerContract.get_user_balance(address);
-          const deposited = BigInt(depositedResult || 0);
-          setContractBalance(Number(deposited) / 1e18);
-        } catch (error) {
-          console.warn('Could not fetch contract balance:', error);
+          
+          // Parse u256 result (can be string, number, or {low, high} object)
+          let deposited: bigint;
+          if (typeof depositedResult === 'string' || typeof depositedResult === 'number') {
+            deposited = BigInt(depositedResult || 0);
+          } else if (depositedResult && typeof depositedResult === 'object') {
+            // Handle u256 format: {low: string, high: string} or nested structure
+            if (depositedResult.low !== undefined && depositedResult.high !== undefined) {
+              const low = BigInt(String(depositedResult.low || 0));
+              const high = BigInt(String(depositedResult.high || 0));
+              deposited = low + (high << 128n);
+            } else if (depositedResult.balance) {
+              // Handle nested balance object
+              const bal = depositedResult.balance;
+              if (bal.low !== undefined && bal.high !== undefined) {
+                deposited = BigInt(String(bal.low || 0)) + (BigInt(String(bal.high || 0)) << 128n);
+              } else {
+                deposited = BigInt(String(bal || 0));
+              }
+            } else {
+              deposited = BigInt(String(depositedResult || 0));
+            }
+          } else {
+            deposited = BigInt(0);
+          }
+          
+          const balanceNum = Number(deposited) / 1e18;
+          setContractBalance(balanceNum);
+          console.log(`📊 Contract balance (deposited): ${balanceNum.toFixed(6)} STRK`);
+        } catch (error: any) {
+          console.warn('Could not fetch contract balance:', error?.message || error);
           setContractBalance(0);
         }
       } else {
@@ -270,7 +297,34 @@ export function useStrategyDeposit(strategyRouterAddress: string) {
         }
         
         const depositTx = await account.execute([depositCall]);
-        await provider.waitForTransaction(depositTx.transaction_hash);
+        const receipt = await provider.waitForTransaction(depositTx.transaction_hash);
+        
+        // Track gas fees (non-blocking - don't fail deposit if fee extraction fails)
+        try {
+          if (receipt.actual_fee) {
+            // Handle both string and U256 object formats
+            let gasFeeWei: bigint;
+            if (typeof receipt.actual_fee === 'string') {
+              gasFeeWei = BigInt(receipt.actual_fee);
+            } else if (receipt.actual_fee && typeof receipt.actual_fee === 'object' && receipt.actual_fee.low !== undefined && receipt.actual_fee.high !== undefined) {
+              // U256 format: {low: string, high: string}
+              const low = BigInt(String(receipt.actual_fee.low));
+              const high = BigInt(String(receipt.actual_fee.high));
+              gasFeeWei = low + (high * BigInt(2 ** 128));
+            } else {
+              // Fallback: try to convert to string first
+              gasFeeWei = BigInt(String(receipt.actual_fee));
+            }
+            const gasFeeStrk = Number(gasFeeWei) / 1e18;
+            console.log(`💰 Deposit gas fee: ${gasFeeStrk.toFixed(6)} STRK (${gasFeeWei.toString()} wei)`);
+          }
+        } catch (feeError: any) {
+          // Don't fail the deposit if gas fee extraction fails
+          console.warn('⚠️ Could not extract gas fee from receipt:', feeError.message);
+        }
+        
+        // Wait a bit for state to update, then refresh balance
+        await new Promise(resolve => setTimeout(resolve, 1000));
         await fetchBalance();
 
         return depositTx.transaction_hash;
@@ -427,7 +481,34 @@ export function useStrategyDeposit(strategyRouterAddress: string) {
         console.log('✅ Withdraw tx:', withdrawTx.transaction_hash);
 
         // Refresh balance after withdrawal
-        await provider.waitForTransaction(withdrawTx.transaction_hash);
+        const receipt = await provider.waitForTransaction(withdrawTx.transaction_hash);
+        
+        // Track gas fees (non-blocking - don't fail withdraw if fee extraction fails)
+        try {
+          if (receipt.actual_fee) {
+            // Handle both string and U256 object formats
+            let gasFeeWei: bigint;
+            if (typeof receipt.actual_fee === 'string') {
+              gasFeeWei = BigInt(receipt.actual_fee);
+            } else if (receipt.actual_fee && typeof receipt.actual_fee === 'object' && receipt.actual_fee.low !== undefined && receipt.actual_fee.high !== undefined) {
+              // U256 format: {low: string, high: string}
+              const low = BigInt(String(receipt.actual_fee.low));
+              const high = BigInt(String(receipt.actual_fee.high));
+              gasFeeWei = low + (high * BigInt(2 ** 128));
+            } else {
+              // Fallback: try to convert to string first
+              gasFeeWei = BigInt(String(receipt.actual_fee));
+            }
+            const gasFeeStrk = Number(gasFeeWei) / 1e18;
+            console.log(`💰 Withdraw gas fee: ${gasFeeStrk.toFixed(6)} STRK (${gasFeeWei.toString()} wei)`);
+          }
+        } catch (feeError: any) {
+          // Don't fail the withdraw if gas fee extraction fails
+          console.warn('⚠️ Could not extract gas fee from receipt:', feeError.message);
+        }
+        
+        // Wait a bit for state to update, then refresh balance
+        await new Promise(resolve => setTimeout(resolve, 1000));
         await fetchBalance();
 
         return withdrawTx.transaction_hash;

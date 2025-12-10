@@ -1,0 +1,278 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    STRATEGY ROUTER V2 - PROTOCOL FLOW                        ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              USER INTERACTION                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    User Wallet (Argent/Braavos)
+           │
+           │ 1. deposit(amount)
+           ▼
+    ┌──────────────────────┐
+    │  StrategyRouterV2    │
+    │  0x0456ae70...       │
+    └──────────────────────┘
+           │
+           ├─► Transfer STRK from user
+           ├─► Update user_balances[user]
+           └─► Add to pending_deposits
+           │
+           │ 2. deploy_to_protocols()
+           ▼
+    ┌─────────────────────────────────────────────────────────────────────┐
+    │                    PROTOCOL DEPLOYMENT                              │
+    └─────────────────────────────────────────────────────────────────────┘
+           │
+           ├─────────────────────────────────────────────────────────────┐
+           │                                                               │
+           │  JEDI SWAP PATH (50% allocation)                              │
+           │  ──────────────────────────────                              │
+           │                                                               │
+           │  ┌──────────────────┐                                        │
+           │  │ JediSwap Router  │                                        │
+           │  │ (V2)             │                                        │
+           │  └──────────────────┘                                        │
+           │         │                                                     │
+           │         │ Swap STRK → ETH                                      │
+           │         ▼                                                     │
+           │  ┌──────────────────┐                                        │
+           │  │ NFT Position     │                                        │
+           │  │ Manager          │                                        │
+           │  └──────────────────┘                                        │
+           │         │                                                     │
+           │         │ mint(MintParams)                                    │
+           │         │  - token0: STRK                                     │
+           │         │  - token1: ETH                                      │
+           │         │  - fee: 10000 (1%)                                 │
+           │         │  - tick_lower: I32{-887200}                        │
+           │         │  - tick_upper: I32{887200}                         │
+           │         ▼                                                     │
+           │  Returns: (token_id, liquidity, amount0, amount1)             │
+           │                                                               │
+           │  Store: jediswap_position_ids[index] = token_id               │
+           │                                                               │
+           └───────────────────────────────────────────────────────────────┘
+           │
+           ├─────────────────────────────────────────────────────────────┐
+           │                                                               │
+           │  EKUBO PATH (50% allocation)                                  │
+           │  ────────────────────────────                                │
+           │                                                               │
+           │  ┌──────────────────┐                                        │
+           │  │ Ekubo Positions  │                                        │
+           │  │ (NFT Registry)   │                                        │
+           │  └──────────────────┘                                        │
+           │         │                                                     │
+           │         │ mint_and_deposit(pool_key, bounds)                  │
+           │         │  - pool_key: {token0, token1, fee, tick_spacing}   │
+           │         │  - bounds: {lower: i129, upper: i129}               │
+           │         │                                                     │
+           │         │ [Positions contract handles Core.lock() internally]│
+           │         │                                                     │
+           │         ├─► Ekubo Core.lock()                                │
+           │         │                                                     │
+           │         │  ┌──────────────────┐                             │
+           │         │  │  Ekubo Core      │                             │
+           │         │  │  (locked callback)│                             │
+           │         │  └──────────────────┘                             │
+           │         │         │                                           │
+           │         │         ├─► pay(STRK)                               │
+           │         │         └─► update_position()                       │
+           │         │                                                     │
+           │         ▼                                                     │
+           │  Returns: (token_id, liquidity)                               │
+           │                                                               │
+           │  Store:                                                       │
+           │    - ekubo_position_ids[index] = token_id                     │
+           │    - ekubo_position_pool_keys[index] = pool_key               │
+           │    - ekubo_position_bounds[index] = bounds                    │
+           │    - ekubo_position_salt[index] = token_id (as felt252)       │
+           │                                                               │
+           └───────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            FEE COLLECTION FLOW                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    User calls: accrue_yields()
+           │
+           ▼
+    ┌──────────────────────┐
+    │  StrategyRouterV2     │
+    │  accrue_yields()      │
+    └──────────────────────┘
+           │
+           ├─────────────────────────────────────────────────────────────┐
+           │                                                               │
+           │  JEDI SWAP FEE COLLECTION                                    │
+           │  ────────────────────────────                                │
+           │                                                               │
+           │  For each position in jediswap_position_ids:                  │
+           │                                                               │
+           │  ┌──────────────────┐                                        │
+           │  │ NFT Position     │                                        │
+           │  │ Manager          │                                        │
+           │  └──────────────────┘                                        │
+           │         │                                                     │
+           │         │ collect(CollectParams)                              │
+           │         │  - token_id: position NFT ID                         │
+           │         │  - recipient: StrategyRouterV2                      │
+           │         │  - amount0_max: MAX                                 │
+           │         │  - amount1_max: MAX                                 │
+           │         ▼                                                     │
+           │  Returns: (amount0, amount1)                                  │
+           │                                                               │
+           │  Fees transferred to StrategyRouterV2                         │
+           │                                                               │
+           └───────────────────────────────────────────────────────────────┘
+           │
+           ├─────────────────────────────────────────────────────────────┐
+           │                                                               │
+           │  EKUBO FEE COLLECTION                                        │
+           │  ──────────────────────                                      │
+           │                                                               │
+           │  For each position in ekubo_position_ids:                    │
+           │                                                               │
+           │  1. Read metadata: pool_key, bounds, salt                     │
+           │  2. Set ekubo_collecting_fees = true                          │
+           │  3. Store collection state                                    │
+           │                                                               │
+           │  ┌──────────────────┐                                        │
+           │  │  Ekubo Core      │                                        │
+           │  └──────────────────┘                                        │
+           │         │                                                     │
+           │         │ lock(empty_data)                                    │
+           │         │                                                     │
+           │         │ [Core locks state and calls back]                   │
+           │         │                                                     │
+           │         ▼                                                     │
+           │  ┌──────────────────┐                                        │
+           │  │ StrategyRouterV2 │                                        │
+           │  │ locked() callback│                                        │
+           │  └──────────────────┘                                        │
+           │         │                                                     │
+           │         │ if collecting_fees:                                 │
+           │         │   collect_fees(pool_key, salt, bounds)             │
+           │         │                                                     │
+           │         │ Core computes fees owed                             │
+           │         │ Core updates position state                         │
+           │         │ Core transfers fees to StrategyRouterV2             │
+           │         │                                                     │
+           │         ▼                                                     │
+           │  Returns: Delta(amount0, amount1)                             │
+           │                                                               │
+           │  4. Set ekubo_collecting_fees = false                         │
+           │                                                               │
+           └───────────────────────────────────────────────────────────────┘
+           │
+           │ Sum all fees collected
+           │ Update total_deposits += total_fees
+           │ Emit YieldsAccrued event
+           │
+           ▼
+    Returns: total_yield (u256)
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            WITHDRAWAL FLOW                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    User calls: withdraw(amount)
+           │
+           ▼
+    ┌──────────────────────┐
+    │  StrategyRouterV2     │
+    │  withdraw()           │
+    └──────────────────────┘
+           │
+           ├─► Check user_balances[user] >= amount
+           ├─► Update user_balances[user] -= amount
+           ├─► Update total_deposits -= amount
+           ├─► Transfer STRK to user
+           └─► Return actual withdrawn amount
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         CONTRACT STORAGE STRUCTURE                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    User Data:
+    ──────────
+    user_balances: Map<ContractAddress, u256>
+    total_deposits: u256
+    pending_deposits: u256
+
+    JediSwap Positions:
+    ───────────────────
+    jediswap_position_count: u256
+    jediswap_position_ids: Map<u256, u256>  [index → NFT token_id]
+
+    Ekubo Positions:
+    ────────────────
+    ekubo_position_count: u256
+    ekubo_position_ids: Map<u256, u64>  [index → position token_id]
+    ekubo_position_token0: Map<u256, ContractAddress>
+    ekubo_position_token1: Map<u256, ContractAddress>
+    ekubo_position_fee: Map<u256, u128>
+    ekubo_position_tick_spacing: Map<u256, u128>
+    ekubo_position_extension: Map<u256, ContractAddress>
+    ekubo_position_salt: Map<u256, felt252>  [for collect_fees()]
+    ekubo_position_tick_lower_mag: Map<u256, u128>
+    ekubo_position_tick_lower_sign: Map<u256, bool>
+    ekubo_position_tick_upper_mag: Map<u256, u128>
+    ekubo_position_tick_upper_sign: Map<u256, bool>
+
+    Protocol Configuration:
+    ───────────────────────
+    jediswap_allocation: u256  [basis points, 10000 = 100%]
+    ekubo_allocation: u256      [basis points, 10000 = 100%]
+    jediswap_router: ContractAddress
+    jediswap_nft_manager: ContractAddress
+    ekubo_core: ContractAddress
+    ekubo_positions: ContractAddress
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         KEY FUNCTION SIGNATURES                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    User Functions:
+    ───────────────
+    deposit(amount: u256)
+    withdraw(amount: u256) -> u256
+    deploy_to_protocols()
+    accrue_yields() -> u256
+    rebalance()
+    update_allocation(jediswap_pct: felt252, ekubo_pct: felt252)
+
+    Position Queries:
+    ─────────────────
+    get_jediswap_position(index: u256) -> u256
+    get_ekubo_position(index: u256) -> u64
+    get_jediswap_position_count() -> u256
+    get_ekubo_position_count() -> u256
+
+    Ekubo Callback:
+    ───────────────
+    locked(id: u32, data: Span<felt252>) -> Span<felt252>
+      - Handles both liquidity addition and fee collection
+      - Checks ekubo_collecting_fees flag
+      - Calls collect_fees() when in fee collection mode
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         DEPLOYMENT INFORMATION                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    Contract Address: 0x0456ae70b7b9c77522b4bef65a119ce4e8341be78c4007ceefd764685e7aad8e
+    Network: Starknet Sepolia
+    Class Hash: 0x01afb6e5a5811eca06eddb043710aff0b2527055703d80d41f18325e40b332d8
+    
+    Explorer: https://sepolia.starkscan.co/contract/0x0456ae70b7b9c77522b4bef65a119ce4e8341be78c4007ceefd764685e7aad8e
+
+    Protocol Addresses:
+    ───────────────────
+    JediSwap Router:     0x03c8e56d7f6afccb775160f1ae3b69e3db31b443e544e56bd845d8b3b3a87a21
+    JediSwap NFT Mgr:   0x024fd9721eea36cf8cebc226fd9414057bbf895b47739822f849f622029f9399
+    Ekubo Core:         0x0444a09d96389aa7148f1aada508e30b71299ffe650d9c97fdaae38cb9a23384
+    Ekubo Positions:    0x024fd9721eea36cf8cebc226fd9414057bbf895b47739822f849f622029f9399
+    STRK Token:         0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d
+

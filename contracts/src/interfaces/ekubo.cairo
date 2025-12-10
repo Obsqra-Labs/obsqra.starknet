@@ -14,12 +14,22 @@ pub trait IEkuboCore<TContractState> {
     fn pay(ref self: TContractState, token_address: ContractAddress);
     
     // Withdraw tokens from the core (used within locked callback)
+    // Simple token withdrawal - for ERC-20 tokens, not position fees
     fn withdraw(
         ref self: TContractState,
         token_address: ContractAddress,
         recipient: ContractAddress,
         amount: u128
     );
+    
+    // Collect fees from a position (used within locked callback)
+    // This is the ONLY way to collect fees from an Ekubo position
+    fn collect_fees(
+        ref self: TContractState,
+        pool_key: PoolKey,
+        salt: felt252,
+        bounds: Bounds
+    ) -> Delta;
     
     // Update liquidity position (used within locked callback)
     // Note: This requires PoolKey and UpdatePositionParameters structs
