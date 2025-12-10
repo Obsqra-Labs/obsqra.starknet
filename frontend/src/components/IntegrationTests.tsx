@@ -4,7 +4,60 @@ import { useState, useEffect } from 'react';
 import { useAccount } from '@starknet-react/core';
 import { useStrategyRouterV2 } from '@/hooks/useStrategyRouterV2';
 import { getConfig } from '@/lib/config';
-import { Call, RpcProvider } from 'starknet';
+import { Call, RpcProvider, Contract } from 'starknet';
+
+// Strategy Router V2 ABI including test functions
+const STRATEGY_ROUTER_V2_ABI = [
+  {
+    name: 'deposit',
+    type: 'function',
+    inputs: [{ name: 'amount', type: 'core::integer::u256' }],
+    outputs: [],
+    state_mutability: 'external',
+  },
+  {
+    name: 'withdraw',
+    type: 'function',
+    inputs: [{ name: 'amount', type: 'core::integer::u256' }],
+    outputs: [{ type: 'core::integer::u256' }],
+    state_mutability: 'external',
+  },
+  {
+    name: 'get_user_balance',
+    type: 'function',
+    inputs: [{ name: 'user', type: 'core::starknet::contract_address::ContractAddress' }],
+    outputs: [{ type: 'core::integer::u256' }],
+    state_mutability: 'view',
+  },
+  {
+    name: 'get_total_value_locked',
+    type: 'function',
+    inputs: [],
+    outputs: [{ type: 'core::integer::u256' }],
+    state_mutability: 'view',
+  },
+  {
+    name: 'deploy_to_protocols',
+    type: 'function',
+    inputs: [],
+    outputs: [],
+    state_mutability: 'external',
+  },
+  {
+    name: 'test_jediswap_only',
+    type: 'function',
+    inputs: [{ name: 'amount', type: 'core::integer::u256' }],
+    outputs: [],
+    state_mutability: 'external',
+  },
+  {
+    name: 'test_ekubo_only',
+    type: 'function',
+    inputs: [{ name: 'amount', type: 'core::integer::u256' }],
+    outputs: [],
+    state_mutability: 'external',
+  },
+];
 
 interface IntegrationChecklistItem {
   id: string;
@@ -238,35 +291,50 @@ export function IntegrationTests() {
         console.warn('Contract verification warning:', verifyError);
       }
 
+      // Create contract instance to properly format calls
+      const routerContract = new Contract(STRATEGY_ROUTER_V2_ABI, contractAddress, provider);
+      routerContract.connect(account);
+
       const calls: Call[] = [];
       
       if (item.testFunction === 'deploy_to_protocols') {
-        calls.push({
-          contractAddress,
-          entrypoint: 'deploy_to_protocols',
-          calldata: [],
+        const call = routerContract.populate('deploy_to_protocols', []);
+        console.log('🔍 deploy_to_protocols call:', {
+          contractAddress: call.contractAddress,
+          entrypoint: call.entrypoint,
+          calldata: call.calldata
         });
+        calls.push(call);
       } else if (item.testFunction === 'test_jediswap_only') {
         // Test with 0.1 STRK (100000000000000000 wei)
-        const amount = '100000000000000000';
-        calls.push({
-          contractAddress,
-          entrypoint: 'test_jediswap_only',
-          calldata: [amount, '0'], // u256: low, high
+        const amount = BigInt('100000000000000000');
+        const call = routerContract.populate('test_jediswap_only', [amount]);
+        console.log('🔍 test_jediswap_only call:', {
+          contractAddress: call.contractAddress,
+          entrypoint: call.entrypoint,
+          calldata: call.calldata,
+          amount: amount.toString()
         });
+        calls.push(call);
       } else if (item.testFunction === 'test_ekubo_only') {
         // Test with 0.1 STRK (100000000000000000 wei)
-        const amount = '100000000000000000';
-        calls.push({
-          contractAddress,
-          entrypoint: 'test_ekubo_only',
-          calldata: [amount, '0'], // u256: low, high
+        const amount = BigInt('100000000000000000');
+        const call = routerContract.populate('test_ekubo_only', [amount]);
+        console.log('🔍 test_ekubo_only call:', {
+          contractAddress: call.contractAddress,
+          entrypoint: call.entrypoint,
+          calldata: call.calldata,
+          amount: amount.toString()
         });
+        calls.push(call);
       }
 
       if (calls.length === 0) {
         throw new Error('No test function available');
       }
+
+      // Log the full call structure for debugging
+      console.log('📤 Executing calls:', JSON.stringify(calls, null, 2));
 
       // Execute transaction using account.execute()
       const result = await account.execute(calls);
@@ -498,6 +566,42 @@ export function IntegrationTests() {
             <span className="text-slate-700">Status:</span>{' '}
             <span className="text-slate-900">{routerV2.isLoading ? 'Loading...' : 'Connected'}</span>
           </div>
+        </div>
+      </div>
+
+      {/* Development Log Section */}
+      <div className="border-2 border-blue-200 rounded-xl p-5 bg-blue-50 shadow-sm mt-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-bold text-blue-900">Development Log</h3>
+          <button
+            onClick={() => {
+              setDevLogLoading(true);
+              fetch('/api/integration-tests/dev-log')
+                .then(res => res.json())
+                .then(data => {
+                  if (data.success) {
+                    setDevLog(data.content);
+                  }
+                  setDevLogLoading(false);
+                })
+                .catch(error => {
+                  console.error('Error refreshing dev log:', error);
+                  setDevLogLoading(false);
+                });
+            }}
+            className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+          >
+            {devLogLoading ? 'Loading...' : 'Refresh'}
+          </button>
+        </div>
+        <div className="bg-white rounded-lg p-4 border border-blue-200 max-h-96 overflow-y-auto">
+          {devLogLoading ? (
+            <div className="text-slate-500 text-center py-4">Loading dev log...</div>
+          ) : (
+            <pre className="text-xs font-mono whitespace-pre-wrap text-slate-700">
+              {devLog || 'No log content available'}
+            </pre>
+          )}
         </div>
       </div>
     </div>

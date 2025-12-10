@@ -123,6 +123,38 @@ This log tracks notable findings, issues, and solutions discovered during integr
 
 ---
 
+---
+
+## 2025-12-10 - Integration Test Call Construction Fix
+
+### Finding: Integration Tests Failing with "Unauthorized" Error
+
+**Issue**: Integration tests were failing with `Unauthorized` and `ENTRYPOINT_FAILED` errors when trying to execute test functions.
+
+**Root Cause**: 
+- Integration tests were creating `Call` objects manually with `entrypoint: 'function_name'` strings
+- Manual `Call` objects don't properly format the entrypoint selector
+- The wallet/contract was rejecting the malformed calls
+
+**Solution**: 
+- Changed to use `Contract.populate()` method (same as deposit/withdraw functions)
+- Added test functions to `STRATEGY_ROUTER_V2_ABI` in IntegrationTests component
+- Using `Contract` instance to properly format calls with correct entrypoint selectors
+- Added detailed logging to show exact call structure being sent
+
+**Files Modified**:
+- `frontend/src/components/IntegrationTests.tsx`
+
+**Key Changes**:
+- Import `Contract` from starknet
+- Create contract instance: `new Contract(STRATEGY_ROUTER_V2_ABI, contractAddress, provider)`
+- Use `contract.populate('function_name', [args])` instead of manual `Call` objects
+- Use `BigInt` for amounts (auto-converts to u256 format)
+
+**Status**: ✅ Fixed
+
+---
+
 ## Next Steps
 
 1. Implement per-user deposit tracking in contract
