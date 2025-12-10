@@ -120,9 +120,6 @@ mod StrategyRouterV3 {
         swap_slippage_bps: u256,  // Slippage tolerance for swaps (default: 100 = 1%)
         liquidity_slippage_bps: u256,  // Slippage tolerance for liquidity (default: 50 = 0.5%)
         
-        // Owner address
-        owner: ContractAddress,
-        
         // Ekubo operation state (for lock/callback pattern)
         ekubo_pending_token0: ContractAddress,
         ekubo_pending_token1: ContractAddress,
@@ -940,11 +937,11 @@ mod StrategyRouterV3 {
     fn update_slippage_tolerance(ref self: ContractState, swap_slippage_bps: u256, liquidity_slippage_bps: u256) {
         let caller = get_caller_address();
         let owner = self.owner.read();
-        assert(caller == owner, 'Only owner can update slippage tolerance');
+        assert(caller == owner, 'Unauthorized');
         
         // Validate slippage values (max 10% = 1000 basis points)
-        assert(swap_slippage_bps <= 1000, 'Swap slippage too high (max 10%)');
-        assert(liquidity_slippage_bps <= 1000, 'Liquidity slippage too high (max 10%)');
+        assert(swap_slippage_bps <= 1000, 'Slippage too high');
+        assert(liquidity_slippage_bps <= 1000, 'Slippage too high');
         
         self.swap_slippage_bps.write(swap_slippage_bps);
         self.liquidity_slippage_bps.write(liquidity_slippage_bps);
