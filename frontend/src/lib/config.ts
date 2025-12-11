@@ -11,6 +11,9 @@ interface FrontendConfig {
   networkName: 'sepolia' | 'mainnet';
   docsUrl: string;
   githubUrl: string;
+  jediswapFactoryAddress: string;
+  jediswapRouterAddress: string;
+  mistChamberAddress: string; // NEW: MIST.cash chamber address
 }
 
 const REQUIRED_ENV_VARS = {
@@ -61,6 +64,15 @@ function loadConfig(): FrontendConfig {
   validateAddress(strategyRouterAddress, 'Strategy Router Address');
   validateAddress(riskEngineAddress, 'Risk Engine Address');
 
+  // JediSwap Sepolia addresses (from official documentation)
+  const jediswapFactoryAddress = '0x050d3df81b920d3e608c4f7aeb67945a830413f618a1cf486bdcce66a395109c';
+  const jediswapRouterAddress = '0x03c8e56d7f6afccb775160f1ae3b69e3db31b443e544e56bd845d8b3b3a87a21';
+
+  // MIST.cash Chamber address (mainnet - Sepolia not available)
+  // Default: mainnet address from @mistcash/config
+  const mistChamberAddress = process.env.NEXT_PUBLIC_MIST_CHAMBER_ADDRESS || 
+    '0x063eab2f19523fc8578c66a3ddf248d72094c65154b6dd7680b6e05a64845277';
+
   return {
     rpcUrl,
     backendUrl,
@@ -69,6 +81,9 @@ function loadConfig(): FrontendConfig {
     networkName,
     docsUrl: 'https://github.com/obsqra-labs/obsqra.starknet/tree/main/docs',
     githubUrl: 'https://github.com/obsqra-labs/obsqra.starknet',
+    jediswapFactoryAddress,
+    jediswapRouterAddress,
+    mistChamberAddress,
   };
 }
 
@@ -110,6 +125,20 @@ export function getContractAddress(contractType: 'strategyRouter' | 'riskEngine'
     strategyRouter: cfg.strategyRouterAddress,
     riskEngine: cfg.riskEngineAddress,
   }[contractType] as `0x${string}`;
+}
+
+/**
+ * Get JediSwap factory address (Sepolia testnet)
+ */
+export function getJediSwapFactoryAddress(): string {
+  return getConfig().jediswapFactoryAddress;
+}
+
+/**
+ * Get JediSwap router address (Sepolia testnet, v2)
+ */
+export function getJediSwapRouterAddress(): string {
+  return getConfig().jediswapRouterAddress;
 }
 
 export type { FrontendConfig };

@@ -405,6 +405,92 @@ Added `/orchestrate-allocation` endpoint:
 
 ---
 
-*Updated December 2025*
+## December 10, 2025: Strategy Router v3.5 - Unified Contract with MIST Integration
+
+### The Problem: Contract Fragmentation
+
+After deploying v2 and v3 contracts separately, we discovered a critical issue: **the frontend didn't know which contract to call**. Functions were split across versions:
+- v2 had: `get_total_value_locked()`, `get_allocation()`
+- v3 had: `get_protocol_tvl()`, `get_jediswap_tvl()`, `get_ekubo_tvl()`
+- User balance tracking was broken (returned total deposits, not per-user)
+- MIST.cash privacy integration was missing
+
+### The Solution: Unified v3.5
+
+Created a single, unified contract that combines everything:
+
+**Key Improvements**:
+1. **Fixed User Balance Tracking**
+   - Added `user_balances: Map<ContractAddress, u256>` storage
+   - `deposit()` now updates per-user balance
+   - `withdraw()` checks per-user balance before allowing withdrawal
+   - `get_user_balance()` returns actual per-user balance
+
+2. **MIST.cash Privacy Integration**
+   - Hash commitment pattern (Pattern 2 from research)
+   - User commits hash of secret: `commit_mist_deposit(commitment_hash, expected_amount)`
+   - User reveals secret when ready: `reveal_and_claim_mist_deposit(secret)`
+   - Router verifies hash and claims from MIST chamber on behalf of user
+   - Non-custodial: router never sees raw secret until user reveals
+
+3. **All Functions Unified**
+   - All v2 functions (backward compatible)
+   - All v3 functions (TVL, yield accrual, slippage)
+   - MIST functions (privacy integration)
+   - Frontend intelligently queries available functions
+
+**Contract Address**: `0x0221284a7b77041f9f963c0f0b65b901604792533f0f937aa4591bd43d08ee2b`
+
+**Class Hash**: `0x043acf130464d2a1325403f619a62480fd9d10a13941a81fcb2a491e2ec5bc28`
+
+### Cairo Compilation Lessons
+
+**Dispatcher Pattern**:
+- Interfaces must be in separate files (`interfaces/mist.cairo`)
+- Import both `Dispatcher` and `DispatcherTrait`
+- Use: `let chamber = IMistChamberDispatcher { contract_address: addr };`
+
+**Tuple Destructuring**:
+- Cairo supports: `let (a, b) = dispatcher.call();`
+- No `result.0` / `result.1` syntax (not supported)
+
+**Doc Comments**:
+- Cairo parser interprets certain words as macros
+- Words like "deposit", "MIST", "transaction" in doc comments cause errors
+- Solution: Use regular comments (`//`) instead of doc comments (`/** */`) for these cases
+
+**Map Access**:
+- Always use `.entry(key).read()` / `.entry(key).write()` for storage maps
+- Direct `.read(key)` / `.write(key, value)` is deprecated
+
+### Frontend Updates
+
+- Renamed `useStrategyRouterV2` → `useStrategyRouter` (unified hook)
+- Updated all components to use v3.5 ABI
+- Added intelligent function detection (tries v3.5 first, falls back to v2)
+- MIST functions restricted to testing panel (as requested)
+
+### Deployment
+
+Deployed to Sepolia using `sncast`:
+```bash
+sncast --account deployer deploy \
+  --class-hash 0x043acf130464d2a1325403f619a62480fd9d10a13941a81fcb2a491e2ec5bc28 \
+  --constructor-calldata [owner, jediswap_router, jediswap_nft, ekubo_core, ekubo_positions, risk_engine, dao_manager, asset_token, jediswap_pct, ekubo_pct, mist_chamber] \
+  --network sepolia
+```
+
+**Result**: Contract successfully deployed and verified on Starkscan.
+
+### Next Steps
+
+1. Update frontend environment variables
+2. Test MIST integration in testing panel
+3. Verify user balance tracking works correctly
+4. Test backward compatibility with existing frontend code
+
+---
+
+*Updated December 10, 2025*
 
 **From computation to settlement, everything is on-chain and auditable.** 🔺

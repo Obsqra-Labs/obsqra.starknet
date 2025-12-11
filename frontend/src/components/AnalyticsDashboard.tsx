@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import { useStrategyRouterV2 } from '@/hooks/useStrategyRouterV2';
+import { useStrategyRouter } from '@/hooks/useStrategyRouter';
 import { useStrategyDeposit } from '@/hooks/useStrategyDeposit';
 import { getConfig } from '@/lib/config';
 import { useAccount } from '@starknet-react/core';
@@ -10,7 +10,7 @@ interface ProtocolStats {
   name: string;
   icon: string;
   allocation: number;
-  apy: number;
+  apy: number | string;
   tvl: string;
   risk: 'low' | 'medium' | 'high';
   change24h: number;
@@ -23,54 +23,100 @@ interface AnalyticsDashboardProps {
 
 export function AnalyticsDashboard({ allocation }: AnalyticsDashboardProps) {
   const { address } = useAccount();
-  const routerV2 = useStrategyRouterV2();
+  const router = useStrategyRouter();
   const strategyDeposit = useStrategyDeposit(getConfig().strategyRouterAddress);
   
   // Fetch real portfolio data
-  const [protocolAPYs, setProtocolAPYs] = useState<{ jediswap: number; ekubo: number }>({
+  const [protocolAPYs, setProtocolAPYs] = useState<{ jediswap: number | string; ekubo: number | string }>({
     jediswap: 5.2, // Default, will fetch real data
     ekubo: 8.5,
   });
 
-  // Fetch APY data from backend (or protocol contracts)
+  // Calculate APY from actual yield data
   useEffect(() => {
-    const fetchAPYs = async () => {
+    const calculateAPYs = () => {
       try {
-        const response = await fetch('/api/v1/analytics/protocol-apys');
-        if (response.ok) {
-          const data = await response.json();
-          setProtocolAPYs({
-            jediswap: data.jediswap || 5.2,
-            ekubo: data.ekubo || 8.5,
-          });
-          if (data.source === 'on-chain') {
-            console.log('✅ Fetched real APY data from protocols');
-          } else {
-            console.log('⚠️ Using default APY values (real fetching not yet implemented)');
+        const totalYield = BigInt(router.totalYieldAccrued || '0');
+        const jediTvl = BigInt(router.jediswapTvl || '0');
+        const ekuboTvl = BigInt(router.ekuboTvl || '0');
+        const totalTvl = BigInt(router.totalValueLocked || '0');
+
+        // Calculate APY based on yield accrued and TVL
+        // APY = (yield / tvl) * 100, but we need to annualize it
+        // For now, show yield as percentage of TVL (simplified)
+        let jediApy = 0;
+        let ekuboApy = 0;
+
+        if (totalTvl > 0n && totalYield > 0n) {
+          // Distribute yield proportionally based on TVL
+          const jediYield = totalTvl > 0n ? (totalYield * jediTvl) / totalTvl : 0n;
+          const ekuboYield = totalTvl > 0n ? (totalYield * ekuboTvl) / totalTvl : 0n;
+
+          // Calculate APY: (yield / tvl) * 100
+          // Note: This is a simplified calculation. Real APY would need time period
+          if (jediTvl > 0n) {
+            jediApy = Number((jediYield * 10000n) / jediTvl) / 100; // Convert to percentage
+          }
+          if (ekuboTvl > 0n) {
+            ekuboApy = Number((ekuboYield * 10000n) / ekuboTvl) / 100; // Convert to percentage
           }
         }
+
+        // Use defaults if calculation fails, but only if TVL > 0
+        // If TVL is 0, APY should be N/A (handled in display)
+        if (totalTvl > 0n) {
+          setProtocolAPYs({
+            jediswap: jediApy > 0 ? jediApy : 5.2,
+            ekubo: ekuboApy > 0 ? ekuboApy : 8.5,
+          });
+        } else {
+          // TVL is 0, so APY is not applicable
+          setProtocolAPYs({
+            jediswap: 'N/A',
+            ekubo: 'N/A',
+          });
+        }
+
+        if (jediApy > 0 || ekuboApy > 0) {
+          console.log('✅ Calculated APY from yield data:', { jediApy, ekuboApy, totalYield: totalYield.toString() });
+        } else if (totalTvl === 0n) {
+          console.log('⚠️ TVL is 0, cannot calculate APY');
+        }
       } catch (err) {
-        console.warn('Failed to fetch APY data, using defaults:', err);
+        console.warn('Failed to calculate APY from yield data, using defaults:', err);
+        setProtocolAPYs({
+          jediswap: 5.2,
+          ekubo: 8.5,
+        });
       }
     };
     
-    fetchAPYs();
-    // Refresh every 5 minutes (matches cache TTL)
-    const interval = setInterval(fetchAPYs, 5 * 60 * 1000);
+    calculateAPYs();
+    // Recalculate when router data updates
+    const interval = setInterval(calculateAPYs, 30000); // Every 30 seconds
     return () => clearInterval(interval);
-  }, []);
+  }, [router.totalYieldAccrued, router.jediswapTvl, router.ekuboTvl, router.totalValueLocked]);
 
   const protocolStats: ProtocolStats[] = useMemo(() => {
-    const jediAlloc = allocation?.jediswap ?? routerV2.jediswapAllocation ?? 50;
-    const ekuboAlloc = allocation?.ekubo ?? routerV2.ekuboAllocation ?? 50;
+    const jediAlloc = allocation?.jediswap ?? router.jediswapAllocation ?? 50;
+    const ekuboAlloc = allocation?.ekubo ?? router.ekuboAllocation ?? 50;
+    
+    // Use actual APY if available (from on-chain data), otherwise use projected APY
+    // Actual APY is more accurate but requires historical data
+    const jediApy = router.jediswapActualApy > 0 
+      ? router.jediswapActualApy 
+      : (router.jediswapProjectedApy || (typeof protocolAPYs.jediswap === 'number' ? protocolAPYs.jediswap : 5.2));
+    const ekuboApy = router.ekuboActualApy > 0 
+      ? router.ekuboActualApy 
+      : (router.ekuboProjectedApy || (typeof protocolAPYs.ekubo === 'number' ? protocolAPYs.ekubo : 8.5));
 
     return [
       {
         name: 'JediSwap',
         icon: '🔄',
         allocation: jediAlloc,
-        apy: protocolAPYs.jediswap,
-        tvl: routerV2.totalValueLocked ? `${(parseFloat(routerV2.totalValueLocked) / 1e18).toFixed(2)} ETH` : 'Loading...',
+        apy: jediApy,
+        tvl: router.jediswapTvl ? `${(parseFloat(router.jediswapTvl) / 1e18).toFixed(4)} STRK` : '0.0000 STRK',
         risk: 'low',
         change24h: 1.1, // TODO: Calculate from historical data
         color: 'blue',
@@ -79,18 +125,19 @@ export function AnalyticsDashboard({ allocation }: AnalyticsDashboardProps) {
         name: 'Ekubo',
         icon: '🌀',
         allocation: ekuboAlloc,
-        apy: protocolAPYs.ekubo,
-        tvl: routerV2.totalValueLocked ? `${(parseFloat(routerV2.totalValueLocked) / 1e18).toFixed(2)} ETH` : 'Loading...',
+        apy: ekuboApy,
+        tvl: router.ekuboTvl ? `${(parseFloat(router.ekuboTvl) / 1e18).toFixed(4)} STRK` : '0.0000 STRK',
         risk: 'medium',
         change24h: 2.4, // TODO: Calculate from historical data
         color: 'orange',
       },
     ];
-  }, [allocation, routerV2, protocolAPYs]);
+  }, [allocation, router, protocolAPYs]);
 
   const totalAPY = useMemo(() => {
     return protocolStats.reduce((sum, protocol) => {
-      return sum + (protocol.apy * protocol.allocation / 100);
+      const apy = typeof protocol.apy === 'string' ? 0 : protocol.apy;
+      return sum + (apy * protocol.allocation / 100);
     }, 0);
   }, [protocolStats]);
 
@@ -100,9 +147,9 @@ export function AnalyticsDashboard({ allocation }: AnalyticsDashboardProps) {
       return strategyDeposit.contractBalance;
     }
     // Fallback to TVL if user balance not available
-    const tvl = parseFloat(routerV2.totalValueLocked || '0') / 1e18;
+    const tvl = parseFloat(router.totalValueLocked || '0') / 1e18;
     return tvl > 0 ? tvl : 0;
-  }, [address, strategyDeposit.contractBalance, routerV2.totalValueLocked]);
+  }, [address, strategyDeposit.contractBalance, router.totalValueLocked]);
 
   const getRiskBadge = (risk: string) => {
     switch (risk) {
@@ -142,7 +189,7 @@ export function AnalyticsDashboard({ allocation }: AnalyticsDashboardProps) {
       <div className={`px-4 py-2 rounded-xl border text-sm font-semibold flex items-center gap-2 ${
         'bg-green-500/10 border-green-500/30 text-green-400'
       }`}>
-        ✅ Live Production Data - StrategyRouterV2
+        ✅ Live Production Data - Strategy Router v3.5
       </div>
 
       {/* Portfolio Overview Cards */}
@@ -212,8 +259,32 @@ export function AnalyticsDashboard({ allocation }: AnalyticsDashboardProps) {
 
               <div className="grid grid-cols-3 gap-4 text-sm">
                 <div>
-                  <span className="text-gray-400">APY</span>
-                  <p className="text-green-400 font-bold">{protocol.apy}%</p>
+                  <span className="text-gray-400">
+                    {protocol.name === 'JediSwap' && router.jediswapActualApy > 0 ? 'Actual APY' : 
+                     protocol.name === 'Ekubo' && router.ekuboActualApy > 0 ? 'Actual APY' : 
+                     'Projected APY'}
+                  </span>
+                  <p className="text-green-400 font-bold">
+                    {typeof protocol.apy === 'string' ? protocol.apy : `${protocol.apy.toFixed(2)}%`}
+                  </p>
+                  {typeof protocol.apy === 'number' && protocol.apy > 0 && (
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {protocol.name === 'JediSwap' && router.jediswapActualApy > 0 ? 'From on-chain' :
+                       protocol.name === 'Ekubo' && router.ekuboActualApy > 0 ? 'From on-chain' :
+                       'From protocol'}
+                    </p>
+                  )}
+                  {/* Show pending fees if available */}
+                  {protocol.name === 'JediSwap' && router.pendingFees?.jediswap && parseFloat(router.pendingFees.jediswap) > 0 && (
+                    <p className="text-xs text-yellow-400 mt-0.5">
+                      Pending: {(parseFloat(router.pendingFees.jediswap) / 1e18).toFixed(4)} STRK
+                    </p>
+                  )}
+                  {protocol.name === 'Ekubo' && router.pendingFees?.ekubo && parseFloat(router.pendingFees.ekubo) > 0 && (
+                    <p className="text-xs text-yellow-400 mt-0.5">
+                      Pending: {(parseFloat(router.pendingFees.ekubo) / 1e18).toFixed(4)} STRK
+                    </p>
+                  )}
                 </div>
                 <div>
                   <span className="text-gray-400">24h Change</span>
@@ -224,7 +295,7 @@ export function AnalyticsDashboard({ allocation }: AnalyticsDashboardProps) {
                 <div>
                   <span className="text-gray-400">Est. Yield/Year</span>
                   <p className="text-white font-bold">
-                    {((portfolioValue * protocol.allocation / 100) * (protocol.apy / 100)).toFixed(2)} ETH
+                    {typeof protocol.apy === 'string' ? 'N/A' : `${((portfolioValue * protocol.allocation / 100) * (protocol.apy / 100)).toFixed(2)} ETH`}
                   </p>
                 </div>
               </div>

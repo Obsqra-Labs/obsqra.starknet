@@ -1,7 +1,8 @@
 """Application Configuration"""
 
-from typing import List
+from typing import List, Union
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 from functools import lru_cache
 import os
 
@@ -30,11 +31,25 @@ class Settings(BaseSettings):
     
     # CORS
     FRONTEND_URL: str = "http://localhost:3003"
-    CORS_ORIGINS: List[str] = [
+    CORS_ORIGINS: Union[List[str], str] = [
         "http://localhost:3003",
         "http://localhost:3000",
         "http://127.0.0.1:3003",
+        "https://starknet.obsqra.fi",  # Production frontend
     ]
+    
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v):
+        """Parse CORS_ORIGINS from string or list, filtering out '*'."""
+        if isinstance(v, str):
+            # Split comma-separated string and filter out '*'
+            origins = [origin.strip() for origin in v.split(",") if origin.strip() and origin.strip() != "*"]
+            return origins if origins else v.split(",")  # Return original if all were '*'
+        elif isinstance(v, list):
+            # Filter out '*' from list
+            return [origin for origin in v if origin != "*"]
+        return v
     
     # Trusted Hosts (for TrustedHostMiddleware)
     # In development, allow all hosts; in production, specify exact hosts

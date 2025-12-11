@@ -47,12 +47,22 @@ app = FastAPI(
 )
 
 # Add middleware
+# Filter out "*" from CORS_ORIGINS if present (can't use with allow_credentials=True)
+cors_origins = [origin for origin in settings.CORS_ORIGINS if origin != "*"]
+if not cors_origins:
+    # If no origins specified, allow all (but disable credentials)
+    cors_origins = ["*"]
+    allow_creds = False
+else:
+    allow_creds = True
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
+    allow_origins=cors_origins,
+    allow_credentials=allow_creds,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Only apply TrustedHostMiddleware if not allowing all hosts

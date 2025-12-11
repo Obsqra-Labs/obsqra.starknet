@@ -2,6 +2,7 @@
 Risk Engine API endpoints for on-chain risk calculations
 """
 import asyncio
+import time
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
@@ -221,14 +222,17 @@ async def orchestrate_allocation(
         
         # STEP 1: Generate STARK Proof
         logger.info(f"🔐 Generating STARK proof...")
+        proof_start_time = time.time()
         luminair = get_luminair_service()
         proof = await luminair.generate_proof(
             request.jediswap_metrics.dict(),
             request.ekubo_metrics.dict()
         )
+        proof_generation_time = time.time() - proof_start_time
         logger.info(f"✅ Proof generated: {proof.proof_hash[:32]}...")
         logger.info(f"   Jediswap risk: {proof.output_score_jediswap}")
         logger.info(f"   Ekubo risk: {proof.output_score_ekubo}")
+        logger.info(f"   Generation time: {proof_generation_time:.2f}s")
         
         # STEP 2: Store proof in database
         # Set status based on verification result

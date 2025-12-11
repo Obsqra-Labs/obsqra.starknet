@@ -44,8 +44,8 @@ const STRK_TOKEN_ABI = [
   },
 ];
 
-// Strategy Router V2 ABI (with deposit/withdraw functions)
-const STRATEGY_ROUTER_V2_ABI = [
+// Strategy Router V3.5 ABI (minimal - only deposit/withdraw/get_user_balance needed here)
+const STRATEGY_ROUTER_V35_ABI = [
   {
     name: 'deposit',
     type: 'function',
@@ -113,7 +113,7 @@ export function useStrategyDeposit(strategyRouterAddress: string) {
       
       if (abiStr.includes('"deposit"')) {
         setContractVersion('v2');
-        console.log('📋 Strategy Router V2 detected (with deposit/withdraw)');
+        console.log('📋 Strategy Router v3.5 detected (with deposit/withdraw)');
       } else {
         setContractVersion('v1');
         console.log('📋 Strategy Router V1 detected (allocation only, no deposit/withdraw)');
@@ -177,7 +177,7 @@ export function useStrategyDeposit(strategyRouterAddress: string) {
       // Use current state value, but don't depend on it in the callback
       if (contractVersion === 'v2' && strategyRouterAddress && strategyRouterAddress !== '0x0') {
         try {
-          const routerContract = new Contract(STRATEGY_ROUTER_V2_ABI, strategyRouterAddress, provider);
+          const routerContract = new Contract(STRATEGY_ROUTER_V35_ABI, strategyRouterAddress, provider);
           const depositedResult = await routerContract.get_user_balance(address);
           
           // Parse u256 result (can be string, number, or {low, high} object)
@@ -256,7 +256,7 @@ export function useStrategyDeposit(strategyRouterAddress: string) {
         }
 
         // Deposit - verify contract first
-        const routerContract = new Contract(STRATEGY_ROUTER_V2_ABI, strategyRouterAddress, provider);
+        const routerContract = new Contract(STRATEGY_ROUTER_V35_ABI, strategyRouterAddress, provider);
         
         // Verify contract has deposit function by checking class
         try {
@@ -301,19 +301,28 @@ export function useStrategyDeposit(strategyRouterAddress: string) {
         
         // Track gas fees (non-blocking - don't fail deposit if fee extraction fails)
         try {
-          if (receipt.actual_fee) {
+          const actualFee = (receipt as any).actual_fee;
+          if (actualFee) {
             // Handle both string and U256 object formats
             let gasFeeWei: bigint;
-            if (typeof receipt.actual_fee === 'string') {
-              gasFeeWei = BigInt(receipt.actual_fee);
-            } else if (receipt.actual_fee && typeof receipt.actual_fee === 'object' && receipt.actual_fee.low !== undefined && receipt.actual_fee.high !== undefined) {
-              // U256 format: {low: string, high: string}
-              const low = BigInt(String(receipt.actual_fee.low));
-              const high = BigInt(String(receipt.actual_fee.high));
-              gasFeeWei = low + (high * BigInt(2 ** 128));
+            if (typeof actualFee === 'string') {
+              gasFeeWei = BigInt(actualFee);
+            } else if (actualFee && typeof actualFee === 'object') {
+              // Handle new format: { amount: string; unit: "WEI" | "FRI" }
+              if (actualFee.amount !== undefined) {
+                gasFeeWei = BigInt(actualFee.amount);
+              } else if (actualFee.low !== undefined && actualFee.high !== undefined) {
+                // Handle old U256 format: {low: string, high: string}
+                const low = BigInt(String(actualFee.low));
+                const high = BigInt(String(actualFee.high));
+                gasFeeWei = low + (high * BigInt(2 ** 128));
+              } else {
+                // Fallback: try to convert to string first
+                gasFeeWei = BigInt(String(actualFee));
+              }
             } else {
               // Fallback: try to convert to string first
-              gasFeeWei = BigInt(String(receipt.actual_fee));
+              gasFeeWei = BigInt(String(actualFee));
             }
             const gasFeeStrk = Number(gasFeeWei) / 1e18;
             console.log(`💰 Deposit gas fee: ${gasFeeStrk.toFixed(6)} STRK (${gasFeeWei.toString()} wei)`);
@@ -461,7 +470,7 @@ export function useStrategyDeposit(strategyRouterAddress: string) {
       if (contractVersion === 'v1') {
         throw new Error(
           'The deployed Strategy Router (V1) does not support withdrawals yet. ' +
-          'Please wait for Strategy Router V2 to be deployed, or use Demo Mode to test the UI.'
+          'Please wait for Strategy Router v3.5 to be deployed, or use Demo Mode to test the UI.'
         );
       }
 
@@ -472,7 +481,7 @@ export function useStrategyDeposit(strategyRouterAddress: string) {
         const amountWei = BigInt(Math.floor(amount * 1e18));
         const amountU256 = uint256.bnToUint256(amountWei);
 
-        const routerContract = new Contract(STRATEGY_ROUTER_V2_ABI, strategyRouterAddress, provider);
+        const routerContract = new Contract(STRATEGY_ROUTER_V35_ABI, strategyRouterAddress, provider);
         routerContract.connect(account);
 
         const withdrawCall = routerContract.populate('withdraw', [amountU256]);
@@ -485,19 +494,28 @@ export function useStrategyDeposit(strategyRouterAddress: string) {
         
         // Track gas fees (non-blocking - don't fail withdraw if fee extraction fails)
         try {
-          if (receipt.actual_fee) {
+          const actualFee = (receipt as any).actual_fee;
+          if (actualFee) {
             // Handle both string and U256 object formats
             let gasFeeWei: bigint;
-            if (typeof receipt.actual_fee === 'string') {
-              gasFeeWei = BigInt(receipt.actual_fee);
-            } else if (receipt.actual_fee && typeof receipt.actual_fee === 'object' && receipt.actual_fee.low !== undefined && receipt.actual_fee.high !== undefined) {
-              // U256 format: {low: string, high: string}
-              const low = BigInt(String(receipt.actual_fee.low));
-              const high = BigInt(String(receipt.actual_fee.high));
-              gasFeeWei = low + (high * BigInt(2 ** 128));
+            if (typeof actualFee === 'string') {
+              gasFeeWei = BigInt(actualFee);
+            } else if (actualFee && typeof actualFee === 'object') {
+              // Handle new format: { amount: string; unit: "WEI" | "FRI" }
+              if (actualFee.amount !== undefined) {
+                gasFeeWei = BigInt(actualFee.amount);
+              } else if (actualFee.low !== undefined && actualFee.high !== undefined) {
+                // Handle old U256 format: {low: string, high: string}
+                const low = BigInt(String(actualFee.low));
+                const high = BigInt(String(actualFee.high));
+                gasFeeWei = low + (high * BigInt(2 ** 128));
+              } else {
+                // Fallback: try to convert to string first
+                gasFeeWei = BigInt(String(actualFee));
+              }
             } else {
               // Fallback: try to convert to string first
-              gasFeeWei = BigInt(String(receipt.actual_fee));
+              gasFeeWei = BigInt(String(actualFee));
             }
             const gasFeeStrk = Number(gasFeeWei) / 1e18;
             console.log(`💰 Withdraw gas fee: ${gasFeeStrk.toFixed(6)} STRK (${gasFeeWei.toString()} wei)`);

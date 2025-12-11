@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { useAccount } from '@starknet-react/core';
-import { useStrategyRouterV2 } from '@/hooks/useStrategyRouterV2';
+import { useStrategyRouter } from '@/hooks/useStrategyRouter';
 import { getConfig } from '@/lib/config';
 import { Call, RpcProvider, Contract, uint256 } from 'starknet';
 
-// Strategy Router V2 ABI including test functions
-const STRATEGY_ROUTER_V2_ABI = [
+// Strategy Router V3.5 ABI including all functions and MIST integration
+const STRATEGY_ROUTER_V35_ABI = [
   {
     name: 'deposit',
     type: 'function',
@@ -34,6 +34,13 @@ const STRATEGY_ROUTER_V2_ABI = [
     type: 'function',
     inputs: [],
     outputs: [{ type: 'core::integer::u256' }],
+    state_mutability: 'view',
+  },
+  {
+    name: 'get_allocation',
+    type: 'function',
+    inputs: [],
+    outputs: [{ type: 'core::integer::u256' }, { type: 'core::integer::u256' }],
     state_mutability: 'view',
   },
   {
@@ -85,6 +92,52 @@ const STRATEGY_ROUTER_V2_ABI = [
     outputs: [],
     state_mutability: 'external',
   },
+  // MIST.cash Privacy Integration Functions
+  {
+    name: 'commit_mist_deposit',
+    type: 'function',
+    inputs: [
+      { name: 'commitment_hash', type: 'core::felt252' },
+      { name: 'expected_amount', type: 'core::integer::u256' },
+    ],
+    outputs: [],
+    state_mutability: 'external',
+  },
+  {
+    name: 'reveal_and_claim_mist_deposit',
+    type: 'function',
+    inputs: [{ name: 'secret', type: 'core::felt252' }],
+    outputs: [
+      { type: 'core::starknet::contract_address::ContractAddress' },
+      { type: 'core::integer::u256' },
+    ],
+    state_mutability: 'external',
+  },
+  {
+    name: 'get_mist_commitment',
+    type: 'function',
+    inputs: [{ name: 'commitment_hash', type: 'core::felt252' }],
+    outputs: [
+      { type: 'core::starknet::contract_address::ContractAddress' },
+      { type: 'core::integer::u256' },
+      { type: 'core::bool' },
+    ],
+    state_mutability: 'view',
+  },
+  {
+    name: 'set_mist_chamber',
+    type: 'function',
+    inputs: [{ name: 'chamber', type: 'core::starknet::contract_address::ContractAddress' }],
+    outputs: [],
+    state_mutability: 'external',
+  },
+  {
+    name: 'get_mist_chamber',
+    type: 'function',
+    inputs: [],
+    outputs: [{ type: 'core::starknet::contract_address::ContractAddress' }],
+    state_mutability: 'view',
+  },
 ];
 
 interface IntegrationChecklistItem {
@@ -99,7 +152,7 @@ interface IntegrationChecklistItem {
 
 export function IntegrationTests() {
   const { address, account } = useAccount();
-  const routerV2 = useStrategyRouterV2();
+  const router = useStrategyRouter();
   const [testing, setTesting] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, any>>({});
   const [devLog, setDevLog] = useState<string>('');
@@ -122,7 +175,7 @@ export function IntegrationTests() {
   const STRK_TOKEN_ADDRESS = '0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d';
   
   // Functions that require owner access
-  const ownerOnlyFunctions = ['deploy_to_protocols', 'test_jediswap_only', 'test_ekubo_only', 'accrue_yields', 'accrue_jediswap_yields', 'accrue_ekubo_yields'];
+  const ownerOnlyFunctions = ['deploy_to_protocols', 'test_jediswap_only', 'test_ekubo_only', 'accrue_yields', 'accrue_jediswap_yields', 'accrue_ekubo_yields', 'recall_from_protocols'];
 
   // Simple deposit function for test actions
   const handleDeposit = async () => {
@@ -178,7 +231,7 @@ export function IntegrationTests() {
     setYieldLoading(true);
     try {
       const provider = new RpcProvider({ nodeUrl: config.rpcUrl });
-      const contract = new Contract(STRATEGY_ROUTER_V2_ABI, contractAddress, provider);
+      const contract = new Contract(STRATEGY_ROUTER_V35_ABI, contractAddress, provider);
       const result = await contract.call('get_total_yield_accrued', []);
       // Handle both U256 format and direct bigint
       let yieldAmount: bigint;
@@ -201,19 +254,28 @@ export function IntegrationTests() {
 
   // Fetch protocol statistics (TVL, APY)
   const fetchProtocolStats = async () => {
-    if (!contractAddress) return;
+    if (!contractAddress) {
+      console.warn('No contract address available for TVL fetch');
+      setProtocolStats({
+        jediswap: { tvl: 'N/A', apy: 'N/A' },
+        ekubo: { tvl: 'N/A', apy: 'N/A' },
+      });
+      return;
+    }
     
     setStatsLoading(true);
     try {
       const provider = new RpcProvider({ nodeUrl: config.rpcUrl });
-      const contract = new Contract(STRATEGY_ROUTER_V2_ABI, contractAddress, provider);
+      const contract = new Contract(STRATEGY_ROUTER_V35_ABI, contractAddress, provider);
       
-      // Fetch TVL for both protocols
-      const [jediTvlResult, ekuboTvlResult, totalYieldResult] = await Promise.all([
-        contract.call('get_jediswap_tvl', []),
-        contract.call('get_ekubo_tvl', []),
-        contract.call('get_total_yield_accrued', []),
-      ]);
+      // Helper to check if error indicates missing function
+      const isFunctionNotFound = (error: any): boolean => {
+        const msg = error?.message || String(error || '');
+        return msg.includes('Contract not found') || 
+               msg.includes('ENTRYPOINT_NOT_FOUND') ||
+               msg.includes('Entry point') ||
+               msg.includes('undefined');
+      };
       
       // Parse TVL values
       const parseU256 = (result: any): bigint => {
@@ -221,22 +283,178 @@ export function IntegrationTests() {
         if (result && typeof result === 'object' && 'low' in result && 'high' in result) {
           return uint256.uint256ToBN(result as any);
         }
-        return BigInt(String(result));
+        if (Array.isArray(result) && result.length > 0) {
+          // Handle array response (e.g., from get_protocol_tvl)
+          const first = result[0];
+          if (typeof first === 'bigint') return first;
+          if (first && typeof first === 'object' && 'low' in first && 'high' in first) {
+            return uint256.uint256ToBN(first as any);
+          }
+          return BigInt(String(first));
+        }
+        return BigInt(String(result || '0'));
       };
       
-      const jediTvl = parseU256(jediTvlResult);
-      const ekuboTvl = parseU256(ekuboTvlResult);
-      const totalYield = parseU256(totalYieldResult);
+      // Try v3 functions first (get_protocol_tvl or individual get_jediswap_tvl/get_ekubo_tvl)
+      let jediTvl: bigint, ekuboTvl: bigint;
+      let tvlFunctionsAvailable = false;
+      let isV3Contract = false;
+      
+      try {
+        // Try v3's get_protocol_tvl first (most efficient - returns both in one call)
+        const protocolTvlResult = await contract.call('get_protocol_tvl', []);
+        console.log('✅ get_protocol_tvl successful (v3 contract detected):', protocolTvlResult);
+        tvlFunctionsAvailable = true;
+        isV3Contract = true;
+        
+        // get_protocol_tvl returns [jediswap_tvl, ekubo_tvl]
+        if (Array.isArray(protocolTvlResult) && protocolTvlResult.length >= 2) {
+          jediTvl = parseU256(protocolTvlResult[0]);
+          ekuboTvl = parseU256(protocolTvlResult[1]);
+        } else {
+          throw new Error('Unexpected get_protocol_tvl response format');
+        }
+      } catch (protocolTvlError: any) {
+        if (isFunctionNotFound(protocolTvlError)) {
+          console.log('ℹ️ get_protocol_tvl not found, trying individual v3 calls...');
+        } else {
+          console.warn('⚠️ get_protocol_tvl failed, trying individual calls:', protocolTvlError.message);
+        }
+        
+        // Fallback to individual v3 calls
+        const [jediTvlResult, ekuboTvlResult] = await Promise.all([
+          contract.call('get_jediswap_tvl', []).catch((e: any) => {
+            if (isFunctionNotFound(e)) {
+              return null; // Will try v2 approach
+            } else {
+              console.error('❌ get_jediswap_tvl failed:', e.message || e);
+              return null;
+            }
+          }),
+          contract.call('get_ekubo_tvl', []).catch((e: any) => {
+            if (isFunctionNotFound(e)) {
+              return null; // Will try v2 approach
+            } else {
+              console.error('❌ get_ekubo_tvl failed:', e.message || e);
+              return null;
+            }
+          }),
+        ]);
+        
+        if (jediTvlResult && ekuboTvlResult) {
+          // v3 contract with individual functions
+          console.log('✅ Individual v3 TVL functions available');
+          tvlFunctionsAvailable = true;
+          isV3Contract = true;
+          jediTvl = parseU256(jediTvlResult);
+          ekuboTvl = parseU256(ekuboTvlResult);
+        } else {
+          // v2 contract - use get_total_value_locked and split by allocation
+          console.log('ℹ️ v3 TVL functions not found, trying v2 approach (get_total_value_locked + allocation)...');
+          
+          try {
+            // Get total TVL from v2 contract
+            const totalTvlResult = await contract.call('get_total_value_locked', []);
+            const totalTvl = parseU256(totalTvlResult);
+            
+            // Get allocation to split the TVL
+            const allocationResult = await contract.call('get_allocation', []);
+            let jediAllocBps = 5000n; // Default 50%
+            let ekuboAllocBps = 5000n; // Default 50%
+            
+            if (Array.isArray(allocationResult) && allocationResult.length >= 2) {
+              jediAllocBps = parseU256(allocationResult[0]);
+              ekuboAllocBps = parseU256(allocationResult[1]);
+            } else if (typeof allocationResult === 'object' && allocationResult !== null) {
+              // Handle object format
+              const alloc = allocationResult as any;
+              if ('low' in alloc && 'high' in alloc) {
+                jediAllocBps = parseU256(alloc);
+                ekuboAllocBps = 10000n - jediAllocBps; // Assume they sum to 10000 (100%)
+              }
+            }
+            
+            // Split total TVL by allocation (basis points: 10000 = 100%)
+            // jediTvl = totalTvl * jediAllocBps / 10000
+            jediTvl = (totalTvl * jediAllocBps) / 10000n;
+            ekuboTvl = (totalTvl * ekuboAllocBps) / 10000n;
+            
+            tvlFunctionsAvailable = true;
+            isV3Contract = false;
+            console.log(`✅ v2 contract: Total TVL ${totalTvl.toString()}, split ${jediAllocBps.toString()}/${ekuboAllocBps.toString()} bps`);
+          } catch (v2Error: any) {
+            console.error('❌ v2 approach also failed:', v2Error.message);
+            tvlFunctionsAvailable = false;
+            jediTvl = 0n;
+            ekuboTvl = 0n;
+          }
+        }
+      }
+      
+      // Fetch total yield
+      let totalYield = 0n;
+      let yieldFunctionAvailable = false;
+      try {
+        const totalYieldResult = await contract.call('get_total_yield_accrued', []);
+        totalYield = parseU256(totalYieldResult);
+        yieldFunctionAvailable = true;
+      } catch (yieldError: any) {
+        if (isFunctionNotFound(yieldError)) {
+          console.warn('⚠️ get_total_yield_accrued not found on contract');
+        } else {
+          console.warn('⚠️ get_total_yield_accrued failed:', yieldError.message);
+        }
+      }
+      
+      // If TVL functions are not available at all, show "Not Supported"
+      if (!tvlFunctionsAvailable) {
+        console.warn(`⚠️ Contract at ${contractAddress} does not support TVL functions. This may be an older contract version.`);
+        setProtocolStats({
+          jediswap: { tvl: 'Not Supported', apy: 'N/A' },
+          ekubo: { tvl: 'Not Supported', apy: 'N/A' },
+        });
+        return;
+      }
+      
+      // Log which contract version we detected
+      if (isV3Contract) {
+        console.log('📊 Using v3 contract TVL functions');
+      } else {
+        console.log('📊 Using v2 contract (total TVL split by allocation)');
+      }
       
       const jediTvlStrk = Number(jediTvl) / 1e18;
       const ekuboTvlStrk = Number(ekuboTvl) / 1e18;
       const totalYieldStrk = Number(totalYield) / 1e18;
       const totalTvl = jediTvlStrk + ekuboTvlStrk;
       
+      console.log('📊 TVL Stats:', {
+        jediTvl: jediTvlStrk,
+        ekuboTvl: ekuboTvlStrk,
+        totalTvl,
+        totalYield: totalYieldStrk,
+      });
+      
       // Calculate APY (simplified: yield as % of TVL, annualized)
       // This is a rough estimate - in production you'd track yield over time
-      const jediApy = jediTvlStrk > 0 ? ((totalYieldStrk * (jediTvlStrk / totalTvl)) / jediTvlStrk * 100).toFixed(2) : '0.00';
-      const ekuboApy = ekuboTvlStrk > 0 ? ((totalYieldStrk * (ekuboTvlStrk / totalTvl)) / ekuboTvlStrk * 100).toFixed(2) : '0.00';
+      let jediApy = '0.00';
+      let ekuboApy = '0.00';
+      
+      if (yieldFunctionAvailable && totalTvl > 0) {
+        if (jediTvlStrk > 0) {
+          // APY = (yield allocated to protocol / TVL) * 100
+          const jediYield = totalYieldStrk * (jediTvlStrk / totalTvl);
+          jediApy = ((jediYield / jediTvlStrk) * 100).toFixed(2);
+        }
+        if (ekuboTvlStrk > 0) {
+          const ekuboYield = totalYieldStrk * (ekuboTvlStrk / totalTvl);
+          ekuboApy = ((ekuboYield / ekuboTvlStrk) * 100).toFixed(2);
+        }
+      } else if (!yieldFunctionAvailable) {
+        // If yield function not available, show N/A
+        jediApy = 'N/A';
+        ekuboApy = 'N/A';
+      }
       
       setProtocolStats({
         jediswap: {
@@ -248,12 +466,31 @@ export function IntegrationTests() {
           apy: ekuboApy,
         },
       });
-    } catch (error) {
-      console.error('Error fetching protocol stats:', error);
-      setProtocolStats({
-        jediswap: { tvl: 'Error', apy: 'Error' },
-        ekubo: { tvl: 'Error', apy: 'Error' },
+    } catch (error: any) {
+      console.error('❌ Error fetching protocol stats (outer catch):', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        contractAddress,
+        rpcUrl: config.rpcUrl,
       });
+      
+      // Check if it's a contract not found error
+      const isContractNotFound = error?.message?.includes('Contract not found') || 
+                                 error?.message?.includes('undefined');
+      
+      if (isContractNotFound) {
+        console.warn(`⚠️ Contract at ${contractAddress} may not be deployed or address is incorrect.`);
+        setProtocolStats({
+          jediswap: { tvl: 'Contract Not Found', apy: 'N/A' },
+          ekubo: { tvl: 'Contract Not Found', apy: 'N/A' },
+        });
+      } else {
+        setProtocolStats({
+          jediswap: { tvl: 'Error', apy: 'Error' },
+          ekubo: { tvl: 'Error', apy: 'Error' },
+        });
+      }
     } finally {
       setStatsLoading(false);
     }
@@ -436,12 +673,50 @@ export function IntegrationTests() {
       notes: 'Function exists - needs testing'
     },
     {
+      id: 'recall_from_protocols',
+      category: 'Advanced',
+      name: 'Recall from Protocols',
+      status: 'in_progress',
+      description: 'Withdraw liquidity from JediSwap/Ekubo positions and return to contract',
+      testFunction: 'recall_from_protocols',
+      notes: 'Owner-only function - withdraws liquidity from protocols. Requires position index and liquidity amount.'
+    },
+    {
       id: 'slippage_protection',
       category: 'Advanced',
       name: 'Slippage Protection',
       status: 'planned',
       description: 'Add slippage protection for swaps and liquidity provision',
       notes: 'Currently set to 0 (no protection) - requires contract modification'
+    },
+    
+    // MIST.cash Privacy Integration (Testing Only)
+    {
+      id: 'mist_commit_deposit',
+      category: 'Privacy',
+      name: 'MIST: Commit Deposit (Hash)',
+      status: 'planned',
+      description: 'Commit to MIST deposit by sending hash(secret) to router',
+      testFunction: 'commit_mist_deposit',
+      notes: 'Pattern 2 Phase 1: User commits hash, router stores commitment. Testing only - not in main UI.'
+    },
+    {
+      id: 'mist_reveal_claim',
+      category: 'Privacy',
+      name: 'MIST: Reveal & Claim',
+      status: 'planned',
+      description: 'Reveal secret to router, router claims from MIST chamber',
+      testFunction: 'reveal_and_claim_mist_deposit',
+      notes: 'Pattern 2 Phase 2: User reveals secret when ready, router claims. Testing only - not in main UI.'
+    },
+    {
+      id: 'mist_check_commitment',
+      category: 'Privacy',
+      name: 'MIST: Check Commitment',
+      status: 'planned',
+      description: 'Query commitment status before revealing',
+      testFunction: 'get_mist_commitment',
+      notes: 'View function to check if commitment exists and if revealed. Testing only - not in main UI.'
     },
   ];
 
@@ -571,14 +846,21 @@ export function IntegrationTests() {
             
             // Extract gas fee
             let gasFeeWei = BigInt(0);
-            if (receipt.actual_fee) {
+            const actualFee = (receipt as any).actual_fee;
+            if (actualFee) {
               try {
-                if (typeof receipt.actual_fee === 'string') {
-                  gasFeeWei = BigInt(receipt.actual_fee);
-                } else if (receipt.actual_fee && typeof receipt.actual_fee === 'object') {
-                  const low = BigInt(receipt.actual_fee.low || '0');
-                  const high = BigInt(receipt.actual_fee.high || '0');
-                  gasFeeWei = low + (high << 128n);
+                if (typeof actualFee === 'string') {
+                  gasFeeWei = BigInt(actualFee);
+                } else if (actualFee && typeof actualFee === 'object') {
+                  // Handle new format: { amount: string; unit: "WEI" | "FRI" }
+                  if (actualFee.amount !== undefined) {
+                    gasFeeWei = BigInt(actualFee.amount);
+                  } else if (actualFee.low !== undefined && actualFee.high !== undefined) {
+                    // Handle old U256 format: { low: string, high: string }
+                    const low = BigInt(actualFee.low || '0');
+                    const high = BigInt(actualFee.high || '0');
+                    gasFeeWei = low + (high << 128n);
+                  }
                 }
               } catch (e) {
                 console.warn('Could not parse gas fee:', e);
@@ -586,7 +868,10 @@ export function IntegrationTests() {
             }
             
             const gasFeeEth = Number(gasFeeWei) / 1e18;
-            const isSuccess = receipt.status === 'ACCEPTED_ON_L2' || receipt.status === 'ACCEPTED_ON_L1';
+            const finalityStatus = (receipt as any).finality_status;
+            const executionStatus = (receipt as any).execution_status;
+            const isSuccess = (finalityStatus === 'ACCEPTED_ON_L2' || finalityStatus === 'ACCEPTED_ON_L1') && 
+                             executionStatus === 'SUCCEEDED';
             
             setTestResults(prev => ({
               ...prev,
@@ -594,7 +879,7 @@ export function IntegrationTests() {
                 status: isSuccess ? 'success' : 'error',
                 message: isSuccess 
                   ? `✅ Success! Transaction confirmed on-chain. Gas: ${gasFeeEth.toFixed(6)} ETH`
-                  : `Transaction ${receipt.status}`,
+                  : `Transaction ${finalityStatus || 'unknown'}`,
                 txHash: data.transactionHash,
                 gasFee: gasFeeEth.toFixed(6),
                 timestamp: new Date().toISOString(),
@@ -652,14 +937,21 @@ export function IntegrationTests() {
         
         // Extract gas fee
         let gasFeeWei = BigInt(0);
-        if (receipt.actual_fee) {
+        const actualFee = (receipt as any).actual_fee;
+        if (actualFee) {
           try {
-            if (typeof receipt.actual_fee === 'string') {
-              gasFeeWei = BigInt(receipt.actual_fee);
-            } else if (receipt.actual_fee && typeof receipt.actual_fee === 'object') {
-              const low = BigInt(receipt.actual_fee.low || '0');
-              const high = BigInt(receipt.actual_fee.high || '0');
-              gasFeeWei = low + (high << 128n);
+            if (typeof actualFee === 'string') {
+              gasFeeWei = BigInt(actualFee);
+            } else if (actualFee && typeof actualFee === 'object') {
+              // Handle new format: { amount: string; unit: "WEI" | "FRI" }
+              if (actualFee.amount !== undefined) {
+                gasFeeWei = BigInt(actualFee.amount);
+              } else if (actualFee.low !== undefined && actualFee.high !== undefined) {
+                // Handle old U256 format: { low: string, high: string }
+                const low = BigInt(actualFee.low || '0');
+                const high = BigInt(actualFee.high || '0');
+                gasFeeWei = low + (high << 128n);
+              }
             }
           } catch (e) {
             console.warn('Could not parse gas fee:', e);
@@ -668,14 +960,18 @@ export function IntegrationTests() {
 
         const gasFeeEth = Number(gasFeeWei) / 1e18;
         const gasFeeLink = `https://sepolia.voyager.online/tx/${data.transactionHash}`;
+        const finalityStatus = (receipt as any).finality_status;
+        const executionStatus = (receipt as any).execution_status;
+        const isSuccess = (finalityStatus === 'ACCEPTED_ON_L2' || finalityStatus === 'ACCEPTED_ON_L1') && 
+                         executionStatus === 'SUCCEEDED';
 
         setTestResults(prev => ({
           ...prev,
           [item.id]: {
-            status: receipt.status === 'ACCEPTED_ON_L2' || receipt.status === 'ACCEPTED_ON_L1' ? 'success' : 'error',
-            message: receipt.status === 'ACCEPTED_ON_L2' || receipt.status === 'ACCEPTED_ON_L1' 
+            status: isSuccess ? 'success' : 'error',
+            message: isSuccess 
               ? `✅ Success! Executed via owner wallet. Gas: ${gasFeeEth.toFixed(6)} ETH`
-              : `Transaction ${receipt.status}`,
+              : `Transaction ${finalityStatus || 'unknown'}`,
             txHash: data.transactionHash,
             gasFee: gasFeeEth.toFixed(6),
             gasFeeLink,
@@ -899,6 +1195,143 @@ export function IntegrationTests() {
           setTesting(null);
           return;
         }
+      } else if (item.testFunction === 'commit_mist_deposit') {
+        // MIST: Commit deposit (Phase 1) - requires hash and expected amount
+        // For testing, generate a random secret and hash it
+        // Note: In production, users compute hash(secret) on their side
+        const secret = BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)).toString();
+        const { hash } = await import('starknet');
+        // Contract uses poseidon_hash_span([secret, secret]) to match frontend
+        // computeHashOnElements uses Poseidon hash
+        const commitmentHash = hash.computeHashOnElements([secret, secret]);
+        const expectedAmount = BigInt('100000000000000000'); // 0.1 STRK for testing
+        const amountU256 = uint256.bnToUint256(expectedAmount);
+        
+        const call: Call = {
+          contractAddress: contractAddress,
+          entrypoint: 'commit_mist_deposit',
+          calldata: [
+            commitmentHash,
+            amountU256.low.toString(),
+            amountU256.high.toString(),
+          ],
+        };
+        
+        // Store secret in localStorage for later reveal (testing only)
+        localStorage.setItem(`mist_secret_${commitmentHash}`, secret);
+        
+        calls.push(call);
+        console.log('🔍 MIST commit_mist_deposit call:', {
+          commitmentHash,
+          expectedAmount: expectedAmount.toString(),
+          secret: '***stored in localStorage***',
+        });
+      } else if (item.testFunction === 'reveal_and_claim_mist_deposit') {
+        // MIST: Reveal secret and claim (Phase 2)
+        // For testing, prompt user for commitment hash or use stored secret
+        const commitmentHash = prompt('Enter commitment hash (or leave empty to use last stored secret):');
+        if (!commitmentHash) {
+          setTestResults(prev => ({
+            ...prev,
+            [item.id]: {
+              status: 'error',
+              message: '❌ Commitment hash required',
+              timestamp: new Date().toISOString()
+            }
+          }));
+          setTesting(null);
+          return;
+        }
+        
+        // Try to get secret from localStorage
+        const secret = localStorage.getItem(`mist_secret_${commitmentHash}`);
+        if (!secret) {
+          const manualSecret = prompt('Secret not found in storage. Enter secret manually:');
+          if (!manualSecret) {
+            setTestResults(prev => ({
+              ...prev,
+              [item.id]: {
+                status: 'error',
+                message: '❌ Secret required',
+                timestamp: new Date().toISOString()
+              }
+            }));
+            setTesting(null);
+            return;
+          }
+          
+          const call: Call = {
+            contractAddress: contractAddress,
+            entrypoint: 'reveal_and_claim_mist_deposit',
+            calldata: [manualSecret],
+          };
+          calls.push(call);
+        } else {
+          const call: Call = {
+            contractAddress: contractAddress,
+            entrypoint: 'reveal_and_claim_mist_deposit',
+            calldata: [secret],
+          };
+          calls.push(call);
+          // Remove secret from storage after use
+          localStorage.removeItem(`mist_secret_${commitmentHash}`);
+        }
+        
+        console.log('🔍 MIST reveal_and_claim_mist_deposit call:', {
+          commitmentHash,
+          secret: '***provided***',
+        });
+      } else if (item.testFunction === 'get_mist_commitment') {
+        // MIST: Query commitment status (view function)
+        const commitmentHash = prompt('Enter commitment hash to check:');
+        if (!commitmentHash) {
+          setTestResults(prev => ({
+            ...prev,
+            [item.id]: {
+              status: 'error',
+              message: '❌ Commitment hash required',
+              timestamp: new Date().toISOString()
+            }
+          }));
+          setTesting(null);
+          return;
+        }
+        
+        try {
+          const result = await provider.callContract({
+            contractAddress: contractAddress,
+            entrypoint: 'get_mist_commitment',
+            calldata: [commitmentHash],
+          });
+          
+          const user = result[0] || '0x0';
+          const amountLow = BigInt(result[1] || '0');
+          const amountHigh = BigInt(result[2] || '0');
+          const amount = amountLow + (amountHigh << 128n);
+          const revealed = result[3] === '1' || result[3] === 'true';
+          
+          setTestResults(prev => ({
+            ...prev,
+            [item.id]: {
+              status: 'success',
+              message: `✅ Commitment Status:\nHash: ${commitmentHash}\nUser: ${user}\nAmount: ${(Number(amount) / 1e18).toFixed(6)} STRK\nRevealed: ${revealed ? 'Yes' : 'No'}`,
+              timestamp: new Date().toISOString()
+            }
+          }));
+          setTesting(null);
+          return;
+        } catch (error: any) {
+          setTestResults(prev => ({
+            ...prev,
+            [item.id]: {
+              status: 'error',
+              message: `❌ Failed to query commitment: ${error.message}`,
+              timestamp: new Date().toISOString()
+            }
+          }));
+          setTesting(null);
+          return;
+        }
       } else if (item.testFunction === 'deposit' || item.testFunction === 'withdraw') {
         // These are handled by the main dashboard, but we can add test buttons here
         // For now, show a message directing users to the main dashboard
@@ -999,29 +1432,33 @@ export function IntegrationTests() {
         let gasFee = '0';
         let gasFeeWei = BigInt(0);
         try {
-          if (receipt && receipt.actual_fee !== undefined && receipt.actual_fee !== null) {
+          const actualFee = (receipt as any).actual_fee;
+          if (receipt && actualFee !== undefined && actualFee !== null) {
             // Handle both string and U256 object formats
-            if (typeof receipt.actual_fee === 'string') {
-              if (receipt.actual_fee.trim() !== '') {
-                gasFeeWei = BigInt(receipt.actual_fee);
+            if (typeof actualFee === 'string') {
+              if (actualFee.trim() !== '') {
+                gasFeeWei = BigInt(actualFee);
               }
-            } else if (receipt.actual_fee && typeof receipt.actual_fee === 'object') {
-              // U256 format: {low: string, high: string}
-              if (receipt.actual_fee.low !== undefined && receipt.actual_fee.high !== undefined) {
-                const lowStr = String(receipt.actual_fee.low || '0');
-                const highStr = String(receipt.actual_fee.high || '0');
+            } else if (actualFee && typeof actualFee === 'object') {
+              // Handle new format: { amount: string; unit: "WEI" | "FRI" }
+              if (actualFee.amount !== undefined) {
+                gasFeeWei = BigInt(actualFee.amount);
+              } else if (actualFee.low !== undefined && actualFee.high !== undefined) {
+                // Handle old U256 format: {low: string, high: string}
+                const lowStr = String(actualFee.low || '0');
+                const highStr = String(actualFee.high || '0');
                 if (lowStr !== '' && highStr !== '') {
                   const low = BigInt(lowStr);
                   const high = BigInt(highStr);
                   gasFeeWei = low + (high * BigInt(2 ** 128));
                 }
               } else {
-                // Object doesn't have low/high structure - skip parsing
+                // Object doesn't have expected structure - skip parsing
                 // Log for debugging but don't try to convert
-                console.warn('actual_fee is an object but not in U256 format:', receipt.actual_fee);
+                console.warn('actual_fee is an object but not in expected format:', actualFee);
               }
-            } else if (typeof receipt.actual_fee === 'number') {
-              gasFeeWei = BigInt(Math.floor(receipt.actual_fee));
+            } else if (typeof actualFee === 'number') {
+              gasFeeWei = BigInt(Math.floor(actualFee));
             }
             
             // Convert to STRK (assuming 18 decimals)
@@ -1342,7 +1779,7 @@ export function IntegrationTests() {
           </div>
           <div>
             <span className="text-slate-700">Status:</span>{' '}
-            <span className="text-slate-900">{routerV2.isLoading ? 'Loading...' : 'Connected'}</span>
+            <span className="text-slate-900">{router.isLoading ? 'Loading...' : 'Connected'}</span>
           </div>
           <div>
             <span className="text-slate-700">Total Yield Accrued:</span>{' '}

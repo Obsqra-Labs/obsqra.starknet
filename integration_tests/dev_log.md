@@ -457,3 +457,111 @@ This log tracks notable findings, issues, and solutions discovered during integr
 
 ---
 
+## 2025-12-10: Strategy Router v3.5 Deployment
+
+### Finding: Unified Contract with MIST Integration
+
+**Issue**: Contract versions were fragmented across v2 and v3, causing frontend confusion about which functions to call. User balance tracking was broken, and MIST.cash privacy integration was missing.
+
+**Solution**: Created unified Strategy Router v3.5 that:
+- ✅ Combines all v2 and v3 functions in one contract
+- ✅ Fixes user balance tracking (per-user balances in `user_balances` map)
+- ✅ Fixes withdraw logic (checks actual user balance before withdrawal)
+- ✅ Adds MIST.cash privacy integration (hash commitment pattern)
+- ✅ Maintains backward compatibility (frontend tries v3.5 functions first, falls back to v2)
+
+**Contract Details**:
+- **Address**: `0x0221284a7b77041f9f963c0f0b65b901604792533f0f937aa4591bd43d08ee2b`
+- **Class Hash**: `0x043acf130464d2a1325403f619a62480fd9d10a13941a81fcb2a491e2ec5bc28`
+- **Network**: Sepolia
+- **Deployed**: 2025-12-10T21:30:00Z
+
+**Key Features**:
+1. **Fixed User Balance Tracking**: `get_user_balance()` now returns per-user balance from `user_balances` map
+2. **Fixed Withdraw Logic**: `withdraw()` checks `user_balances` before allowing withdrawal
+3. **MIST Integration**: Hash commitment pattern for privacy deposits
+   - `commit_mist_deposit()`: User commits hash of secret
+   - `reveal_and_claim_mist_deposit()`: User reveals secret, router claims from MIST chamber
+4. **All v3 Functions**: TVL getters, yield accrual, slippage protection, position tracking
+5. **Backward Compatible**: Frontend intelligently queries available functions
+
+**Compilation Fixes**:
+- Moved MIST interface to `interfaces/mist.cairo` for proper dispatcher pattern
+- Fixed tuple destructuring: `let (token_address, claimed_amount) = chamber_contract.read_tx(secret);`
+- Fixed doc comments (Cairo parser was interpreting "deposit", "MIST" as macros)
+- All Map accesses use `.entry(key).read()` / `.entry(key).write()` pattern
+
+**Files Modified**:
+- `contracts/src/strategy_router_v3_5.cairo` - New unified contract
+- `contracts/src/interfaces/mist.cairo` - MIST Chamber interface
+- `contracts/src/interfaces.cairo` - Added mist module export
+- `frontend/src/hooks/useStrategyRouter.ts` - Unified hook (renamed from useStrategyRouterV2)
+- `frontend/src/components/IntegrationTests.tsx` - Updated to use v3.5 ABI
+- `frontend/src/hooks/useStrategyDeposit.ts` - Updated to use v3.5 ABI
+- `frontend/src/components/Dashboard.tsx` - Updated labels to v3.5
+- `frontend/src/components/AnalyticsDashboard.tsx` - Updated labels to v3.5
+
+**Next Steps**:
+1. Update frontend `.env.local`: `NEXT_PUBLIC_STRATEGY_ROUTER_ADDRESS=0x0221284a7b77041f9f963c0f0b65b901604792533f0f937aa4591bd43d08ee2b`
+2. Update backend `config.py`: `STRATEGY_ROUTER_ADDRESS=0x0221284a7b77041f9f963c0f0b65b901604792533f0f937aa4591bd43d08ee2b`
+3. Test MIST functions in integration tests panel
+4. Test deposit/withdraw with fixed user balances
+
+**Status**: ✅ Deployed - Contract live on Sepolia
+
+---
+
+## 2025-12-10: v3.5 Updated Deployment - Bug Fixes
+
+### Finding: Multiple Issues in Production
+
+**Issues Reported**:
+1. Slippage errors in JediSwap swaps
+2. No yield aggregation display
+3. APY meters not working
+4. Ekubo allocation not showing after mint_and_deposit
+
+**Root Causes**:
+1. **Slippage**: Contract set `amount_out_minimum = 0`, causing JediSwap to reject swaps
+2. **Yield Display**: Frontend wasn't fetching `get_total_yield_accrued()`
+3. **APY Meters**: Tried to fetch from non-existent API endpoint instead of calculating from yield data
+4. **Ekubo Allocation**: `ekubo_position_value` and `jediswap_position_value` weren't updated when positions were minted
+
+**Solutions Applied**:
+
+1. **Fixed Slippage Calculation**:
+   - Calculate minimum output: `estimated_output = swap_amount` (1:1 conservative estimate)
+   - Apply slippage: `amount_out_minimum = estimated_output - (estimated_output * slippage_bps / 10000)`
+   - Prevents swap failures while maintaining protection
+
+2. **Added Yield Display**:
+   - Added `get_total_yield_accrued()` fetching in `useStrategyRouter`
+   - Display total yield in Dashboard TVL card
+   - Show individual protocol TVLs
+
+3. **Fixed APY Meters**:
+   - Calculate APY from actual yield data: `(yield / tvl) * 100`
+   - Distribute yield proportionally based on TVL
+   - Update every 30 seconds when router data changes
+
+4. **Fixed Position Value Tracking**:
+   - Update `jediswap_position_value` when JediSwap positions are minted
+   - Update `ekubo_position_value` when Ekubo positions are minted
+   - Allocation now reflects actual deployed amounts
+
+**Contract Details**:
+- **Address**: `0x07a63e22447815f69b659c81a2014d02bcd463510d7283b5f6bad1c370c5d652`
+- **Class Hash**: `0x01f4af41d2d8ce21a9abb9985e194d7fa2153f9a52a8ca5ce15d9c9b07431d59`
+- **Network**: Sepolia
+- **Deployed**: 2025-12-10T21:45:00Z
+
+**Files Modified**:
+- `contracts/src/strategy_router_v3_5.cairo` - Fixed slippage calculation and position tracking
+- `frontend/src/hooks/useStrategyRouter.ts` - Added yield fetching
+- `frontend/src/components/Dashboard.tsx` - Added yield and TVL displays
+- `frontend/src/components/AnalyticsDashboard.tsx` - Fixed APY calculation
+
+**Status**: ✅ Deployed - All fixes live
+
+---
+

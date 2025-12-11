@@ -5,6 +5,80 @@ Obsqra.starknet - A verifiable AI infrastructure for private DeFi, combining Sta
 
 ---
 
+## 📚 Latest: Strategy Router v3.5 Compilation & Deployment (December 10, 2025)
+
+### Cairo Interface Dispatcher Pattern
+
+**Challenge:** Using MIST Chamber interface defined in same file caused dispatcher access errors.
+
+**Solution:** 
+- Move interfaces to separate files (`interfaces/mist.cairo`)
+- Import both `Dispatcher` and `DispatcherTrait`
+- Pattern: `let chamber = IMistChamberDispatcher { contract_address: addr };`
+
+**Key Insight:** Cairo auto-generates dispatcher types from `#[starknet::interface]` traits. You never declare them yourself - just import from the module where the interface lives.
+
+### Tuple Destructuring in Cairo
+
+**Challenge:** `read_tx()` returns `(ContractAddress, u256)` but destructuring failed.
+
+**Solution:**
+- Use: `let (token, amount) = dispatcher.read_tx(secret);`
+- Cairo does NOT support `result.0` / `result.1` syntax
+- If wrapped in `Result`, use `.unwrap()` first
+
+### Doc Comments Parser Issues
+
+**Challenge:** Compiler errors: "Expected a '!' after the identifier 'deposit' to start an inline macro"
+
+**Root Cause:** Cairo's doc comment parser interprets certain words (like "deposit", "MIST", "transaction") as macro identifiers.
+
+**Solution:** 
+- Use regular comments (`//`) instead of doc comments (`/** */`) for these cases
+- Or rephrase to avoid problematic words
+
+**Example:**
+```cairo
+// ❌ This causes parser errors:
+/**
+ * Pattern 2: Commit to MIST deposit (Phase 1)
+ */
+
+// ✅ Use regular comments instead:
+// Pattern 2: Commit phase - user sends hash of secret to router
+```
+
+### Map Access Pattern
+
+**Challenge:** Direct `.read(key)` / `.write(key, value)` on storage maps causes errors.
+
+**Solution:**
+- Always use `.entry(key).read()` / `.entry(key).write(value)` for storage maps
+- This is the Cairo 2.0+ pattern for `StorageMap` types
+
+**Example:**
+```cairo
+// ❌ Old pattern (deprecated):
+let balance = self.balances.read(user);
+
+// ✅ New pattern (required):
+let balance = self.balances.entry(user).read();
+self.balances.entry(user).write(new_balance);
+```
+
+### Contract Fragmentation Problem
+
+**Challenge:** Functions split across v2 and v3 contracts, frontend didn't know which to call.
+
+**Solution:**
+- Created unified v3.5 contract with all functions
+- Frontend intelligently queries available functions (tries v3.5 first, falls back to v2)
+- Maintains backward compatibility while providing unified interface
+
+**Key Insight:** When adding features, consider backward compatibility. A unified contract is better than multiple versions, but if you must have versions, make the frontend smart enough to handle both.
+
+---
+
 ## 🔥 Key Challenges & Solutions
 
 ### 1. **EVM → Starknet Migration**
@@ -214,5 +288,5 @@ await account.waitForTransaction(result.transaction_hash); // ← Critical!
 
 ---
 
-**Built with ❤️ (and a lot of debugging) by the Obsqra team**
+**Built with caffine and stress (and a lot of debugging) by the Obsqra team**
 

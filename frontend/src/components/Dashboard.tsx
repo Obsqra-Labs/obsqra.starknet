@@ -1,7 +1,7 @@
 'use client';
 
 import { useAccount } from '@starknet-react/core';
-import { useStrategyRouterV2 } from '@/hooks/useStrategyRouterV2';
+import { useStrategyRouter } from '@/hooks/useStrategyRouter';
 import { useRiskEngineBackend } from '@/hooks/useRiskEngineBackend';
 import { useSettlement } from '@/hooks/useSettlement';
 import { useRiskEngineOrchestration, ProtocolMetrics } from '@/hooks/useRiskEngineOrchestration';
@@ -47,7 +47,7 @@ export function Dashboard() {
   
   // Now safe to call other hooks
   const { account, address } = useAccount();
-  const routerV2 = useStrategyRouterV2();
+  const router = useStrategyRouter();
   const strategyDeposit = useStrategyDeposit(getConfig().strategyRouterAddress);
   const txHistory = useTransactionHistory();
   const riskEngine = useRiskEngineBackend();
@@ -67,18 +67,41 @@ export function Dashboard() {
   // Calculate allocation from live contract data
   const allocation = useMemo(() => {
     return {
-      jediswap: routerV2.jediswapAllocation,
-      ekubo: routerV2.ekuboAllocation,
+      jediswap: router.jediswapAllocation,
+      ekubo: router.ekuboAllocation,
     };
-  }, [routerV2.jediswapAllocation, routerV2.ekuboAllocation]);
+  }, [router.jediswapAllocation, router.ekuboAllocation]);
 
   // Format TVL from live contract data
   const tvlDisplay = useMemo(() => {
-    if (routerV2.isLoading) return '...';
-    const tvl = BigInt(routerV2.totalValueLocked || '0');
+    if (router.isLoading) return '...';
+    const tvl = BigInt(router.totalValueLocked || '0');
     const tvlEth = Number(tvl) / 1e18;
     return tvlEth.toFixed(2);
-  }, [routerV2.isLoading, routerV2.totalValueLocked]);
+  }, [router.isLoading, router.totalValueLocked]);
+
+  // Format yield from live contract data
+  const yieldDisplay = useMemo(() => {
+    if (router.isLoading) return '...';
+    const yieldAmount = BigInt(router.totalYieldAccrued || '0');
+    const yieldEth = Number(yieldAmount) / 1e18;
+    return yieldEth.toFixed(4);
+  }, [router.isLoading, router.totalYieldAccrued]);
+
+  // Format individual protocol TVLs
+  const jediTvlDisplay = useMemo(() => {
+    if (router.isLoading) return '...';
+    const tvl = BigInt(router.jediswapTvl || '0');
+    const tvlEth = Number(tvl) / 1e18;
+    return tvlEth.toFixed(4);
+  }, [router.isLoading, router.jediswapTvl]);
+
+  const ekuboTvlDisplay = useMemo(() => {
+    if (router.isLoading) return '...';
+    const tvl = BigInt(router.ekuboTvl || '0');
+    const tvlEth = Number(tvl) / 1e18;
+    return tvlEth.toFixed(4);
+  }, [router.isLoading, router.ekuboTvl]);
 
   // Handle deposit - STRK deposit
   const handleDeposit = async () => {
@@ -288,7 +311,7 @@ export function Dashboard() {
         // Wait for transaction to be included, then refresh
         setTimeout(() => {
           console.log('🔄 Refreshing allocation display...');
-          routerV2.refetch();
+          router.refetch();
         }, 5000);
       } else {
         // Transaction failed or returned null
@@ -430,13 +453,13 @@ export function Dashboard() {
       console.log('🔄 Scheduling allocation refresh after AI orchestration...');
       setTimeout(() => {
         console.log('🔄 Refreshing allocation after AI orchestration...');
-        routerV2.refetch();
+        router.refetch();
       }, 8000); // Wait 8 seconds for RiskEngine transaction to be confirmed
       
       // Also refresh again after a longer delay to catch any delayed updates
       setTimeout(() => {
         console.log('🔄 Second refresh after AI orchestration...');
-        routerV2.refetch();
+        router.refetch();
       }, 20000); // Wait 20 seconds for final confirmation
       
       // Show success message with proof
@@ -491,7 +514,7 @@ export function Dashboard() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold text-white">Yield Optimizer</h1>
-          <p className="text-gray-400 text-sm">StrategyRouterV2 on Starknet Sepolia</p>
+          <p className="text-gray-400 text-sm">Strategy Router v3.5 on Starknet Sepolia</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="px-4 py-2 rounded-full text-sm font-bold bg-green-500/20 text-green-400 border border-green-500/30">
@@ -539,16 +562,35 @@ export function Dashboard() {
           {/* Stats */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="bg-gradient-to-br from-purple-900/60 via-slate-900/70 to-slate-900/80 border border-purple-400/30 rounded-xl p-5 shadow-lg">
-              <p className="text-sm text-purple-200 mb-1">Total Value Locked</p>
+              <p className="text-sm text-purple-200 mb-1">Vault TVL (Total Deposits)</p>
               <p className="text-3xl font-bold text-white">{tvlDisplay} <span className="text-lg text-purple-200">STRK</span></p>
+              <div className="mt-2 pt-2 border-t border-purple-400/20">
+                <p className="text-xs text-purple-300 mb-1">Total Yield Accrued</p>
+                <p className="text-xl font-bold text-green-400">{yieldDisplay} <span className="text-sm text-purple-200">STRK</span></p>
+              </div>
+              <div className="mt-2 pt-2 border-t border-purple-400/20">
+                <p className="text-xs text-purple-300 mb-1">Protocol TVL (Deployed)</p>
+                <div className="grid grid-cols-2 gap-2 text-xs mt-1">
+                  <div>
+                    <p className="text-purple-300 mb-0.5">JediSwap</p>
+                    <p className="text-white font-semibold">{jediTvlDisplay} STRK</p>
+                  </div>
+                  <div>
+                    <p className="text-purple-300 mb-0.5">Ekubo</p>
+                    <p className="text-white font-semibold">{ekuboTvlDisplay} STRK</p>
+                  </div>
+                </div>
+              </div>
             </div>
             <div className="bg-gradient-to-br from-blue-900/60 via-slate-900/70 to-slate-900/80 border border-blue-400/30 rounded-xl p-5 shadow-lg">
               <p className="text-sm text-blue-200 mb-1">🔄 JediSwap</p>
               <p className="text-3xl font-bold text-white">{allocation.jediswap.toFixed(1)}%</p>
+              <p className="text-xs text-blue-300 mt-1">TVL: {jediTvlDisplay} STRK</p>
             </div>
             <div className="bg-gradient-to-br from-amber-900/60 via-slate-900/70 to-slate-900/80 border border-amber-400/30 rounded-xl p-5 shadow-lg">
               <p className="text-sm text-orange-200 mb-1">🌀 Ekubo</p>
               <p className="text-3xl font-bold text-white">{allocation.ekubo.toFixed(1)}%</p>
+              <p className="text-xs text-orange-300 mt-1">TVL: {ekuboTvlDisplay} STRK</p>
             </div>
           </div>
 
@@ -559,7 +601,7 @@ export function Dashboard() {
               <button
                 onClick={() => {
                   console.log('🔄 Manual refresh triggered');
-                  routerV2.refetch();
+                  router.refetch();
                 }}
                 className="px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors flex items-center gap-2"
                 title="Refresh allocation from contract"
@@ -567,14 +609,14 @@ export function Dashboard() {
                 🔄 Refresh
               </button>
             </div>
-            {routerV2.error && (
+            {router.error && (
               <div className="mb-2 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded p-2">
-                ⚠️ {routerV2.error}
+                ⚠️ {router.error}
               </div>
             )}
-            {routerV2.lastUpdated && (
+            {router.lastUpdated && (
               <div className="mb-2 text-xs text-gray-400">
-                Last updated: {routerV2.lastUpdated.toLocaleTimeString()}
+                Last updated: {router.lastUpdated.toLocaleTimeString()}
               </div>
             )}
             <div className="h-8 rounded-full overflow-hidden flex mb-4 bg-gray-800">
@@ -634,7 +676,7 @@ export function Dashboard() {
                     ? 'bg-yellow-500/20 text-yellow-400'
                     : 'bg-gray-500/20 text-gray-400'
                 }`}>
-                  {strategyDeposit.contractVersion === 'v2' ? '✓ V2 Live' : strategyDeposit.contractVersion === 'v1' ? 'V1 (Allocation Only)' : 'Checking...'}
+                  {strategyDeposit.contractVersion === 'v2' ? '✓ v3.5 Live' : strategyDeposit.contractVersion === 'v1' ? 'V1 (Allocation Only)' : 'Checking...'}
                 </span>
               </div>
               
@@ -642,8 +684,8 @@ export function Dashboard() {
               {strategyDeposit.contractVersion === 'v1' && (
                 <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mb-4">
                   <p className="text-yellow-400 text-xs">
-                    ⏳ <strong>V2 Deployment</strong> Current contract (V1) only manages allocations. 
-                    V2 with deposits is deployed and ready.
+                    ⏳ <strong>v3.5 Deployment</strong> Current contract (V1) only manages allocations. 
+                    v3.5 with deposits is deployed and ready.
                   </p>
                 </div>
               )}
@@ -735,7 +777,7 @@ export function Dashboard() {
                     ? 'bg-yellow-500/20 text-yellow-400'
                     : 'bg-gray-500/20 text-gray-400'
                 }`}>
-                  {strategyDeposit.contractVersion === 'v2' ? '✓ V2 Live' : strategyDeposit.contractVersion === 'v1' ? 'V1 (Allocation Only)' : 'Checking...'}
+                  {strategyDeposit.contractVersion === 'v2' ? '✓ v3.5 Live' : strategyDeposit.contractVersion === 'v1' ? 'V1 (Allocation Only)' : 'Checking...'}
                 </span>
               </div>
               
@@ -743,7 +785,7 @@ export function Dashboard() {
               {strategyDeposit.contractVersion === 'v1' && (
                 <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mb-4">
                   <p className="text-yellow-400 text-xs">
-                    ⏳ <strong>V2 Required</strong> Withdrawals require V2 contract deployment.
+                    ⏳ <strong>v3.5 Required</strong> Withdrawals require v3.5 contract deployment.
                   </p>
                 </div>
               )}
@@ -909,9 +951,9 @@ export function Dashboard() {
           </div>
 
           {/* Error */}
-          {routerV2.error && (
+          {router.error && (
             <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
-              <p className="text-red-400 text-sm">⚠️ {routerV2.error}</p>
+              <p className="text-red-400 text-sm">⚠️ {router.error}</p>
             </div>
           )}
         </div>

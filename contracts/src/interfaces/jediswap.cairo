@@ -14,6 +14,14 @@ pub trait IJediSwapFactory<TContractState> {
         token0: ContractAddress,
         token1: ContractAddress
     ) -> ContractAddress;
+    
+    // V2 Factory: Get pool address for token pair and fee tier
+    fn get_pool(
+        self: @TContractState,
+        token0: ContractAddress,
+        token1: ContractAddress,
+        fee: u32
+    ) -> ContractAddress;
 }
 
 // JediSwap V2 Swap Router Interface - For swaps
@@ -130,7 +138,7 @@ pub trait IJediSwapRouter<TContractState> {
     ) -> (u256, u256, u256); // Returns (amountA, amountB, liquidity)
 }
 
-// JediSwap Pair Interface - For LP tokens
+// JediSwap Pair Interface - For LP tokens (V1)
 #[starknet::interface]
 pub trait IJediSwapPair<TContractState> {
     fn get_reserves(self: @TContractState) -> (u256, u256, u64); // (reserve0, reserve1, timestamp)
@@ -138,6 +146,15 @@ pub trait IJediSwapPair<TContractState> {
     fn total_supply(self: @TContractState) -> u256;
     
     fn balance_of(self: @TContractState, account: ContractAddress) -> u256;
+}
+
+// JediSwap V2 Pool Interface - For concentrated liquidity pools
+// Based on: https://docs.jediswap.xyz/for-developers/jediswap-v2/core/jediswap_v2_pool
+#[starknet::interface]
+pub trait IJediSwapV2Pool<TContractState> {
+    fn get_sqrt_price_X96(self: @TContractState) -> u256; // Q64.96-encoded square-root price
+    fn get_tick(self: @TContractState) -> i32; // Current tick
+    fn get_fee(self: @TContractState) -> u32; // Fee tier (e.g., 10000 for 1%)
 }
 
 // JediSwap V2 NFT Position Manager Interface - For concentrated liquidity

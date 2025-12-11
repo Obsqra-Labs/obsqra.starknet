@@ -398,7 +398,7 @@ function Landing({
                 <div className="flex items-start gap-3 p-3 rounded-xl bg-cloud">
                   <span className="text-green-600 font-bold">✓</span>
                   <div>
-                    <p className="font-semibold text-ink">Strategy Router V2</p>
+                    <p className="font-semibold text-ink">Strategy Router v3.5</p>
                     <p className="text-sm text-slate-600">Dual-protocol routing on Sepolia</p>
                   </div>
                 </div>
@@ -521,7 +521,7 @@ function Landing({
               </div>
               <div className="space-y-4">
                 <div className="p-4 rounded-xl bg-white border border-green-100">
-                  <p className="font-semibold text-ink mb-2">Strategy Router V2 on Sepolia</p>
+                  <p className="font-semibold text-ink mb-2">Strategy Router v3.5 on Sepolia</p>
                   <p className="text-sm text-slate-600">Dual-protocol integration (JediSwap V2 + Ekubo) with automated yield collection, position tracking, and on-chain events.</p>
                 </div>
                 <div className="p-4 rounded-xl bg-white border border-green-100">

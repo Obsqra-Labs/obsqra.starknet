@@ -5,8 +5,8 @@ import { Contract, AccountInterface, RpcProvider } from 'starknet';
 import { useState, useCallback } from 'react';
 import { getConfig } from '@/lib/config';
 
-// StrategyRouter V2 ABI for update_allocation - 2 protocols: JediSwap and Ekubo
-const STRATEGY_ROUTER_V2_ABI = [
+// StrategyRouter V3.5 ABI for update_allocation - 2 protocols: JediSwap and Ekubo
+const STRATEGY_ROUTER_V35_ABI = [
   {
     type: 'function',
     name: 'update_allocation',
@@ -69,7 +69,7 @@ export function useSettlement() {
 
         // Create contract instance using account (has provider)
         const contract = new Contract(
-          STRATEGY_ROUTER_V2_ABI,
+          STRATEGY_ROUTER_V35_ABI,
           strategyRouterAddress,
           account as unknown as AccountInterface
         );

@@ -178,6 +178,35 @@ export async function POST(request: NextRequest) {
           entrypoint: functionName,
           calldata: [amountU256.low.toString(), amountU256.high.toString()], // Explicit u256 [low, high] as strings
         };
+      } else if (functionName === 'commit_mist_deposit') {
+        // MIST: commit_mist_deposit(commitment_hash: felt252, expected_amount: u256)
+        if (!safeCalldata || safeCalldata.length < 2) {
+          throw new Error('Missing parameters for commit_mist_deposit: need commitment_hash and expected_amount');
+        }
+        
+        const commitmentHash = String(safeCalldata[0]);
+        const amountString = String(safeCalldata[1]);
+        const amountBigInt = BigInt(amountString);
+        const amountU256 = uint256.bnToUint256(amountBigInt);
+        
+        call = {
+          contractAddress: contractAddress,
+          entrypoint: 'commit_mist_deposit',
+          calldata: [commitmentHash, amountU256.low.toString(), amountU256.high.toString()],
+        };
+      } else if (functionName === 'reveal_and_claim_mist_deposit') {
+        // MIST: reveal_and_claim_mist_deposit(secret: felt252)
+        if (!safeCalldata || safeCalldata.length === 0 || !safeCalldata[0]) {
+          throw new Error('Missing secret parameter for reveal_and_claim_mist_deposit');
+        }
+        
+        const secret = String(safeCalldata[0]);
+        
+        call = {
+          contractAddress: contractAddress,
+          entrypoint: 'reveal_and_claim_mist_deposit',
+          calldata: [secret],
+        };
       } else {
         throw new Error(`Unknown function: ${functionName}`);
       }
