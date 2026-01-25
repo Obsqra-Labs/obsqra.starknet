@@ -32,6 +32,12 @@ export default function Home() {
     jediswap_score?: number;
     ekubo_score?: number;
     message?: string;
+    zkml?: {
+      model?: string;
+      threshold?: number;
+      jediswap?: { score?: number; decision?: number };
+      ekubo?: { score?: number; decision?: number };
+    };
   } | null>(null);
 
   const handleLaunch = () => {
@@ -740,6 +746,16 @@ function Landing({
                     <p className="text-[11px] text-white/70 font-mono break-all">{proofResult.proof_hash?.slice(0, 32)}...</p>
                     <p className="text-[10px] text-white/40 font-mono mt-3">status</p>
                     <p className="text-[11px] text-emerald-400 font-mono">{proofResult.status || 'generated'}</p>
+                    {proofResult.zkml && (
+                      <div className="pt-3 mt-3 border-t border-emerald-400/20 space-y-1">
+                        <p className="text-[10px] text-white/40 font-mono">zkml_model</p>
+                        <p className="text-[11px] text-white/70 font-mono">{proofResult.zkml.model || 'linear_v0'}</p>
+                        <p className="text-[10px] text-white/40 font-mono mt-2">decisions (jedi / ekubo)</p>
+                        <p className="text-[11px] text-emerald-300 font-mono">
+                          {proofResult.zkml.jediswap?.decision ?? '—'} / {proofResult.zkml.ekubo?.decision ?? '—'}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

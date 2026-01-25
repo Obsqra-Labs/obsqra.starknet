@@ -22,6 +22,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { getConfig } from '@/lib/config';
 import { useProofHistory } from '@/hooks/useProofHistory';
 import { ProofBadge } from './ProofBadge';
+import { useMarketSnapshot } from '@/hooks/useMarketSnapshot';
 
 type TabType = 'overview' | 'analytics' | 'history' | 'integration-tests';
 
@@ -60,6 +61,7 @@ export function Dashboard() {
   const { status: txStatus } = useTransactionMonitor(lastTxHash || undefined);
   const proofHistory = useProofHistory(5);
   const latestProof = proofHistory.data[0];
+  const marketSnapshot = useMarketSnapshot();
   
   // Fetch user's STRK balance on mount and when address changes
   useEffect(() => {
@@ -595,6 +597,62 @@ export function Dashboard() {
               <p className="text-sm text-orange-200 mb-1">🌀 Ekubo</p>
               <p className="text-3xl font-bold text-white">{allocation.ekubo.toFixed(1)}%</p>
               <p className="text-xs text-orange-300 mt-1">TVL: {ekuboTvlDisplay} STRK</p>
+            </div>
+          </div>
+
+          {/* Market Snapshot */}
+          <div className="bg-slate-900/70 border border-white/10 rounded-xl p-6 shadow-lg">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-white">Read‑Only Market Snapshot</h2>
+                <p className="text-xs text-gray-400">Mainnet data feed (no writes)</p>
+              </div>
+              <button
+                onClick={() => marketSnapshot.refetch()}
+                className="px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors flex items-center gap-2"
+              >
+                🔄 Refresh
+              </button>
+            </div>
+
+            {marketSnapshot.error && (
+              <div className="mb-3 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded p-2">
+                ⚠️ {marketSnapshot.error}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-xs text-gray-400 mb-1">Block</p>
+                <p className="text-white font-semibold">
+                  {marketSnapshot.loading ? '...' : marketSnapshot.data?.block_number ?? '—'}
+                </p>
+                <p className="text-[11px] text-gray-500 mt-1">
+                  {marketSnapshot.data?.timestamp
+                    ? new Date(marketSnapshot.data.timestamp * 1000).toLocaleString()
+                    : '—'}
+                </p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-xs text-gray-400 mb-1">APY (JediSwap / Ekubo)</p>
+                <p className="text-white font-semibold">
+                  {marketSnapshot.loading
+                    ? '...'
+                    : `${marketSnapshot.data?.apys?.jediswap?.toFixed(2) ?? '—'}% / ${marketSnapshot.data?.apys?.ekubo?.toFixed(2) ?? '—'}%`}
+                </p>
+                <p className="text-[11px] text-gray-500 mt-1">
+                  Source: {marketSnapshot.data?.apy_source ?? '—'}
+                </p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-xs text-gray-400 mb-1">Network</p>
+                <p className="text-white font-semibold">
+                  {marketSnapshot.data?.network ?? '—'}
+                </p>
+                <p className="text-[11px] text-gray-500 mt-1">
+                  {marketSnapshot.data?.block_hash ? `${marketSnapshot.data.block_hash.slice(0, 12)}...` : '—'}
+                </p>
+              </div>
             </div>
           </div>
 
