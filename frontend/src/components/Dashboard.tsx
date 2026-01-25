@@ -24,6 +24,7 @@ import { useProofHistory } from '@/hooks/useProofHistory';
 import { ProofBadge } from './ProofBadge';
 import { useMarketSnapshot } from '@/hooks/useMarketSnapshot';
 import { useMarketMetrics } from '@/hooks/useMarketMetrics';
+import { useZkmlVerification } from '@/hooks/useZkmlVerification';
 
 type TabType = 'overview' | 'analytics' | 'history' | 'integration-tests';
 
@@ -64,6 +65,7 @@ export function Dashboard() {
   const latestProof = proofHistory.data[0];
   const marketSnapshot = useMarketSnapshot();
   const marketMetrics = useMarketMetrics();
+  const zkmlVerification = useZkmlVerification();
   
   // Fetch user's STRK balance on mount and when address changes
   useEffect(() => {
@@ -695,6 +697,52 @@ export function Dashboard() {
                   </div>
                 );
               })}
+            </div>
+          </div>
+
+          {/* zkML Proof Demo */}
+          <div className="bg-slate-900/70 border border-white/10 rounded-xl p-6 shadow-lg">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-white">zkML Proof Demo</h2>
+                <p className="text-xs text-gray-400">Integrity verification (precomputed proof)</p>
+              </div>
+              <button
+                onClick={() => zkmlVerification.verify()}
+                disabled={zkmlVerification.loading}
+                className="px-3 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-500 text-white rounded transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                {zkmlVerification.loading ? 'Verifying…' : 'Verify zkML Proof'}
+              </button>
+            </div>
+
+            {zkmlVerification.error && (
+              <div className="mb-3 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded p-2">
+                ⚠️ {zkmlVerification.error}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-xs text-gray-400 mb-1">Status</p>
+                <p className="text-white font-semibold">
+                  {zkmlVerification.result
+                    ? zkmlVerification.result.verified ? '✅ Verified' : '❌ Failed'
+                    : '—'}
+                </p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-xs text-gray-400 mb-1">Source</p>
+                <p className="text-white font-semibold">
+                  {zkmlVerification.result?.calldata_source ?? '—'}
+                </p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-xs text-gray-400 mb-1">Notes</p>
+                <p className="text-gray-300 text-xs">
+                  Configure proof paths to enable full demo.
+                </p>
+              </div>
             </div>
           </div>
 
