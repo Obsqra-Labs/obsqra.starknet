@@ -155,6 +155,7 @@ class ProofJob(Base):
     proof_hash = Column(String, nullable=False, index=True)
     sharp_job_id = Column(String, nullable=True, index=True)
     fact_hash = Column(String, nullable=True)
+    decision_id = Column(Integer, nullable=True, index=True)
     
     # L2 verification (Integrity Verifier)
     l2_fact_hash = Column(String, nullable=True, index=True)

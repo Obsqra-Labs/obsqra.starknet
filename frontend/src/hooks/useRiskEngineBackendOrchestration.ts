@@ -36,12 +36,35 @@ export interface AllocationDecision {
   proof_status?: string;
 }
 
+/**
+ * Allocation proposal (proof + preview, no execution)
+ */
+export interface AllocationProposal {
+  proposal_id: string;
+  block_number?: number;
+  timestamp?: number;
+  jediswap_pct: number;
+  ekubo_pct: number;
+  jediswap_risk: number;
+  ekubo_risk: number;
+  jediswap_apy: number;
+  ekubo_apy: number;
+  message: string;
+  proof_job_id: string;
+  proof_hash?: string;
+  proof_status?: string;
+  proof_source?: string;
+  l2_verified_at?: string;
+  can_execute?: boolean;
+}
+
 interface UseRiskEngineBackendOrchestrationReturn {
-  proposeAndExecuteAllocation: (
+  proposeAllocation: (
     jediswapMetrics: ProtocolMetrics,
     ekuboMetrics: ProtocolMetrics
-  ) => Promise<AllocationDecision | null>;
-  proposeFromMarket: () => Promise<AllocationDecision | null>;
+  ) => Promise<AllocationProposal | null>;
+  proposeFromMarket: () => Promise<AllocationProposal | null>;
+  executeAllocation: (proofJobId: string) => Promise<AllocationDecision | null>;
   getLatestDecision: () => Promise<AllocationDecision | null>;
   isLoading: boolean;
   error: string | null;
@@ -68,11 +91,11 @@ export function useRiskEngineBackendOrchestration(): UseRiskEngineBackendOrchest
     setError(null);
   }, []);
 
-  const proposeAndExecuteAllocation = useCallback(
+  const proposeAllocation = useCallback(
     async (
       jediswapMetrics: ProtocolMetrics,
       ekuboMetrics: ProtocolMetrics
-    ): Promise<AllocationDecision | null> => {
+    ): Promise<AllocationProposal | null> => {
       setIsLoading(true);
       setError(null);
 
@@ -80,24 +103,23 @@ export function useRiskEngineBackendOrchestration(): UseRiskEngineBackendOrchest
         const config = getConfig();
         const backendUrl = config.backendUrl;
 
-        console.log('🤖 Backend Orchestration: Proposing and executing allocation...');
+        console.log('🤖 Backend Proposal: Generating proof + allocation preview...');
         console.log('📊 JediSwap metrics:', jediswapMetrics);
         console.log('📊 Ekubo metrics:', ekuboMetrics);
 
         // Use relative path if no backend URL configured (Nginx will proxy to /api/...)
         // Otherwise use the configured backend URL
         const apiUrl = backendUrl 
-          ? `${backendUrl}/api/v1/risk-engine/orchestrate-allocation`
-          : '/api/v1/risk-engine/orchestrate-allocation';
+          ? `${backendUrl}/api/v1/risk-engine/propose-allocation`
+          : '/api/v1/risk-engine/propose-allocation';
 
         console.log('📍 API URL:', apiUrl);
 
-        // Call backend orchestration endpoint
+        // Call backend proposal endpoint
         // The backend will:
-        // 1. Validate metrics
-        // 2. Call propose_and_execute_allocation on RiskEngine (via user wallet or backend account)
-        // 3. Read the on-chain decision
-        // 4. Return the decision data
+        // 1. Generate proof + verify it
+        // 2. Compute allocation preview (read-only)
+        // 3. Return a proposal with proof status
         const response = await fetch(apiUrl, {
           method: 'POST',
           headers: {
@@ -130,10 +152,10 @@ export function useRiskEngineBackendOrchestration(): UseRiskEngineBackendOrchest
 
         const data = await response.json();
 
-        console.log('✅ Backend orchestration response:', data);
+        console.log('✅ Backend proposal response:', data);
 
-        const decision: AllocationDecision = {
-          decision_id: data.decision_id,
+        const proposal: AllocationProposal = {
+          proposal_id: data.proposal_id,
           block_number: data.block_number,
           timestamp: data.timestamp,
           jediswap_pct: data.jediswap_pct,
@@ -142,22 +164,22 @@ export function useRiskEngineBackendOrchestration(): UseRiskEngineBackendOrchest
           ekubo_risk: data.ekubo_risk,
           jediswap_apy: data.jediswap_apy,
           ekubo_apy: data.ekubo_apy,
-          rationale_hash: data.rationale_hash,
-          strategy_router_tx: data.strategy_router_tx,
-          tx_hash: data.tx_hash,
           message: data.message,
           proof_job_id: data.proof_job_id,
           proof_hash: data.proof_hash,
           proof_status: data.proof_status,
+          proof_source: data.proof_source,
+          l2_verified_at: data.l2_verified_at,
+          can_execute: data.can_execute,
         };
 
-        return decision;
+        return proposal;
       } catch (err) {
-        let errorMessage = 'Backend orchestration failed';
+        let errorMessage = 'Backend proposal failed';
         if (err instanceof Error) {
           errorMessage = err.message;
         }
-        console.error('❌ Backend orchestration error:', err);
+        console.error('❌ Backend proposal error:', err);
         setError(errorMessage);
         return null;
       } finally {
@@ -167,7 +189,7 @@ export function useRiskEngineBackendOrchestration(): UseRiskEngineBackendOrchest
     []
   );
 
-  const proposeFromMarket = useCallback(async (): Promise<AllocationDecision | null> => {
+  const proposeFromMarket = useCallback(async (): Promise<AllocationProposal | null> => {
     setIsLoading(true);
     setError(null);
 
@@ -175,8 +197,8 @@ export function useRiskEngineBackendOrchestration(): UseRiskEngineBackendOrchest
       const config = getConfig();
       const backendUrl = config.backendUrl;
       const apiUrl = backendUrl
-        ? `${backendUrl}/api/v1/risk-engine/orchestrate-from-market`
-        : '/api/v1/risk-engine/orchestrate-from-market';
+        ? `${backendUrl}/api/v1/risk-engine/propose-from-market`
+        : '/api/v1/risk-engine/propose-from-market';
 
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -189,6 +211,67 @@ export function useRiskEngineBackendOrchestration(): UseRiskEngineBackendOrchest
         const errorData = await response.json().catch(() => ({}));
         throw new Error(
           errorData.detail || `Market orchestration failed: ${response.statusText}`
+        );
+      }
+
+      const data = await response.json();
+
+      const proposal: AllocationProposal = {
+        proposal_id: data.proposal_id,
+        block_number: data.block_number,
+        timestamp: data.timestamp,
+        jediswap_pct: data.jediswap_pct,
+        ekubo_pct: data.ekubo_pct,
+        jediswap_risk: data.jediswap_risk,
+        ekubo_risk: data.ekubo_risk,
+        jediswap_apy: data.jediswap_apy,
+        ekubo_apy: data.ekubo_apy,
+        message: data.message,
+        proof_job_id: data.proof_job_id,
+        proof_hash: data.proof_hash,
+        proof_status: data.proof_status,
+        proof_source: data.proof_source,
+        l2_verified_at: data.l2_verified_at,
+        can_execute: data.can_execute,
+      };
+
+      return proposal;
+    } catch (err) {
+      let errorMessage = 'Market proposal failed';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      console.error('❌ Market proposal error:', err);
+      setError(errorMessage);
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const executeAllocation = useCallback(async (proofJobId: string): Promise<AllocationDecision | null> => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const config = getConfig();
+      const backendUrl = config.backendUrl;
+      const apiUrl = backendUrl
+        ? `${backendUrl}/api/v1/risk-engine/execute-allocation`
+        : '/api/v1/risk-engine/execute-allocation';
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ proof_job_id: proofJobId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.detail || `Execution failed: ${response.statusText}`
         );
       }
 
@@ -215,11 +298,11 @@ export function useRiskEngineBackendOrchestration(): UseRiskEngineBackendOrchest
 
       return decision;
     } catch (err) {
-      let errorMessage = 'Market orchestration failed';
+      let errorMessage = 'Execution failed';
       if (err instanceof Error) {
         errorMessage = err.message;
       }
-      console.error('❌ Market orchestration error:', err);
+      console.error('❌ Execution error:', err);
       setError(errorMessage);
       return null;
     } finally {
@@ -303,8 +386,9 @@ export function useRiskEngineBackendOrchestration(): UseRiskEngineBackendOrchest
   }, []);
 
   return {
-    proposeAndExecuteAllocation,
+    proposeAllocation,
     proposeFromMarket,
+    executeAllocation,
     getLatestDecision,
     isLoading,
     error,

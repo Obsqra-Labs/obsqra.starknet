@@ -5,7 +5,7 @@ import { useStrategyRouter } from '@/hooks/useStrategyRouter';
 import { useRiskEngineBackend } from '@/hooks/useRiskEngineBackend';
 import { useSettlement } from '@/hooks/useSettlement';
 import { useRiskEngineOrchestration, ProtocolMetrics } from '@/hooks/useRiskEngineOrchestration';
-import { useRiskEngineBackendOrchestration, type ProtocolMetrics as BackendProtocolMetrics } from '@/hooks/useRiskEngineBackendOrchestration';
+import { useRiskEngineBackendOrchestration, type ProtocolMetrics as BackendProtocolMetrics, type AllocationProposal } from '@/hooks/useRiskEngineBackendOrchestration';
 import { useTransactionMonitor, TransactionStatusBadge } from '@/hooks/useTransactionMonitor';
 import { useProofGeneration } from '@/hooks/useProofGeneration';
 import { useStrategyDeposit } from '@/hooks/useStrategyDeposit';
@@ -50,6 +50,7 @@ export function Dashboard() {
     jediswap_pct?: number;
     ekubo_pct?: number;
   } | null>(null);
+  const [proposal, setProposal] = useState<AllocationProposal | null>(null);
   
   // Now safe to call other hooks
   const { account, address } = useAccount();
@@ -113,6 +114,12 @@ export function Dashboard() {
     const tvlEth = Number(tvl) / 1e18;
     return tvlEth.toFixed(4);
   }, [router.isLoading, router.ekuboTvl]);
+
+  const proofTrainSnapshot = proposal?.block_number || marketSnapshot.data?.block_number;
+  const proofTrainMetricsReady = Boolean(marketMetrics.data?.jediswap && marketMetrics.data?.ekubo);
+  const proofTrainProofReady = proposal?.proof_status === 'verified' || proposal?.can_execute;
+  const proofTrainAllocationReady = Boolean(proposal?.jediswap_pct || proposal?.ekubo_pct);
+  const proofTrainTxReady = Boolean(latestDecision?.decisionId || lastTxHash);
 
   // Handle deposit - STRK deposit
   const handleDeposit = async () => {
@@ -411,6 +418,7 @@ export function Dashboard() {
       jediswap_pct: decision.jediswap_pct / 100,
       ekubo_pct: decision.ekubo_pct / 100,
     });
+    setProposal(null);
 
     console.log('🔄 Scheduling allocation refresh after orchestration...');
     setTimeout(() => router.refetch(), 8000);
@@ -435,7 +443,7 @@ export function Dashboard() {
     );
   };
 
-  // Handle AI Risk Engine orchestration (100% on-chain flow)
+  // Generate proposal with demo metrics (proof + allocation preview)
   const handleAIOchestration = async () => {
     setIsCalculatingRisk(true);
     setRiskError(null);
@@ -456,24 +464,21 @@ export function Dashboard() {
         age_days: 700,
       };
 
-      console.log('🤖 AI Risk Engine: Starting full on-chain orchestration...');
-      const decision = await backendOrchestration.proposeAndExecuteAllocation(
+      console.log('🤖 AI Risk Engine: Generating proposal...');
+      const proposalResult = await backendOrchestration.proposeAllocation(
         jediswapMetrics,
         ekuboMetrics
       );
 
-      if (!decision) {
-        throw new Error('Failed to execute AI orchestration');
+      if (!proposalResult) {
+        throw new Error('Failed to generate proposal');
       }
 
-      await applyDecision(decision, 'AI Risk Engine Orchestration');
+      setProposal(proposalResult);
     } catch (error) {
       const obsqraError = categorizeError(error);
       setRiskError(obsqraError.userMessage);
-      console.error('❌ AI orchestration error:', error);
-      if (riskEngineOrchestration.error) {
-        alert(`❌ AI Orchestration Failed: ${riskEngineOrchestration.error}`);
-      }
+      console.error('❌ Proposal error:', error);
     } finally {
       setIsCalculatingRisk(false);
       setGeneratingProofType(null);
@@ -485,19 +490,41 @@ export function Dashboard() {
     setRiskError(null);
 
     try {
-      console.log('🌍 Market Orchestration: Using read-only mainnet metrics...');
-      const decision = await backendOrchestration.proposeFromMarket();
-      if (!decision) {
-        throw new Error('Failed to execute market orchestration');
+      console.log('🌍 Market Proposal: Using read-only mainnet metrics...');
+      const proposalResult = await backendOrchestration.proposeFromMarket();
+      if (!proposalResult) {
+        throw new Error('Failed to generate market proposal');
       }
-      await applyDecision(decision, 'Market Orchestration');
+      setProposal(proposalResult);
     } catch (error) {
       const obsqraError = categorizeError(error);
       setRiskError(obsqraError.userMessage);
-      console.error('❌ Market orchestration error:', error);
-      if (backendOrchestration.error) {
-        alert(`❌ Market Orchestration Failed: ${backendOrchestration.error}`);
+      console.error('❌ Market proposal error:', error);
+    } finally {
+      setIsCalculatingRisk(false);
+      setGeneratingProofType(null);
+    }
+  };
+
+  const handleExecuteAllocation = async () => {
+    if (!proposal?.proof_job_id) {
+      setRiskError('No proposal to execute yet.');
+      return;
+    }
+
+    setIsCalculatingRisk(true);
+    setRiskError(null);
+
+    try {
+      const decision = await backendOrchestration.executeAllocation(proposal.proof_job_id);
+      if (!decision) {
+        throw new Error('Failed to execute allocation');
       }
+      await applyDecision(decision, 'Verified Allocation Execution');
+    } catch (error) {
+      const obsqraError = categorizeError(error);
+      setRiskError(obsqraError.userMessage);
+      console.error('❌ Execution error:', error);
     } finally {
       setIsCalculatingRisk(false);
       setGeneratingProofType(null);
@@ -698,6 +725,38 @@ export function Dashboard() {
                   </div>
                 );
               })}
+            </div>
+          </div>
+
+          {/* Proof Train */}
+          <div className="bg-slate-900/70 border border-white/10 rounded-xl p-6 shadow-lg">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-white">Proof Train</h2>
+                <p className="text-xs text-gray-400">Snapshot → Metrics → Proof → Allocation → Execution</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3 text-sm">
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-xs text-gray-400 mb-1">Snapshot</p>
+                <p className="text-white font-semibold">{proofTrainSnapshot ? '✅ Locked' : '⏳ Pending'}</p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-xs text-gray-400 mb-1">Metrics</p>
+                <p className="text-white font-semibold">{proofTrainMetricsReady ? '✅ Ready' : '⏳ Pending'}</p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-xs text-gray-400 mb-1">zkML Proof</p>
+                <p className="text-white font-semibold">{proofTrainProofReady ? '✅ Verified' : '⏳ Waiting'}</p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-xs text-gray-400 mb-1">Allocation</p>
+                <p className="text-white font-semibold">{proofTrainAllocationReady ? '✅ Proposed' : '⏳ Pending'}</p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-xs text-gray-400 mb-1">Execution</p>
+                <p className="text-white font-semibold">{proofTrainTxReady ? '✅ Executed' : '⏳ Locked'}</p>
+              </div>
             </div>
           </div>
 
@@ -1074,7 +1133,8 @@ export function Dashboard() {
               </div>
             </div>
             <p className="text-sm text-gray-300 mb-4">
-              AI Risk Engine orchestrates the full on-chain flow: calculates risk, queries APY, validates with DAO, and executes allocation. 100% auditable from computation to settlement.
+              Generate a proof‑gated proposal first, then manually execute once the proof verifies. This keeps the flow
+              deterministic and user‑controlled.
             </p>
             
             <button
@@ -1083,9 +1143,9 @@ export function Dashboard() {
               className="w-full py-3 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mb-4"
             >
               {(isCalculatingRisk || riskEngineOrchestration.isLoading) ? (
-                <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> AI Orchestrating...</>
+                <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Generating proposal...</>
               ) : (
-                '🤖 AI Risk Engine: Orchestrate Allocation'
+                '🤖 Generate Proposal (Demo Inputs)'
               )}
             </button>
 
@@ -1097,7 +1157,19 @@ export function Dashboard() {
               {(isCalculatingRisk || backendOrchestration.isLoading) ? (
                 <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Using market data...</>
               ) : (
-                '🌍 Orchestrate from Market Data (Read‑Only)'
+                '🌍 Generate Proposal from Market Data'
+              )}
+            </button>
+
+            <button
+              onClick={handleExecuteAllocation}
+              disabled={isCalculatingRisk || !proposal?.can_execute}
+              className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mb-4"
+            >
+              {isCalculatingRisk ? (
+                <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Executing...</>
+              ) : (
+                proposal?.can_execute ? '✅ Execute Verified Allocation' : '🔒 Execute (waiting for proof)'
               )}
             </button>
 
@@ -1105,6 +1177,33 @@ export function Dashboard() {
             {riskError && (
               <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-4">
                 <p className="text-red-400 text-sm">⚠️ {riskError}</p>
+              </div>
+            )}
+
+            {proposal && (
+              <div className="space-y-3 pt-4 border-t border-indigo-400/20">
+                <p className="text-xs text-indigo-300 font-semibold">PROPOSAL (PROOF‑GATED)</p>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+                    <p className="text-gray-400 text-xs mb-1">JediSwap</p>
+                    <p className="text-indigo-300 font-bold">{(proposal.jediswap_pct / 100).toFixed(1)}%</p>
+                  </div>
+                  <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+                    <p className="text-gray-400 text-xs mb-1">Ekubo</p>
+                    <p className="text-indigo-300 font-bold">{(proposal.ekubo_pct / 100).toFixed(1)}%</p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-xs text-gray-300">
+                  <span>Proof status</span>
+                  <span className="text-white">
+                    {(proposal.proof_status ?? 'pending')}{proposal.can_execute && proposal.proof_status !== 'verified' ? ' (demo override)' : ''}
+                  </span>
+                </div>
+                {proposal.proof_hash && (
+                  <p className="text-[11px] text-gray-500">
+                    proof: {proposal.proof_hash.slice(0, 12)}… · source: {proposal.proof_source ?? '—'}
+                  </p>
+                )}
               </div>
             )}
 

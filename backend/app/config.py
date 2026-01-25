@@ -85,6 +85,8 @@ class Settings(BaseSettings):
     INTEGRITY_HASHER: str = "keccak_160_lsb"
     INTEGRITY_STONE_VERSION: str = "stone5"
     INTEGRITY_MEMORY_VERIFICATION: str = "strict"
+    # Demo override (allow execution even if proof not verified)
+    ALLOW_UNVERIFIED_EXECUTION: bool = False
     # Ekubo API pair for metrics (default: ETH/USDC on Starknet mainnet)
     EKUBO_CHAIN_ID: str = "0x534e5f4d41494e"  # SN_MAIN
     EKUBO_TOKEN_A: str = "0x49d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7"  # ETH

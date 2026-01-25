@@ -4,6 +4,7 @@ Risk Engine API endpoints for on-chain risk calculations
 import asyncio
 import time
 from datetime import datetime
+from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 import logging
@@ -23,6 +24,7 @@ from app.services.integrity_service import get_integrity_service
 from app.services.atlantic_service import get_atlantic_service
 from app.workers.atlantic_worker import enqueue_atlantic_status_check
 from app.services.protocol_metrics_service import get_protocol_metrics_service
+from app.services.market_data_service import get_market_data_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -197,6 +199,218 @@ class OrchestrationResponse(BaseModel):
     proof_job_id: str = None
     proof_hash: str = None
     proof_status: str = None
+
+
+class ProposalResponse(BaseModel):
+    """Response from proposal (proof + allocation preview, no execution)."""
+    proposal_id: str
+    block_number: Optional[int] = None
+    timestamp: Optional[int] = None
+    jediswap_pct: int
+    ekubo_pct: int
+    jediswap_risk: int
+    ekubo_risk: int
+    jediswap_apy: int
+    ekubo_apy: int
+    message: str
+    proof_job_id: str
+    proof_hash: str = None
+    proof_status: str = None
+    proof_source: Optional[str] = None
+    l2_verified_at: Optional[str] = None
+    can_execute: bool = False
+
+
+class ExecuteRequest(BaseModel):
+    """Execute a verified proposal by proof job id."""
+    proof_job_id: str
+
+
+async def _create_proof_job(
+    request: OrchestrationRequest,
+    db: Session,
+    snapshot: Optional[dict] = None,
+    extra_metrics: Optional[dict] = None,
+) -> tuple[ProofJob, dict, dict, Optional[str]]:
+    """
+    Generate proof + verify via Integrity + store ProofJob.
+    Returns (proof_job, zkml_jedi, zkml_ekubo, verification_error).
+    """
+    proof_start_time = time.time()
+    luminair = get_luminair_service()
+    proof = await luminair.generate_proof(
+        request.jediswap_metrics.dict(),
+        request.ekubo_metrics.dict()
+    )
+    proof_generation_time = time.time() - proof_start_time
+
+    # zkML demo inference (tiny linear model)
+    zkml = get_zkml_service()
+    zkml_jedi = zkml.infer_protocol(request.jediswap_metrics.dict())
+    zkml_ekubo = zkml.infer_protocol(request.ekubo_metrics.dict())
+
+    # Integrity verification
+    fact_hash = proof.fact_hash or (
+        luminair.calculate_fact_hash(proof.proof_data or b"") if proof.proof_data else None
+    )
+    if not fact_hash:
+        if settings.ALLOW_FAKE_FACT_HASH:
+            fact_hash = luminair.calculate_fact_hash(proof.proof_data or b"")
+            logger.warning("Using fallback fact hash (stub) because LuminAIR did not emit one")
+        else:
+            raise HTTPException(status_code=500, detail="No fact hash from LuminAIR; set ALLOW_FAKE_FACT_HASH=True to override")
+
+    integrity = get_integrity_service()
+    l2_verified = False
+    l2_verified_at = None
+    verification_error = None
+
+    verifier_struct = None
+    proof_struct = None
+    verifier_bytes = None
+    proof_bytes = None
+
+    if getattr(proof, "verifier_config_json", None) and getattr(proof, "stark_proof_json", None):
+        verifier_struct = proof.verifier_config_json
+        proof_struct = proof.stark_proof_json
+    else:
+        if getattr(proof, "verifier_payload_format", None) == "integrity_json":
+            import base64
+            import json as pyjson
+            try:
+                if proof.verifier_config_b64:
+                    verifier_struct = pyjson.loads(base64.b64decode(proof.verifier_config_b64))
+                if proof.stark_proof_b64:
+                    proof_struct = pyjson.loads(base64.b64decode(proof.stark_proof_b64))
+            except Exception as decode_err:
+                logger.warning(f"Could not decode Integrity JSON payloads: {decode_err}")
+
+    try:
+        if proof.verifier_config_path:
+            from pathlib import Path
+            verifier_bytes = Path(proof.verifier_config_path).read_bytes()
+        if proof.stark_proof_path:
+            from pathlib import Path
+            proof_bytes = Path(proof.stark_proof_path).read_bytes()
+    except Exception as read_err:
+        logger.warning(f"Could not read verifier/proof blobs: {read_err}")
+
+    attempted_full = False
+    if verifier_struct and proof_struct:
+        attempted_full = True
+        l2_verified = await integrity.verify_proof_full_and_register_fact(
+            verifier_config=verifier_struct,
+            stark_proof=proof_struct
+        )
+        l2_verified_at = datetime.utcnow() if l2_verified else None
+    elif verifier_bytes and proof_bytes:
+        attempted_full = True
+        l2_verified = await integrity.verify_proof_full_and_register_fact(
+            verifier_config=verifier_bytes,
+            stark_proof=proof_bytes
+        )
+        l2_verified_at = datetime.utcnow() if l2_verified else None
+    else:
+        attempted_full = True
+        try:
+            l2_verified = await integrity.verify_proof_on_l2(fact_hash)
+            l2_verified_at = datetime.utcnow() if l2_verified else None
+            if not l2_verified:
+                verification_error = "L2 verification failed"
+        except Exception as ver_err:
+            verification_error = str(ver_err)
+            l2_verified = False
+            l2_verified_at = None
+            attempted_full = True
+
+    proof_status = ProofStatus.VERIFIED if l2_verified else ProofStatus.FAILED if attempted_full else ProofStatus.GENERATED
+    proof_source = "luminair_mock" if getattr(luminair, "use_mock", False) else "luminair"
+
+    metrics_payload = {
+        "jediswap": request.jediswap_metrics.dict(),
+        "ekubo": request.ekubo_metrics.dict(),
+        "jediswap_risk": proof.output_score_jediswap,
+        "ekubo_risk": proof.output_score_ekubo,
+        "zkml": {
+            "model": "linear_v0",
+            "threshold": zkml_jedi.threshold,
+            "jediswap": {
+                "score": zkml_jedi.score,
+                "decision": zkml_jedi.decision,
+                "components": zkml_jedi.components,
+            },
+            "ekubo": {
+                "score": zkml_ekubo.score,
+                "decision": zkml_ekubo.decision,
+                "components": zkml_ekubo.components,
+            },
+        },
+        "proof_generation_time_seconds": proof_generation_time,
+        "proof_data_size_bytes": len(proof.proof_data) if proof.proof_data else 0,
+        "proof_source": proof_source,
+        "verification_error": verification_error,
+    }
+    if snapshot:
+        metrics_payload["snapshot"] = snapshot
+    if extra_metrics:
+        metrics_payload.update(extra_metrics)
+
+    proof_job = ProofJob(
+        proof_hash=proof.proof_hash,
+        status=proof_status,
+        fact_hash=fact_hash,
+        l2_fact_hash=fact_hash,
+        l2_verified_at=l2_verified_at,
+        proof_source=proof_source,
+        network=settings.STARKNET_NETWORK,
+        metrics=metrics_payload,
+        proof_data=proof.proof_data,
+        error=verification_error,
+        jediswap_risk=proof.output_score_jediswap,
+        ekubo_risk=proof.output_score_ekubo,
+    )
+    db.add(proof_job)
+    db.commit()
+    db.refresh(proof_job)
+
+    return proof_job, zkml_jedi, zkml_ekubo, verification_error
+
+
+async def _compute_allocation_preview(
+    jediswap_risk: int,
+    ekubo_risk: int
+) -> tuple[int, int, int, int]:
+    """
+    Compute allocation preview using on-chain formulas (read-only).
+    Returns (jediswap_pct, ekubo_pct, jediswap_apy, ekubo_apy).
+    """
+    rpc_client = FullNodeClient(node_url=settings.STARKNET_RPC_URL)
+    contract = await Contract.from_address(
+        address=int(settings.RISK_ENGINE_ADDRESS, 16),
+        provider=rpc_client
+    )
+
+    # Read on-chain APYs (stored values)
+    jediswap_apy_result = await contract.functions["query_jediswap_apy"].call()
+    ekubo_apy_result = await contract.functions["query_ekubo_apy"].call()
+    jediswap_apy = int(jediswap_apy_result[0]) if jediswap_apy_result else 0
+    ekubo_apy = int(ekubo_apy_result[0]) if ekubo_apy_result else 0
+
+    # Call allocation function (maps jediswap -> nostra, ekubo -> ekubo)
+    allocation_result = await contract.functions["calculate_allocation"].call(
+        jediswap_risk,  # nostra_risk (mapped)
+        0,              # zklend_risk (unused)
+        ekubo_risk,     # ekubo_risk
+        jediswap_apy,   # nostra_apy (mapped)
+        0,              # zklend_apy (unused)
+        ekubo_apy,      # ekubo_apy
+    )
+
+    allocation_tuple = allocation_result[0] if allocation_result else (0, 0, 0)
+    jediswap_pct = int(allocation_tuple[0])
+    ekubo_pct = int(allocation_tuple[2])
+
+    return jediswap_pct, ekubo_pct, jediswap_apy, ekubo_apy
 
 
 @router.post("/orchestrate-allocation", response_model=OrchestrationResponse, tags=["Risk Engine"])
@@ -596,6 +810,293 @@ async def orchestrate_allocation(
             status_code=500,
             detail=f"AI execution failed: {str(e)}"
         )
+
+
+@router.post("/propose-allocation", response_model=ProposalResponse, tags=["Risk Engine"])
+async def propose_allocation(
+    request: OrchestrationRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Generate proof + allocation preview without executing on-chain.
+    This is the manual-execute flow: proof first, execution later.
+    """
+    proof_job = None
+    try:
+        proof_job, _, _, _ = await _create_proof_job(request, db)
+
+        # Compute allocation preview using on-chain formulas
+        jediswap_pct, ekubo_pct, jediswap_apy, ekubo_apy = await _compute_allocation_preview(
+            proof_job.jediswap_risk or 0,
+            proof_job.ekubo_risk or 0
+        )
+
+        # Persist allocation preview on the proof job
+        proof_job.jediswap_pct = jediswap_pct
+        proof_job.ekubo_pct = ekubo_pct
+        proof_job.metrics["apys"] = {
+            "jediswap": jediswap_apy,
+            "ekubo": ekubo_apy,
+        }
+        proof_job.metrics["allocation_preview"] = {
+            "jediswap_pct": jediswap_pct,
+            "ekubo_pct": ekubo_pct,
+        }
+        db.commit()
+        db.refresh(proof_job)
+
+        can_execute = (proof_job.status == ProofStatus.VERIFIED)
+        if not can_execute and settings.ALLOW_UNVERIFIED_EXECUTION:
+            can_execute = True
+
+        return ProposalResponse(
+            proposal_id=str(proof_job.id),
+            jediswap_pct=jediswap_pct,
+            ekubo_pct=ekubo_pct,
+            jediswap_risk=proof_job.jediswap_risk or 0,
+            ekubo_risk=proof_job.ekubo_risk or 0,
+            jediswap_apy=jediswap_apy,
+            ekubo_apy=ekubo_apy,
+            message="✅ Proposal ready. Execute when proof is verified.",
+            proof_job_id=str(proof_job.id),
+            proof_hash=proof_job.proof_hash,
+            proof_status=proof_job.status.value if hasattr(proof_job.status, 'value') else str(proof_job.status),
+            proof_source=proof_job.proof_source,
+            l2_verified_at=proof_job.l2_verified_at.isoformat() if proof_job.l2_verified_at else None,
+            can_execute=can_execute,
+        )
+    except Exception as e:
+        logger.error(f"❌ Proposal failed: {str(e)}", exc_info=True)
+        try:
+            if proof_job:
+                proof_job.status = ProofStatus.FAILED
+                proof_job.error = str(e)
+                db.commit()
+        except Exception:
+            pass
+        raise HTTPException(status_code=500, detail=f"Proposal failed: {str(e)}")
+
+
+@router.post("/propose-from-market", response_model=ProposalResponse, tags=["Risk Engine"])
+async def propose_from_market(db: Session = Depends(get_db)):
+    """
+    Generate proof + allocation preview using read-only mainnet-derived proxy metrics.
+    """
+    metrics_service = get_protocol_metrics_service()
+    metrics = await metrics_service.get_protocol_metrics()
+
+    # Snapshot block context for auditability
+    data_rpc = settings.DATA_RPC_URL or settings.STARKNET_RPC_URL
+    data_network = settings.DATA_NETWORK or settings.STARKNET_NETWORK
+    market_service = get_market_data_service(rpc_url=data_rpc, network=data_network)
+    snapshot = await market_service.get_snapshot()
+
+    request = OrchestrationRequest(
+        jediswap_metrics=RiskMetricsRequest(**{
+            "utilization": metrics["jediswap"].utilization,
+            "volatility": metrics["jediswap"].volatility,
+            "liquidity": metrics["jediswap"].liquidity,
+            "audit_score": metrics["jediswap"].audit_score,
+            "age_days": metrics["jediswap"].age_days,
+        }),
+        ekubo_metrics=RiskMetricsRequest(**{
+            "utilization": metrics["ekubo"].utilization,
+            "volatility": metrics["ekubo"].volatility,
+            "liquidity": metrics["ekubo"].liquidity,
+            "audit_score": metrics["ekubo"].audit_score,
+            "age_days": metrics["ekubo"].age_days,
+        }),
+    )
+
+    # Attach snapshot metadata for audit trail
+    snapshot_payload = {
+        "block_number": snapshot.block_number,
+        "block_hash": snapshot.block_hash,
+        "timestamp": snapshot.timestamp,
+        "network": snapshot.network,
+    }
+
+    proof_job, _, _, _ = await _create_proof_job(
+        request,
+        db,
+        snapshot=snapshot_payload,
+    )
+
+    jediswap_pct, ekubo_pct, jediswap_apy, ekubo_apy = await _compute_allocation_preview(
+        proof_job.jediswap_risk or 0,
+        proof_job.ekubo_risk or 0
+    )
+
+    proof_job.jediswap_pct = jediswap_pct
+    proof_job.ekubo_pct = ekubo_pct
+    proof_job.metrics["apys"] = {
+        "jediswap": jediswap_apy,
+        "ekubo": ekubo_apy,
+    }
+    proof_job.metrics["allocation_preview"] = {
+        "jediswap_pct": jediswap_pct,
+        "ekubo_pct": ekubo_pct,
+    }
+    db.commit()
+    db.refresh(proof_job)
+
+    can_execute = (proof_job.status == ProofStatus.VERIFIED)
+    if not can_execute and settings.ALLOW_UNVERIFIED_EXECUTION:
+        can_execute = True
+
+    return ProposalResponse(
+        proposal_id=str(proof_job.id),
+        block_number=snapshot.block_number,
+        timestamp=snapshot.timestamp,
+        jediswap_pct=jediswap_pct,
+        ekubo_pct=ekubo_pct,
+        jediswap_risk=proof_job.jediswap_risk or 0,
+        ekubo_risk=proof_job.ekubo_risk or 0,
+        jediswap_apy=jediswap_apy,
+        ekubo_apy=ekubo_apy,
+        message="✅ Market proposal ready. Execute when proof is verified.",
+        proof_job_id=str(proof_job.id),
+        proof_hash=proof_job.proof_hash,
+        proof_status=proof_job.status.value if hasattr(proof_job.status, 'value') else str(proof_job.status),
+        proof_source=proof_job.proof_source,
+        l2_verified_at=proof_job.l2_verified_at.isoformat() if proof_job.l2_verified_at else None,
+        can_execute=can_execute,
+    )
+
+
+@router.post("/execute-allocation", response_model=OrchestrationResponse, tags=["Risk Engine"])
+async def execute_allocation(
+    request: ExecuteRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Execute a previously proposed allocation once proof is verified.
+    """
+    proof_job = db.query(ProofJob).filter(ProofJob.id == request.proof_job_id).first()
+    if not proof_job:
+        raise HTTPException(status_code=404, detail="Proposal not found")
+
+    can_execute = (proof_job.status == ProofStatus.VERIFIED)
+    if not can_execute and settings.ALLOW_UNVERIFIED_EXECUTION:
+        can_execute = True
+
+    if not can_execute:
+        raise HTTPException(status_code=400, detail="Proof not verified. Execution blocked.")
+
+    # Build orchestration request from stored metrics
+    metrics = proof_job.metrics or {}
+    jediswap_metrics = metrics.get("jediswap", {})
+    ekubo_metrics = metrics.get("ekubo", {})
+
+    orchestration_request = OrchestrationRequest(
+        jediswap_metrics=RiskMetricsRequest(**jediswap_metrics),
+        ekubo_metrics=RiskMetricsRequest(**ekubo_metrics),
+    )
+
+    # Execute on-chain using existing orchestration flow (without regenerating proof)
+    # --- Begin execute block (adapted from orchestrate_allocation) ---
+    if not settings.BACKEND_WALLET_PRIVATE_KEY or not settings.BACKEND_WALLET_ADDRESS:
+        raise HTTPException(
+            status_code=500,
+            detail="Backend wallet not configured. Set BACKEND_WALLET_PRIVATE_KEY in .env"
+        )
+
+    rpc_client = FullNodeClient(node_url=settings.STARKNET_RPC_URL)
+    key_pair = KeyPair.from_private_key(int(settings.BACKEND_WALLET_PRIVATE_KEY, 16))
+    network_chain = StarknetChainId.SEPOLIA if settings.STARKNET_NETWORK.lower() == "sepolia" else StarknetChainId.MAINNET
+    account = Account(
+        address=int(settings.BACKEND_WALLET_ADDRESS, 16),
+        client=rpc_client,
+        key_pair=key_pair,
+        chain=network_chain
+    )
+
+    contract = await Contract.from_address(
+        address=int(settings.RISK_ENGINE_ADDRESS, 16),
+        provider=account
+    )
+
+    from starknet_py.hash.selector import get_selector_from_name
+    selector = get_selector_from_name("propose_and_execute_allocation")
+
+    calldata = [
+        orchestration_request.jediswap_metrics.utilization,
+        orchestration_request.jediswap_metrics.volatility,
+        orchestration_request.jediswap_metrics.liquidity,
+        orchestration_request.jediswap_metrics.audit_score,
+        orchestration_request.jediswap_metrics.age_days,
+        orchestration_request.ekubo_metrics.utilization,
+        orchestration_request.ekubo_metrics.volatility,
+        orchestration_request.ekubo_metrics.liquidity,
+        orchestration_request.ekubo_metrics.audit_score,
+        orchestration_request.ekubo_metrics.age_days,
+    ]
+
+    from starknet_py.net.client_models import Call
+    call = Call(
+        to_addr=int(settings.RISK_ENGINE_ADDRESS, 16),
+        selector=selector,
+        calldata=calldata
+    )
+
+    invoke_result = await account.execute_v3(
+        calls=[call],
+        auto_estimate=True
+    )
+
+    tx_hash = hex(invoke_result.transaction_hash)
+    proof_job.tx_hash = tx_hash
+    if proof_job.status != ProofStatus.VERIFIED:
+        proof_job.status = ProofStatus.SUBMITTED
+    proof_job.submitted_at = datetime.utcnow()
+    db.commit()
+    db.refresh(proof_job)
+
+    await rpc_client.wait_for_tx(invoke_result.transaction_hash)
+
+    try:
+        receipt = await rpc_client.get_transaction_receipt(invoke_result.transaction_hash)
+        proof_job.l2_block_number = getattr(receipt, "block_number", None)
+    except Exception as receipt_err:
+        logger.warning(f"⚠️ Could not fetch transaction receipt: {receipt_err}")
+
+    # Fetch latest decision from RiskEngine
+    decision_count_result = await contract.functions["get_decision_count"].call()
+    decision_count = int(decision_count_result[0]) if decision_count_result else 0
+    if decision_count <= 0:
+        raise HTTPException(status_code=500, detail="Execution succeeded but no decision found")
+
+    latest_decision_result = await contract.functions["get_decision"].call(decision_count)
+    decision_data = latest_decision_result[0] if latest_decision_result else None
+    if not decision_data:
+        raise HTTPException(status_code=500, detail="Execution succeeded but decision data missing")
+
+    proof_job.decision_id = int(decision_data['decision_id'])
+    proof_job.jediswap_pct = int(decision_data['jediswap_pct'])
+    proof_job.ekubo_pct = int(decision_data['ekubo_pct'])
+    proof_job.jediswap_risk = int(decision_data['jediswap_risk'])
+    proof_job.ekubo_risk = int(decision_data['ekubo_risk'])
+    db.commit()
+    db.refresh(proof_job)
+
+    return OrchestrationResponse(
+        decision_id=int(decision_data['decision_id']),
+        block_number=int(decision_data['block_number']),
+        timestamp=int(decision_data['timestamp']),
+        jediswap_pct=int(decision_data['jediswap_pct']),
+        ekubo_pct=int(decision_data['ekubo_pct']),
+        jediswap_risk=int(decision_data['jediswap_risk']),
+        ekubo_risk=int(decision_data['ekubo_risk']),
+        jediswap_apy=int(decision_data['jediswap_apy']),
+        ekubo_apy=int(decision_data['ekubo_apy']),
+        rationale_hash=str(decision_data['rationale_hash']),
+        strategy_router_tx=str(decision_data['strategy_router_tx']),
+        tx_hash=tx_hash,
+        message=f"✅ Executed decision #{decision_count} on-chain (tx: {tx_hash})",
+        proof_job_id=str(proof_job.id),
+        proof_hash=proof_job.proof_hash,
+        proof_status=proof_job.status.value if hasattr(proof_job.status, 'value') else str(proof_job.status),
+    )
 
 
 @router.post("/orchestrate-from-market", response_model=OrchestrationResponse, tags=["Risk Engine"])

@@ -173,6 +173,7 @@ async def get_rebalance_history(
             "proof_hash": job.proof_hash,
             "proof_status": job.status.value if hasattr(job.status, 'value') else str(job.status),
             "tx_hash": job.tx_hash,
+            "decision_id": getattr(job, "decision_id", None),
             "fact_hash": job.fact_hash,
             "l2_fact_hash": getattr(job, "l2_fact_hash", None),
             "l2_verified_at": job.l2_verified_at.isoformat() if getattr(job, "l2_verified_at", None) else None,
