@@ -43,14 +43,17 @@ def get_rpc_urls() -> List[str]:
 def is_retryable_rpc_error(exc: Exception) -> bool:
     """Best-effort detection of transient RPC errors."""
     status_code = getattr(exc, "status_code", None)
-    if isinstance(status_code, int) and status_code in {502, 503, 504}:
+    if isinstance(status_code, int) and status_code in {502, 503, 504, 429}:
         return True
 
     message = str(exc).lower()
+    if "blast api is no longer available" in message and "403" in message:
+        return True
     retry_signals = [
         "502",
         "503",
         "504",
+        "429",
         "bad gateway",
         "service unavailable",
         "gateway timeout",

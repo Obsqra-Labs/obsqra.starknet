@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { RpcProvider } from 'starknet';
+import { getConfig } from '@/lib/config';
 
 export interface TransactionStatus {
   hash: string;
@@ -23,7 +24,7 @@ interface MonitoringOptions {
 
 const DEFAULT_POLL_INTERVAL = 3000; // 3 seconds
 const DEFAULT_MAX_POLLS = 40; // ~2 minutes with 3s interval
-const RPC_URL = 'https://starknet-sepolia.public.blastapi.io';
+const DEFAULT_RPC_URL = getConfig().rpcUrl;
 
 const EXPLORER_URLS: Record<string, string> = {
   sepolia: 'https://starkscan.co/tx',
@@ -41,7 +42,7 @@ export function useTransactionMonitor(
   const {
     pollIntervalMs = DEFAULT_POLL_INTERVAL,
     maxPollAttempts = DEFAULT_MAX_POLLS,
-    rpcUrl = RPC_URL,
+    rpcUrl = DEFAULT_RPC_URL,
     networkName = 'sepolia',
   } = options;
 
@@ -217,4 +218,3 @@ export function TransactionStatusBadge({ status }: { status: TransactionStatus |
     </div>
   );
 }
-
