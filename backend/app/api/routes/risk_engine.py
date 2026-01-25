@@ -25,6 +25,7 @@ from app.services.atlantic_service import get_atlantic_service
 from app.workers.atlantic_worker import enqueue_atlantic_status_check
 from app.services.protocol_metrics_service import get_protocol_metrics_service
 from app.services.market_data_service import get_market_data_service
+from app.utils.rpc import with_rpc_fallback, get_rpc_urls, is_retryable_rpc_error
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -71,23 +72,20 @@ async def calculate_risk_score(request: RiskMetricsRequest):
     try:
         logger.info(f"📊 Calculating risk score via contract: {request.dict()}")
         
-        # Initialize RPC client
-        rpc_client = FullNodeClient(node_url=settings.STARKNET_RPC_URL)
-        
-        # Create contract instance (address must be int)
-        contract = await Contract.from_address(
-            address=int(settings.RISK_ENGINE_ADDRESS, 16),
-            provider=rpc_client
-        )
-        
-        # Call calculate_risk_score on the contract
-        result = await contract.functions["calculate_risk_score"].call(
-            request.utilization,
-            request.volatility,
-            request.liquidity,
-            request.audit_score,
-            request.age_days
-        )
+        async def _call_risk(client: FullNodeClient, _rpc_url: str):
+            contract = await Contract.from_address(
+                address=int(settings.RISK_ENGINE_ADDRESS, 16),
+                provider=client,
+            )
+            return await contract.functions["calculate_risk_score"].call(
+                request.utilization,
+                request.volatility,
+                request.liquidity,
+                request.audit_score,
+                request.age_days,
+            )
+
+        result, _ = await with_rpc_fallback(_call_risk)
         
         # Extract risk_score from result (felt252)
         risk_score = int(result[0])
@@ -131,26 +129,21 @@ async def calculate_allocation(request: AllocationRequest):
     try:
         logger.info(f"📊 Calculating allocation via contract: {request.dict()}")
         
-        # Initialize RPC client
-        rpc_client = FullNodeClient(node_url=settings.STARKNET_RPC_URL)
-        
-        # Create contract instance (address must be int)
-        contract = await Contract.from_address(
-            address=int(settings.RISK_ENGINE_ADDRESS, 16),
-            provider=rpc_client
-        )
-        
-        # Call calculate_allocation on the contract
-        # Note: Contract expects 3 protocols (nostra/zklend/ekubo)
-        # We map jediswap -> nostra and set zklend to 0 (not used)
-        result = await contract.functions["calculate_allocation"].call(
-            request.jediswap_risk,  # nostra_risk (mapped from jediswap)
-            0,                       # zklend_risk (not used, set to 0)
-            request.ekubo_risk,      # ekubo_risk
-            request.jediswap_apy,    # nostra_apy (mapped from jediswap)
-            0,                       # zklend_apy (not used, set to 0)
-            request.ekubo_apy        # ekubo_apy
-        )
+        async def _call_allocation(client: FullNodeClient, _rpc_url: str):
+            contract = await Contract.from_address(
+                address=int(settings.RISK_ENGINE_ADDRESS, 16),
+                provider=client,
+            )
+            return await contract.functions["calculate_allocation"].call(
+                request.jediswap_risk,  # nostra_risk (mapped from jediswap)
+                0,                       # zklend_risk (not used, set to 0)
+                request.ekubo_risk,      # ekubo_risk
+                request.jediswap_apy,    # nostra_apy (mapped from jediswap)
+                0,                       # zklend_apy (not used, set to 0)
+                request.ekubo_apy        # ekubo_apy
+            )
+
+        result, _ = await with_rpc_fallback(_call_allocation)
         
         # Extract allocation percentages from contract result
         # Contract returns ((nostra_pct, zklend_pct, ekubo_pct),) - nested tuple
@@ -1000,19 +993,11 @@ async def execute_allocation(
                 detail="Backend wallet not configured. Set BACKEND_WALLET_PRIVATE_KEY in .env"
             )
 
-        rpc_client = FullNodeClient(node_url=settings.STARKNET_RPC_URL)
         key_pair = KeyPair.from_private_key(int(settings.BACKEND_WALLET_PRIVATE_KEY, 16))
-        network_chain = StarknetChainId.SEPOLIA if settings.STARKNET_NETWORK.lower() == "sepolia" else StarknetChainId.MAINNET
-        account = Account(
-            address=int(settings.BACKEND_WALLET_ADDRESS, 16),
-            client=rpc_client,
-            key_pair=key_pair,
-            chain=network_chain
-        )
-
-        contract = await Contract.from_address(
-            address=int(settings.RISK_ENGINE_ADDRESS, 16),
-            provider=account
+        network_chain = (
+            StarknetChainId.SEPOLIA
+            if settings.STARKNET_NETWORK.lower() == "sepolia"
+            else StarknetChainId.MAINNET
         )
 
         from starknet_py.hash.selector import get_selector_from_name
@@ -1038,9 +1023,19 @@ async def execute_allocation(
             calldata=calldata
         )
 
-        invoke_result = await account.execute_v3(
-            calls=[call],
-            auto_estimate=True
+        rpc_urls = get_rpc_urls()
+
+        async def _submit_with_client(client: FullNodeClient, _rpc_url: str):
+            account = Account(
+                address=int(settings.BACKEND_WALLET_ADDRESS, 16),
+                client=client,
+                key_pair=key_pair,
+                chain=network_chain,
+            )
+            return await account.execute_v3(calls=[call], auto_estimate=True)
+
+        invoke_result, submit_rpc = await with_rpc_fallback(
+            _submit_with_client, urls=rpc_urls
         )
 
         tx_hash = hex(invoke_result.transaction_hash)
@@ -1051,21 +1046,48 @@ async def execute_allocation(
         db.commit()
         db.refresh(proof_job)
 
-        await rpc_client.wait_for_tx(invoke_result.transaction_hash)
+        wait_urls = [submit_rpc] + [url for url in rpc_urls if url != submit_rpc]
+        await with_rpc_fallback(
+            lambda client, _url: client.wait_for_tx(invoke_result.transaction_hash),
+            urls=wait_urls,
+        )
 
         try:
-            receipt = await rpc_client.get_transaction_receipt(invoke_result.transaction_hash)
+            receipt, _ = await with_rpc_fallback(
+                lambda client, _url: client.get_transaction_receipt(
+                    invoke_result.transaction_hash
+                ),
+                urls=wait_urls,
+            )
             proof_job.l2_block_number = getattr(receipt, "block_number", None)
         except Exception as receipt_err:
             logger.warning(f"⚠️ Could not fetch transaction receipt: {receipt_err}")
 
         # Fetch latest decision from RiskEngine
-        decision_count_result = await contract.functions["get_decision_count"].call()
+        async def _get_decision_count(client: FullNodeClient, _rpc_url: str):
+            contract = await Contract.from_address(
+                address=int(settings.RISK_ENGINE_ADDRESS, 16),
+                provider=client,
+            )
+            return await contract.functions["get_decision_count"].call()
+
+        decision_count_result, _ = await with_rpc_fallback(
+            _get_decision_count, urls=wait_urls
+        )
         decision_count = int(decision_count_result[0]) if decision_count_result else 0
         if decision_count <= 0:
             raise HTTPException(status_code=500, detail="Execution succeeded but no decision found")
 
-        latest_decision_result = await contract.functions["get_decision"].call(decision_count)
+        async def _get_decision(client: FullNodeClient, _rpc_url: str):
+            contract = await Contract.from_address(
+                address=int(settings.RISK_ENGINE_ADDRESS, 16),
+                provider=client,
+            )
+            return await contract.functions["get_decision"].call(decision_count)
+
+        latest_decision_result, _ = await with_rpc_fallback(
+            _get_decision, urls=wait_urls
+        )
         decision_data = latest_decision_result[0] if latest_decision_result else None
         if not decision_data:
             raise HTTPException(status_code=500, detail="Execution succeeded but decision data missing")
@@ -1100,7 +1122,9 @@ async def execute_allocation(
         raise e
     except Exception as e:
         message = str(e)
-        if "Client failed with code 502" in message:
+        if is_retryable_rpc_error(e):
+            message = "Starknet RPC unavailable. Retried all endpoints."
+        elif "Client failed with code 502" in message:
             message = "Starknet RPC returned 502 (bad gateway). Try again or switch RPC."
         logger.error(f"❌ Execution failed: {message}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Execution failed: {message}")

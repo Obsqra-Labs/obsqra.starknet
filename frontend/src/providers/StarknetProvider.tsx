@@ -2,7 +2,8 @@
 
 import { Chain, sepolia } from '@starknet-react/chains';
 import { ReactNode } from 'react';
-import { StarknetConfig, publicProvider, argent, braavos } from '@starknet-react/core';
+import { StarknetConfig, publicProvider } from '@starknet-react/core';
+import { argentPatched, braavosPatched } from '@/lib/patchedConnectors';
 
 // Create custom Sepolia chain with reliable Alchemy RPC
 // Use spread operator to preserve all properties, then override rpcUrls
@@ -22,7 +23,7 @@ export function StarknetProvider({ children }: { children: ReactNode }) {
   // Use custom chain with reliable Alchemy RPC
   const provider = publicProvider();
   const chains = [sepoliaCustom];
-  const connectors = [argent(), braavos()];
+  const connectors = [argentPatched(), braavosPatched()];
 
   return (
     <StarknetConfig chains={chains} provider={provider} connectors={connectors} autoConnect>
