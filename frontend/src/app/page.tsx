@@ -183,7 +183,7 @@ function Landing({
     // Check backend health
     const checkHealth = async () => {
       try {
-        const response = await fetch('/api/v1/health', { method: 'GET' });
+      const response = await fetch('/health', { method: 'GET' });
         setSystemStatus(response.ok ? 'online' : 'offline');
       } catch {
         setSystemStatus('offline');
