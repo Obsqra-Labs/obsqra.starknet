@@ -7,4 +7,4 @@ pub mod dao_constraint_manager;
 pub mod pool;
 pub mod pool_factory;
 pub mod interfaces;
-
+pub mod zkml_oracle;

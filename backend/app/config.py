@@ -67,6 +67,11 @@ class Settings(BaseSettings):
     STARKNET_NETWORK: str = "sepolia"  # 'sepolia' or 'mainnet'
     RISK_ENGINE_ADDRESS: str = "0x007c2463376a0d21dbccde4c6d59bf8b0649973ca1f88865466b58d81dcbe86d"  # v2.2 with fixed 2-protocol allocation
     STRATEGY_ROUTER_ADDRESS: str = "0x01888e3f3d6cd137e63ff1a090a1e2c9ed5754162a8d5739364aba657fab20e4"  # v2 with ETH + protocol integration + deposit function (redeployed 2025-12-09 with new class hash)
+    # Read-only data RPC (defaults to STARKNET_RPC_URL if unset)
+    DATA_RPC_URL: str = ""
+    DATA_NETWORK: str = ""  # optional override for data network
+    # Optional zkML oracle contract (Cairo demo)
+    ZKML_ORACLE_ADDRESS: str = ""
     
     # L1 Settlement (Atlantic)
     ATLANTIC_API_KEY: str = ""  # Herodotus API key

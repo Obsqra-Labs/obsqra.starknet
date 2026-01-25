@@ -17,6 +17,7 @@ from app.config import get_settings
 from app.db.session import get_db
 from app.models import ProofJob, ProofStatus
 from app.services.luminair_service import get_luminair_service
+from app.services.zkml_service import get_zkml_service
 from app.workers.sharp_worker import submit_proof_to_sharp
 from app.services.integrity_service import get_integrity_service
 from app.services.atlantic_service import get_atlantic_service
@@ -237,6 +238,11 @@ async def orchestrate_allocation(
         logger.info(f"   Jediswap risk: {proof.output_score_jediswap}")
         logger.info(f"   Ekubo risk: {proof.output_score_ekubo}")
         logger.info(f"   Generation time: {proof_generation_time:.2f}s")
+
+        # zkML demo inference (tiny linear model)
+        zkml = get_zkml_service()
+        zkml_jedi = zkml.infer_protocol(request.jediswap_metrics.dict())
+        zkml_ekubo = zkml.infer_protocol(request.ekubo_metrics.dict())
         
         # STEP 2: Calculate fact hash and verify on L2 (Integrity Verifier)
         fact_hash = proof.fact_hash or (
@@ -331,6 +337,20 @@ async def orchestrate_allocation(
                 "ekubo": request.ekubo_metrics.dict(),
                 "jediswap_risk": proof.output_score_jediswap,
                 "ekubo_risk": proof.output_score_ekubo,
+                "zkml": {
+                    "model": "linear_v0",
+                    "threshold": zkml_jedi.threshold,
+                    "jediswap": {
+                        "score": zkml_jedi.score,
+                        "decision": zkml_jedi.decision,
+                        "components": zkml_jedi.components,
+                    },
+                    "ekubo": {
+                        "score": zkml_ekubo.score,
+                        "decision": zkml_ekubo.decision,
+                        "components": zkml_ekubo.components,
+                    },
+                },
                 "proof_generation_time_seconds": proof_generation_time,
                 "proof_data_size_bytes": len(proof.proof_data) if proof.proof_data else 0,
                 "proof_source": proof_source,

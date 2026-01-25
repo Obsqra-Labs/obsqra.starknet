@@ -7,6 +7,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from app.services.luminair_service import get_luminair_service
+from app.services.zkml_service import get_zkml_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -32,6 +33,7 @@ class ProofGenerateResponse(BaseModel):
     proof_hash: str
     jediswap_score: int
     ekubo_score: int
+    zkml: dict | None = None
     status: str
     message: str
 
@@ -54,12 +56,16 @@ async def generate_proof(request: ProofGenerateRequest):
     try:
         # Get proof service
         luminair = get_luminair_service()
+        zkml = get_zkml_service()
         
         # Generate proof
         result = await luminair.generate_proof(
             request.jediswap_metrics.dict(),
             request.ekubo_metrics.dict()
         )
+
+        zkml_jedi = zkml.infer_protocol(request.jediswap_metrics.dict())
+        zkml_ekubo = zkml.infer_protocol(request.ekubo_metrics.dict())
         
         logger.info(f"Proof generated: {result.proof_hash[:32]}...")
         
@@ -67,6 +73,20 @@ async def generate_proof(request: ProofGenerateRequest):
             proof_hash=result.proof_hash,
             jediswap_score=result.output_score_jediswap,
             ekubo_score=result.output_score_ekubo,
+            zkml={
+                "model": "linear_v0",
+                "threshold": zkml_jedi.threshold,
+                "jediswap": {
+                    "score": zkml_jedi.score,
+                    "decision": zkml_jedi.decision,
+                    "components": zkml_jedi.components,
+                },
+                "ekubo": {
+                    "score": zkml_ekubo.score,
+                    "decision": zkml_ekubo.decision,
+                    "components": zkml_ekubo.components,
+                },
+            },
             status="generated",
             message="Proof generated successfully"
         )
