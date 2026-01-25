@@ -41,6 +41,7 @@ interface UseRiskEngineBackendOrchestrationReturn {
     jediswapMetrics: ProtocolMetrics,
     ekuboMetrics: ProtocolMetrics
   ) => Promise<AllocationDecision | null>;
+  proposeFromMarket: () => Promise<AllocationDecision | null>;
   getLatestDecision: () => Promise<AllocationDecision | null>;
   isLoading: boolean;
   error: string | null;
@@ -166,6 +167,66 @@ export function useRiskEngineBackendOrchestration(): UseRiskEngineBackendOrchest
     []
   );
 
+  const proposeFromMarket = useCallback(async (): Promise<AllocationDecision | null> => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const config = getConfig();
+      const backendUrl = config.backendUrl;
+      const apiUrl = backendUrl
+        ? `${backendUrl}/api/v1/risk-engine/orchestrate-from-market`
+        : '/api/v1/risk-engine/orchestrate-from-market';
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.detail || `Market orchestration failed: ${response.statusText}`
+        );
+      }
+
+      const data = await response.json();
+
+      const decision: AllocationDecision = {
+        decision_id: data.decision_id,
+        block_number: data.block_number,
+        timestamp: data.timestamp,
+        jediswap_pct: data.jediswap_pct,
+        ekubo_pct: data.ekubo_pct,
+        jediswap_risk: data.jediswap_risk,
+        ekubo_risk: data.ekubo_risk,
+        jediswap_apy: data.jediswap_apy,
+        ekubo_apy: data.ekubo_apy,
+        rationale_hash: data.rationale_hash,
+        strategy_router_tx: data.strategy_router_tx,
+        tx_hash: data.tx_hash,
+        message: data.message,
+        proof_job_id: data.proof_job_id,
+        proof_hash: data.proof_hash,
+        proof_status: data.proof_status,
+      };
+
+      return decision;
+    } catch (err) {
+      let errorMessage = 'Market orchestration failed';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      console.error('❌ Market orchestration error:', err);
+      setError(errorMessage);
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   const getLatestDecision = useCallback(async (): Promise<AllocationDecision | null> => {
     setIsLoading(true);
     setError(null);
@@ -243,10 +304,10 @@ export function useRiskEngineBackendOrchestration(): UseRiskEngineBackendOrchest
 
   return {
     proposeAndExecuteAllocation,
+    proposeFromMarket,
     getLatestDecision,
     isLoading,
     error,
     clearError,
   };
 }
-

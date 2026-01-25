@@ -72,6 +72,10 @@ class Settings(BaseSettings):
     DATA_NETWORK: str = ""  # optional override for data network
     # Optional zkML oracle contract (Cairo demo)
     ZKML_ORACLE_ADDRESS: str = ""
+    # Optional zkML proof paths (Integrity/Stone)
+    ZKML_PROOF_JSON_PATH: str = ""
+    ZKML_PROOF_CALLDATA_PATH: str = ""
+    INTEGRITY_PROOF_SERIALIZER_BIN: str = ""
     
     # L1 Settlement (Atlantic)
     ATLANTIC_API_KEY: str = ""  # Herodotus API key

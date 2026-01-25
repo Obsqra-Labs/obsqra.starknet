@@ -3,6 +3,7 @@ from fastapi import APIRouter, Query
 
 from app.config import get_settings
 from app.services.market_data_service import get_market_data_service
+from app.services.protocol_metrics_service import get_protocol_metrics_service
 
 router = APIRouter()
 settings = get_settings()
@@ -30,4 +31,18 @@ async def get_market_snapshot(
         "apy_source": snapshot.apy_source,
         "network": snapshot.network,
         "rpc_url": snapshot.rpc_url,
+    }
+
+
+@router.get("/metrics", tags=["Market"])
+async def get_market_metrics():
+    """
+    Read-only proxy metrics derived from mainnet data.
+    These map live APY data into the risk-engine input schema.
+    """
+    service = get_protocol_metrics_service()
+    metrics = await service.get_protocol_metrics()
+    return {
+        "jediswap": metrics["jediswap"].__dict__,
+        "ekubo": metrics["ekubo"].__dict__,
     }

@@ -5,6 +5,7 @@ Verifies STARK proofs on Starknet L2 via the Integrity Verifier contract.
 This provides always-on verification for every proof.
 """
 import logging
+import json
 from typing import Optional
 from starknet_py.contract import Contract
 from starknet_py.net.full_node_client import FullNodeClient
@@ -271,5 +272,4 @@ def get_integrity_service(rpc_url: str = None, network: str = None) -> Integrity
         _integrity_service_instance = IntegrityService(rpc_url=rpc_url, network=network)
     
     return _integrity_service_instance
-
 

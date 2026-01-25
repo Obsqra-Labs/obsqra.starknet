@@ -354,37 +354,104 @@ export function Dashboard() {
     });
   };
 
+  const applyDecision = async (decision: any, label: string) => {
+    console.log(`✅ ${label} complete:`, decision);
+
+    setAllocationForm({
+      jediswap: decision.jediswap_pct / 100,
+      ekubo: decision.ekubo_pct / 100,
+    });
+
+    const actualTxHash = decision.tx_hash || `pending-${decision.decision_id}`;
+    const txId = txHistory.addTransaction(
+      actualTxHash,
+      'AI_ORCHESTRATION',
+      {
+        decisionId: decision.decision_id,
+        jediswap: decision.jediswap_pct,
+        ekubo: decision.ekubo_pct,
+        jediswapRisk: decision.jediswap_risk,
+        ekuboRisk: decision.ekubo_risk,
+        jediswapApy: decision.jediswap_apy,
+        ekuboApy: decision.ekubo_apy,
+        rationaleHash: decision.rationale_hash,
+        timestamp: new Date(decision.timestamp * 1000).toISOString(),
+        blockNumber: decision.block_number,
+        aiManaged: true,
+      }
+    );
+
+    txHistory.confirmTransaction(txId);
+
+    if (!decision.tx_hash && decision.proof_job_id) {
+      setTimeout(async () => {
+        try {
+          const historyResponse = await fetch('/api/v1/analytics/rebalance-history?limit=20');
+          if (historyResponse.ok) {
+            const history = await historyResponse.json();
+            const matchingRecord = history.find((r: any) => r.id === decision.proof_job_id);
+            if (matchingRecord?.tx_hash && matchingRecord.tx_hash.startsWith('0x')) {
+              txHistory.updateTransaction(txId, { hash: matchingRecord.tx_hash });
+            }
+          }
+        } catch (err) {
+          console.warn('Failed to fetch real tx_hash from history:', err);
+        }
+      }, 3000);
+    }
+
+    setLatestDecision({
+      decisionId: decision.decision_id,
+      proofHash: decision.proof_hash,
+      jediswap_pct: decision.jediswap_pct / 100,
+      ekubo_pct: decision.ekubo_pct / 100,
+    });
+
+    console.log('🔄 Scheduling allocation refresh after orchestration...');
+    setTimeout(() => router.refetch(), 8000);
+    setTimeout(() => router.refetch(), 20000);
+
+    const proofStatus = decision.proof_status || 'generated';
+    const isVerified = proofStatus === 'verified';
+    const proofIcon = isVerified ? '✅' : '🔐';
+    const proofInfo = decision.proof_hash
+      ? `\n\n${proofIcon} STARK Proof:\n${decision.proof_hash.slice(0, 20)}...\nStatus: ${proofStatus}\n${isVerified ? '✅ Locally verified (&lt;1s)\n' : ''}`
+      : '';
+
+    alert(
+      `✅ ${label} Complete!\n\n` +
+      `Decision ID: ${decision.decision_id}\n` +
+      `Block: ${decision.block_number}\n\n` +
+      `Allocation:\n` +
+      `JediSwap: ${decision.jediswap_pct.toFixed(1)}% (Risk: ${decision.jediswap_risk}, APY: ${decision.jediswap_apy.toFixed(2)}%)\n` +
+      `Ekubo: ${decision.ekubo_pct.toFixed(1)}% (Risk: ${decision.ekubo_risk}, APY: ${decision.ekubo_apy.toFixed(2)}%)\n` +
+      proofInfo +
+      `\nFull audit trail available on-chain.`
+    );
+  };
+
   // Handle AI Risk Engine orchestration (100% on-chain flow)
   const handleAIOchestration = async () => {
     setIsCalculatingRisk(true);
     setRiskError(null);
 
     try {
-      // Real protocol metrics for JediSwap and Ekubo on Sepolia testnet
-      // BALANCED 47/53 SPLIT: Both protocols under 60% constraint
-      // JediSwap APY=850, Ekubo APY=1210 (hardcoded in contract)
-      // For ~50/50: (850/(risk+1)) ≈ (1210/(risk+1))
-      // Need Ekubo risk slightly higher to compensate for higher APY
       const jediswapMetrics: BackendProtocolMetrics = {
         utilization: 5000,
-        volatility: 4000,   // Risk ~40 → Lower risk for lower APY
+        volatility: 4000,
         liquidity: 1,
         audit_score: 95,
         age_days: 700,
       };
       const ekuboMetrics: BackendProtocolMetrics = {
         utilization: 5500,
-        volatility: 5700,   // Risk ~57 → Higher risk for higher APY
+        volatility: 5700,
         liquidity: 2,
         audit_score: 95,
         age_days: 700,
       };
 
       console.log('🤖 AI Risk Engine: Starting full on-chain orchestration...');
-      console.log('📊 JediSwap metrics:', jediswapMetrics);
-      console.log('📊 Ekubo metrics:', ekuboMetrics);
-
-      // Call the full orchestration function (100% on-chain)
       const decision = await backendOrchestration.proposeAndExecuteAllocation(
         jediswapMetrics,
         ekuboMetrics
@@ -394,106 +461,37 @@ export function Dashboard() {
         throw new Error('Failed to execute AI orchestration');
       }
 
-      console.log('✅ AI orchestration complete:', decision);
-
-      // Update allocation form to reflect AI decision
-      setAllocationForm({
-        jediswap: decision.jediswap_pct / 100,  // Convert from basis points
-        ekubo: decision.ekubo_pct / 100,
-      });
-
-      // Add to transaction history with full audit trail
-      // Use actual tx_hash if available, otherwise fallback to strategy_router_tx (decision ID)
-      // IMPORTANT: tx_hash is the real on-chain transaction hash, strategy_router_tx is just the decision ID
-      // If tx_hash is not available, we'll fetch it from the rebalance history API later
-      const actualTxHash = decision.tx_hash || `pending-${decision.decision_id}`;
-      const txId = txHistory.addTransaction(
-        actualTxHash,
-        'AI_ORCHESTRATION',
-        {
-          decisionId: decision.decision_id,
-          jediswap: decision.jediswap_pct,
-          ekubo: decision.ekubo_pct,
-          jediswapRisk: decision.jediswap_risk,
-          ekuboRisk: decision.ekubo_risk,
-          jediswapApy: decision.jediswap_apy,
-          ekuboApy: decision.ekubo_apy,
-          rationaleHash: decision.rationale_hash,
-          timestamp: new Date(decision.timestamp * 1000).toISOString(),
-          blockNumber: decision.block_number,
-          aiManaged: true,
-        }
-      );
-
-      // Confirm transaction
-      txHistory.confirmTransaction(txId);
-      
-      // If tx_hash wasn't provided, try to fetch it from rebalance history after a delay
-      if (!decision.tx_hash && decision.proof_job_id) {
-        setTimeout(async () => {
-          try {
-            const historyResponse = await fetch('/api/v1/analytics/rebalance-history?limit=20');
-            if (historyResponse.ok) {
-              const history = await historyResponse.json();
-              const matchingRecord = history.find((r: any) => r.id === decision.proof_job_id);
-              if (matchingRecord?.tx_hash && matchingRecord.tx_hash.startsWith('0x')) {
-                txHistory.updateTransaction(txId, { hash: matchingRecord.tx_hash });
-              }
-            }
-          } catch (err) {
-            console.warn('Failed to fetch real tx_hash from history:', err);
-          }
-        }, 3000); // Wait 3 seconds for backend to store tx_hash
-      }
-      
-      // Store latest decision for deposit routing display
-      setLatestDecision({
-        decisionId: decision.decision_id,
-        proofHash: decision.proof_hash,
-        jediswap_pct: decision.jediswap_pct / 100, // Convert from basis points to percentage
-        ekubo_pct: decision.ekubo_pct / 100,
-      });
-
-      // Refresh allocation display after AI orchestration completes
-      // RiskEngine should have updated the contract, so wait a bit longer for confirmation
-      console.log('🔄 Scheduling allocation refresh after AI orchestration...');
-      setTimeout(() => {
-        console.log('🔄 Refreshing allocation after AI orchestration...');
-        router.refetch();
-      }, 8000); // Wait 8 seconds for RiskEngine transaction to be confirmed
-      
-      // Also refresh again after a longer delay to catch any delayed updates
-      setTimeout(() => {
-        console.log('🔄 Second refresh after AI orchestration...');
-        router.refetch();
-      }, 20000); // Wait 20 seconds for final confirmation
-      
-      // Show success message with proof
-      const proofStatus = decision.proof_status || 'generated';
-      const isVerified = proofStatus === 'verified';
-      const proofIcon = isVerified ? '✅' : '🔐';
-      const proofInfo = decision.proof_hash 
-        ? `\n\n${proofIcon} STARK Proof:\n${decision.proof_hash.slice(0, 20)}...\nStatus: ${proofStatus}\n${isVerified ? '✅ Locally verified (&lt;1s)\n' : ''}`
-        : '';
-      
-      alert(
-        `✅ AI Risk Engine Orchestration Complete!\n\n` +
-        `Decision ID: ${decision.decision_id}\n` +
-        `Block: ${decision.block_number}\n\n` +
-        `Allocation:\n` +
-        `JediSwap: ${decision.jediswap_pct.toFixed(1)}% (Risk: ${decision.jediswap_risk}, APY: ${decision.jediswap_apy.toFixed(2)}%)\n` +
-        `Ekubo: ${decision.ekubo_pct.toFixed(1)}% (Risk: ${decision.ekubo_risk}, APY: ${decision.ekubo_apy.toFixed(2)}%)\n` +
-        proofInfo +
-        `\nFull audit trail available on-chain.`
-      );
-      
+      await applyDecision(decision, 'AI Risk Engine Orchestration');
     } catch (error) {
       const obsqraError = categorizeError(error);
       setRiskError(obsqraError.userMessage);
       console.error('❌ AI orchestration error:', error);
-      
       if (riskEngineOrchestration.error) {
         alert(`❌ AI Orchestration Failed: ${riskEngineOrchestration.error}`);
+      }
+    } finally {
+      setIsCalculatingRisk(false);
+      setGeneratingProofType(null);
+    }
+  };
+
+  const handleMarketOrchestration = async () => {
+    setIsCalculatingRisk(true);
+    setRiskError(null);
+
+    try {
+      console.log('🌍 Market Orchestration: Using read-only mainnet metrics...');
+      const decision = await backendOrchestration.proposeFromMarket();
+      if (!decision) {
+        throw new Error('Failed to execute market orchestration');
+      }
+      await applyDecision(decision, 'Market Orchestration');
+    } catch (error) {
+      const obsqraError = categorizeError(error);
+      setRiskError(obsqraError.userMessage);
+      console.error('❌ Market orchestration error:', error);
+      if (backendOrchestration.error) {
+        alert(`❌ Market Orchestration Failed: ${backendOrchestration.error}`);
       }
     } finally {
       setIsCalculatingRisk(false);
@@ -971,6 +969,18 @@ export function Dashboard() {
                 <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> AI Orchestrating...</>
               ) : (
                 '🤖 AI Risk Engine: Orchestrate Allocation'
+              )}
+            </button>
+
+            <button
+              onClick={handleMarketOrchestration}
+              disabled={isCalculatingRisk || backendOrchestration.isLoading}
+              className="w-full py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-white rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mb-4"
+            >
+              {(isCalculatingRisk || backendOrchestration.isLoading) ? (
+                <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Using market data...</>
+              ) : (
+                '🌍 Orchestrate from Market Data (Read‑Only)'
               )}
             </button>
 

@@ -3,8 +3,13 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from app.services.zkml_service import get_zkml_service
+from app.services.integrity_service import get_integrity_service
+from app.services.zkml_proof_service import ZkmlProofService, ZkmlProofConfig
+from app.config import get_settings
+from pathlib import Path
 
 router = APIRouter()
+settings = get_settings()
 
 
 class ProtocolMetrics(BaseModel):
@@ -44,4 +49,27 @@ async def zkml_infer(request: ZkmlRequest):
             "decision": ekubo.decision,
             "components": ekubo.components,
         },
+    }
+
+
+@router.post("/verify-demo", tags=["zkML"])
+async def zkml_verify_demo():
+    """
+    Verify a precomputed zkML proof via Integrity.
+
+    Uses either:
+    - ZKML_PROOF_CALLDATA_PATH (preferred), or
+    - ZKML_PROOF_JSON_PATH + INTEGRITY_PROOF_SERIALIZER_BIN
+    """
+    integrity = get_integrity_service()
+    config = ZkmlProofConfig(
+        proof_json_path=Path(settings.ZKML_PROOF_JSON_PATH) if settings.ZKML_PROOF_JSON_PATH else None,
+        calldata_path=Path(settings.ZKML_PROOF_CALLDATA_PATH) if settings.ZKML_PROOF_CALLDATA_PATH else None,
+        serializer_bin=Path(settings.INTEGRITY_PROOF_SERIALIZER_BIN) if settings.INTEGRITY_PROOF_SERIALIZER_BIN else None,
+    )
+    service = ZkmlProofService(integrity=integrity, config=config)
+    verified = await service.verify_demo()
+    return {
+        "verified": verified,
+        "calldata_source": "file" if config.calldata_path else "serialized" if config.proof_json_path else "missing",
     }

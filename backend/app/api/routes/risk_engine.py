@@ -22,6 +22,7 @@ from app.workers.sharp_worker import submit_proof_to_sharp
 from app.services.integrity_service import get_integrity_service
 from app.services.atlantic_service import get_atlantic_service
 from app.workers.atlantic_worker import enqueue_atlantic_status_check
+from app.services.protocol_metrics_service import get_protocol_metrics_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -595,3 +596,32 @@ async def orchestrate_allocation(
             status_code=500,
             detail=f"AI execution failed: {str(e)}"
         )
+
+
+@router.post("/orchestrate-from-market", response_model=OrchestrationResponse, tags=["Risk Engine"])
+async def orchestrate_from_market(db: Session = Depends(get_db)):
+    """
+    Orchestrate allocation using read-only mainnet-derived proxy metrics.
+    This avoids fake testnet inputs while keeping execution optional.
+    """
+    metrics_service = get_protocol_metrics_service()
+    metrics = await metrics_service.get_protocol_metrics()
+
+    request = OrchestrationRequest(
+        jediswap_metrics=RiskMetricsRequest(**{
+            "utilization": metrics["jediswap"].utilization,
+            "volatility": metrics["jediswap"].volatility,
+            "liquidity": metrics["jediswap"].liquidity,
+            "audit_score": metrics["jediswap"].audit_score,
+            "age_days": metrics["jediswap"].age_days,
+        }),
+        ekubo_metrics=RiskMetricsRequest(**{
+            "utilization": metrics["ekubo"].utilization,
+            "volatility": metrics["ekubo"].volatility,
+            "liquidity": metrics["ekubo"].liquidity,
+            "audit_score": metrics["ekubo"].audit_score,
+            "age_days": metrics["ekubo"].age_days,
+        }),
+    )
+
+    return await orchestrate_allocation(request, db)
