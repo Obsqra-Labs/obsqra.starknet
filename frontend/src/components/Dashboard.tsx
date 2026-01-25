@@ -840,16 +840,25 @@ export function Dashboard() {
           <div className="bg-slate-900/70 border border-white/10 rounded-xl p-6 shadow-lg">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-white">Current Allocation (On-Chain)</h2>
-              <button
-                onClick={() => {
-                  console.log('🔄 Manual refresh triggered');
-                  router.refetch();
-                }}
-                className="px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors flex items-center gap-2"
-                title="Refresh allocation from contract"
-              >
-                🔄 Refresh
-              </button>
+              <div className="flex items-center gap-2">
+                <div className="px-3 py-1.5 text-xs bg-slate-800/70 border border-white/10 rounded-full text-gray-300">
+                  {proposal
+                    ? `Proposal: ${proposal.proof_status ?? 'pending'}${proposal.can_execute && proposal.proof_status !== 'verified' ? ' (demo)' : ''}`
+                    : latestDecision?.decisionId
+                    ? `Last exec: #${latestDecision.decisionId}`
+                    : 'No proposal yet'}
+                </div>
+                <button
+                  onClick={() => {
+                    console.log('🔄 Manual refresh triggered');
+                    router.refetch();
+                  }}
+                  className="px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors flex items-center gap-2"
+                  title="Refresh allocation from contract"
+                >
+                  🔄 Refresh
+                </button>
+              </div>
             </div>
             {router.error && (
               <div className="mb-2 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded p-2">
