@@ -5,6 +5,8 @@ import { useAccount } from '@starknet-react/core';
 import { useStrategyRouter } from '@/hooks/useStrategyRouter';
 import { getConfig } from '@/lib/config';
 import { Call, RpcProvider, Contract, uint256 } from 'starknet';
+import { useProofHistory } from '@/hooks/useProofHistory';
+import { ProofBadge } from './ProofBadge';
 
 // Strategy Router V3.5 ABI including all functions and MIST integration
 const STRATEGY_ROUTER_V35_ABI = [
@@ -153,6 +155,7 @@ interface IntegrationChecklistItem {
 export function IntegrationTests() {
   const { address, account } = useAccount();
   const router = useStrategyRouter();
+  const proofHistory = useProofHistory(5);
   const [testing, setTesting] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, any>>({});
   const [devLog, setDevLog] = useState<string>('');
@@ -1795,6 +1798,95 @@ export function IntegrationTests() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Proof status (L2/L1) */}
+      <div className="border-2 border-emerald-200 rounded-xl p-5 bg-emerald-50 shadow-sm mt-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-emerald-900">Proof Verification (L2/L1)</h3>
+          <button
+            onClick={proofHistory.refetch}
+            className="px-3 py-1 text-sm bg-emerald-600 text-white rounded hover:bg-emerald-700 transition-colors"
+          >
+            Refresh
+          </button>
+        </div>
+        {proofHistory.loading && <p className="text-sm text-emerald-700">Loading proof history…</p>}
+        {proofHistory.error && <p className="text-sm text-red-600">Error: {proofHistory.error}</p>}
+        {proofHistory.data.length === 0 && !proofHistory.loading && (
+          <p className="text-sm text-emerald-700">No proofs yet.</p>
+        )}
+        {proofHistory.data.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm text-left border-collapse">
+              <thead>
+                <tr className="text-xs uppercase text-emerald-800">
+                  <th className="py-2 pr-4">Time</th>
+                  <th className="py-2 pr-4">Proof</th>
+                  <th className="py-2 pr-4">Tx</th>
+                  <th className="py-2 pr-4">L2 Fact</th>
+                  <th className="py-2 pr-4">L1 Fact</th>
+                  <th className="py-2 pr-4">Atlantic</th>
+                  <th className="py-2 pr-4">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {proofHistory.data.slice(0, 8).map((p) => (
+                  <tr key={p.id} className="border-t border-emerald-100 align-top">
+                    <td className="py-2 pr-4 text-slate-700">
+                      {p.timestamp ? new Date(p.timestamp).toLocaleString() : '—'}
+                    </td>
+                    <td className="py-2 pr-4 text-slate-700">
+                      {(p.proof_hash || '').slice(0, 12)}…
+                    </td>
+                    <td className="py-2 pr-4 text-slate-700">
+                      {p.tx_hash ? `${p.tx_hash.slice(0, 10)}…` : '—'}
+                    </td>
+                    <td className="py-2 pr-4 text-slate-700">
+                      {(p.l2_fact_hash || p.fact_hash || '—').slice(0, 12)}…
+                      {p.l2_verified_at ? (
+                        <div className="text-[11px] text-emerald-700">
+                          ✓ {new Date(p.l2_verified_at).toLocaleString()}
+                        </div>
+                      ) : (
+                        <div className="text-[11px] text-amber-700">pending</div>
+                      )}
+                    </td>
+                    <td className="py-2 pr-4 text-slate-700">
+                      {(p.l1_fact_hash || '—').slice(0, 12)}…
+                      {p.l1_verified_at ? (
+                        <div className="text-[11px] text-emerald-700">
+                          ✓ {new Date(p.l1_verified_at).toLocaleString()}
+                        </div>
+                      ) : p.l1_fact_hash ? (
+                        <div className="text-[11px] text-amber-700">pending</div>
+                      ) : null}
+                    </td>
+                    <td className="py-2 pr-4 text-slate-700">
+                      {p.atlantic_query_id ? p.atlantic_query_id.slice(0, 10) + '…' : '—'}
+                    </td>
+                    <td className="py-2 pr-4">
+                      <ProofBadge
+                        hash={p.proof_hash}
+                        status={p.proof_status as any}
+                        txHash={p.tx_hash}
+                        factHash={p.fact_hash}
+                        l2FactHash={p.l2_fact_hash}
+                        l2VerifiedAt={p.l2_verified_at}
+                        l1FactHash={p.l1_fact_hash}
+                        l1VerifiedAt={p.l1_verified_at}
+                        network={p.network}
+                        submittedAt={p.timestamp || undefined}
+                        verifiedAt={p.l2_verified_at || p.l1_verified_at || undefined}
+                        atlanticQueryId={p.atlantic_query_id}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Protocol Statistics */}

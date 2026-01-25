@@ -20,6 +20,8 @@ import { IntegrationTests } from './IntegrationTests';
 import { categorizeError } from '@/services/errorHandler';
 import { useState, useMemo, useEffect } from 'react';
 import { getConfig } from '@/lib/config';
+import { useProofHistory } from '@/hooks/useProofHistory';
+import { ProofBadge } from './ProofBadge';
 
 type TabType = 'overview' | 'analytics' | 'history' | 'integration-tests';
 
@@ -56,6 +58,8 @@ export function Dashboard() {
   const riskEngineOrchestration = useRiskEngineOrchestration();
   const backendOrchestration = useRiskEngineBackendOrchestration();
   const { status: txStatus } = useTransactionMonitor(lastTxHash || undefined);
+  const proofHistory = useProofHistory(5);
+  const latestProof = proofHistory.data[0];
   
   // Fetch user's STRK balance on mount and when address changes
   useEffect(() => {
@@ -945,6 +949,57 @@ export function Dashboard() {
             )}
           </div>
 
+          {/* Latest proof status (L2/L1) */}
+          {latestProof && (
+            <div className="bg-white/80 border border-white/70 rounded-3xl p-6 shadow-lift backdrop-blur">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Latest proof</p>
+                  <h3 className="font-display text-xl text-ink mt-1">On-chain verification</h3>
+                  <p className="text-sm text-slate-600 mt-1">
+                    {latestProof.proof_status} • TX {latestProof.tx_hash?.slice(0, 10) ?? '—'}...
+                  </p>
+                </div>
+                <ProofBadge
+                  hash={latestProof.proof_hash}
+                  status={latestProof.proof_status as any}
+                  txHash={latestProof.tx_hash}
+                  factHash={latestProof.fact_hash}
+                  l2FactHash={latestProof.l2_fact_hash}
+                  l2VerifiedAt={latestProof.l2_verified_at}
+                  l1FactHash={latestProof.l1_fact_hash}
+                  l1VerifiedAt={latestProof.l1_verified_at}
+                  network={latestProof.network}
+                  submittedAt={latestProof.timestamp || undefined}
+                  verifiedAt={latestProof.l2_verified_at || latestProof.l1_verified_at || undefined}
+                />
+              </div>
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm text-slate-700">
+                <div className="bg-white/60 rounded-2xl p-3 border border-white/70">
+                  <p className="text-xs text-slate-500 mb-1">Fact (L2)</p>
+                  <p className="text-ink break-all text-xs">{latestProof.l2_fact_hash || latestProof.fact_hash || '—'}</p>
+                  {latestProof.l2_verified_at && (
+                    <p className="text-[11px] text-gray-500 mt-1">Verified {new Date(latestProof.l2_verified_at).toLocaleString()}</p>
+                  )}
+                </div>
+                <div className="bg-white/60 rounded-2xl p-3 border border-white/70">
+                  <p className="text-xs text-slate-500 mb-1">Fact (L1)</p>
+                  <p className="text-ink break-all text-xs">{latestProof.l1_fact_hash || '—'}</p>
+                  {latestProof.l1_verified_at && (
+                    <p className="text-[11px] text-gray-500 mt-1">Verified {new Date(latestProof.l1_verified_at).toLocaleString()}</p>
+                  )}
+                </div>
+                <div className="bg-white/60 rounded-2xl p-3 border border-white/70">
+                  <p className="text-xs text-slate-500 mb-1">Network</p>
+                  <p className="text-ink text-sm">{latestProof.network || 'sepolia'}</p>
+                </div>
+              </div>
+              {proofHistory.error && (
+                <p className="text-xs text-red-500 mt-3">History load failed: {proofHistory.error}</p>
+              )}
+            </div>
+          )}
+
           {/* Rebalance History with Proofs */}
           <div className="bg-gradient-to-br from-slate-900/70 via-purple-900/20 to-slate-900/70 border border-purple-400/30 rounded-xl p-6 shadow-lg">
             <RebalanceHistory />
@@ -961,4 +1016,3 @@ export function Dashboard() {
     </div>
   );
 }
-

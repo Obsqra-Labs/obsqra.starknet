@@ -15,6 +15,13 @@ interface RebalanceRecord {
   proof_status: ProofStatus;
   tx_hash: string | null;
   fact_hash: string | null;
+  l2_fact_hash?: string | null;
+  l2_verified_at?: string | null;
+  l1_fact_hash?: string | null;
+  l1_verified_at?: string | null;
+  l1_settlement_enabled?: boolean;
+  atlantic_query_id?: string | null;
+  network?: string | null;
   submitted_at: string | null;
   verified_at: string | null;
   proof_job_id?: string;
@@ -173,6 +180,11 @@ export function RebalanceHistory() {
                     status={record.proof_status}
                     txHash={record.tx_hash}
                     factHash={record.fact_hash}
+                    l2FactHash={record.l2_fact_hash}
+                    l2VerifiedAt={record.l2_verified_at}
+                    l1FactHash={record.l1_fact_hash}
+                    l1VerifiedAt={record.l1_verified_at}
+                    network={record.network}
                     submittedAt={record.submitted_at}
                     verifiedAt={record.verified_at}
                     proofJobId={record.proof_job_id || record.id}
@@ -301,4 +313,3 @@ function getRiskColor(risk: number): string {
   if (risk < 70) return 'text-yellow-400';
   return 'text-red-400';
 }
-

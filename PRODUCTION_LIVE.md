@@ -49,6 +49,84 @@ curl -X POST https://starknet.obsqra.fi/api/v1/proofs/generate \
 
 ---
 
+## Technical Scope (Next Build: Privacy + zkML Demo)
+
+### Goal
+Ship a credible, grant‑ready MVP that proves policy‑constrained decisions on real market data, adds privacy via MIST.cash, and demos zkML as a proof‑verified decision gate (small model, not full ML pipeline).
+
+### Why This Is Not “Fake Testnet”
+- Data comes from mainnet state (read‑only or mainnet‑fork), so the model operates on real pool conditions.
+- Execution is optional; proofs are still meaningful because they attest to real inputs and enforced constraints.
+- Privacy is real because deposits/withdrawals are unlinkable (Seek & Hide pattern).
+
+### In Scope
+**Privacy (MIST.cash integration)**
+- Integrate MIST privacy pool contracts for deposits/withdrawals.
+- Enforce denomination buckets or ranges to reduce amount‑correlation risk.
+- Support “Seek & Hide” style partial withdraw/re‑wrap to preserve anonymity sets.
+
+**Proof‑Verified Strategy Execution**
+- Continue generating STARK proofs (LuminAIR) for deterministic risk scoring + allocation.
+- Verify proofs locally and/or on Starknet (Integrity Verifier).
+- Gate on‑chain execution behind proof verification (optional for demo).
+
+**zkML Demo (Stretch, but feasible)**
+- Add a tiny model (e.g., logistic regression or 1‑layer MLP) used as a “rebalance/hold” or “risk tier” classifier.
+- Prove inference off‑chain and verify the proof on Starknet.
+- Keep the model small, explainable, and fast (goal: seconds per proof).
+
+**Real‑Data Pipeline**
+- Use mainnet‑fork (Katana/SNForge) or read‑only mainnet RPC to fetch live pool metrics.
+- Snapshot inputs with timestamp and block number for auditability.
+
+**UX (Minimal, Honest)**
+1. Connect wallet (AA).
+2. Choose policy preset (risk caps, protocol allowlist, max allocation).
+3. Deposit (public or private via MIST).
+4. Generate proof → verify locally.
+5. Execute (optional) or save proof + allocation as audit artifact.
+
+### Out of Scope (for this build)
+- Full zkML training pipeline or large models.
+- Cross‑chain execution or non‑Starknet deployment.
+- High‑frequency strategy automation.
+- “Guaranteed yield” claims.
+
+### Deliverables
+**On‑chain**
+- Policy/constraint registry.
+- Proof verifier hook (Integrity).
+- StrategyRouter gating by proof (optional in demo mode).
+- MIST integration contract adapters.
+
+**Backend**
+- Live metrics fetch + snapshot storage.
+- Proof generation + verification API.
+- Privacy deposit/withdraw orchestration endpoints.
+
+**Frontend**
+- 3‑step guided flow (Policy → Proof → Execute).
+- Proof/decision audit trail.
+- Privacy deposit/withdraw status.
+
+### Timeline (6 Weeks)
+Week 1‑2: Mainnet‑fork data pipeline + proofed decision flow.  
+Week 3‑4: MIST privacy integration (denoms + Seek & Hide).  
+Week 5‑6: zkML demo (tiny model + proof verification).
+
+### Success Criteria
+- Proof generation < 5s on sample inputs.
+- End‑to‑end flow works on real mainnet data (fork or read‑only).
+- Private deposit/withdraw works with denomination/range rules.
+- zkML demo proves a binary decision with on‑chain verification.
+
+### Risks & Mitigations
+- MIST contracts only on mainnet → use mainnet‑fork for integration testing.
+- Proof time too slow → keep model tiny and deterministic.
+- Amount correlation → enforce denoms/ranges and Seek & Hide flow.
+
+---
+
 ## Production Architecture
 
 ```
@@ -437,4 +515,3 @@ done
 *Domain: https://starknet.obsqra.fi*  
 *Backend: /opt/obsqra.starknet*  
 *Status: OPERATIONAL ✅*
-

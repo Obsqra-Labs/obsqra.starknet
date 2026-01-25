@@ -347,6 +347,47 @@ export function useStrategyRouter(): StrategyRouterData & { refetch: () => void 
         console.warn('⚠️ Error fetching projected APY:', apyErr);
       }
 
+      // Calculate actual APY from on-chain data (if we have yield and TVL)
+      let jediswapActualApy = 0;
+      let ekuboActualApy = 0;
+      try {
+        // Calculate actual APY: (yield / tvl) * 100 * (365 / days)
+        // For now, use projected APY as actual (can be enhanced with historical data)
+        // TODO: Calculate from historical yield data
+        jediswapActualApy = jediswapProjectedApy; // Placeholder
+        ekuboActualApy = ekuboProjectedApy; // Placeholder
+      } catch (apyCalcErr) {
+        console.warn('⚠️ Error calculating actual APY:', apyCalcErr);
+      }
+
+      // Fetch pending fees from contract
+      let pendingFees = { jediswap: '0', ekubo: '0' };
+      try {
+        // Try to fetch pending fees (if contract has this function)
+        const feesResult = await provider.callContract({
+          contractAddress: strategyRouterAddress,
+          entrypoint: 'get_pending_fees',
+          calldata: [],
+        }).catch(() => null);
+        
+        if (feesResult) {
+          const feesArray = toResultArray(feesResult);
+          if (feesArray.length >= 2) {
+            pendingFees = {
+              jediswap: parseU256([feesArray[0], feesArray[1] || '0']).toString(),
+              ekubo: parseU256([feesArray[2] || '0', feesArray[3] || '0']).toString(),
+            };
+            console.log('✅ Fetched pending fees:', pendingFees);
+          }
+        }
+      } catch (feesErr) {
+        if (isFunctionNotFound(feesErr)) {
+          console.log('⚠️ get_pending_fees not found on contract, using defaults');
+        } else {
+          console.warn('⚠️ Error fetching pending fees:', feesErr);
+        }
+      }
+
       setData({
         totalValueLocked: vaultTvl || '0', // Vault TVL (total deposits)
         jediswapAllocation: jediPercent,

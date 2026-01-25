@@ -235,13 +235,16 @@ export async function POST(request: NextRequest) {
         entrypoint: String(call.entrypoint),
         calldata: validatedCalldata,
       };
+      const safeCalldataForLog: string[] = Array.isArray(validatedCall.calldata)
+        ? validatedCall.calldata.map((v: any) => String(v))
+        : [];
       
       console.log('[Owner API] Constructed call:', JSON.stringify({
         contractAddress: validatedCall.contractAddress,
         entrypoint: validatedCall.entrypoint,
-        calldata: validatedCall.calldata,
-        calldataLength: validatedCall.calldata.length,
-        calldataTypes: validatedCall.calldata.map(v => typeof v),
+        calldata: safeCalldataForLog,
+        calldataLength: safeCalldataForLog.length,
+        calldataTypes: safeCalldataForLog.map(v => typeof v),
       }, null, 2));
       
       // Use validated call
@@ -270,7 +273,7 @@ export async function POST(request: NextRequest) {
     try {
       // Final validation: ensure calldata has no undefined/null values and is properly formatted
       // Filter out any undefined/null values and convert everything to strings
-      const validatedCalldata = (call.calldata || [])
+      const validatedCalldata = (Array.isArray(call.calldata) ? call.calldata : [])
         .filter((val: any) => val !== undefined && val !== null && val !== 'undefined' && val !== 'null')
         .map((val: any, idx: number) => {
           // Convert BigInt to string (Starknet expects calldata as strings)
@@ -379,13 +382,16 @@ export async function POST(request: NextRequest) {
         console.error('[Owner API] Error stack:', error.stack);
         
         // Log the exact call object that failed
+        const safeFinalCalldata: string[] = Array.isArray(finalCall.calldata)
+          ? finalCall.calldata.map((v: any) => String(v))
+          : [];
         console.error('[Owner API] Failed call object:', JSON.stringify({
           contractAddress: finalCall.contractAddress,
           entrypoint: finalCall.entrypoint,
-          calldata: finalCall.calldata,
-          calldataLength: finalCall.calldata.length,
-          calldataTypes: finalCall.calldata.map((v: any) => typeof v),
-          calldataValues: finalCall.calldata.map((v: any) => String(v)),
+          calldata: safeFinalCalldata,
+          calldataLength: safeFinalCalldata.length,
+          calldataTypes: safeFinalCalldata.map((v: any) => typeof v),
+          calldataValues: safeFinalCalldata.map((v: any) => String(v)),
         }, null, 2));
         
         throw error; // Re-throw to be caught by outer handler
@@ -439,4 +445,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

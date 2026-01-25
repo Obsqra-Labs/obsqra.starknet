@@ -8,38 +8,48 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Dark theme palette
+        surface: {
+          0: '#0a0a0b',
+          1: '#111113',
+          2: '#18181b',
+          3: '#27272a',
+        },
+        // Accent colors
         mint: {
-          50: '#ecfff6',
-          100: '#d3ffe9',
-          200: '#a4f8cb',
-          300: '#6ef0b2',
-          500: '#22d17f',
-          600: '#16b26a',
+          50: '#ecfdf5',
+          100: '#d1fae5',
+          200: '#a7f3d0',
+          300: '#6ee7b7',
+          400: '#34d399',
+          500: '#10b981',
+          600: '#059669',
         },
-        lagoon: {
-          50: '#e8f6ff',
-          100: '#d9f0ff',
-          200: '#a6dcff',
-          300: '#84caff',
-          500: '#1f9ae0',
+        cyan: {
+          400: '#22d3ee',
+          500: '#06b6d4',
         },
-        ink: '#0f172a',
-        sand: '#f5f1e8',
-        cloud: '#f8fbff',
       },
       fontFamily: {
-        display: ['var(--font-display)', 'Space Grotesk', 'Inter', 'system-ui', 'sans-serif'],
-        sans: ['var(--font-body)', 'Inter', 'system-ui', 'sans-serif'],
+        display: ['Space Grotesk', 'Inter', 'system-ui', 'sans-serif'],
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'SF Mono', 'Monaco', 'Inconsolata', 'monospace'],
+      },
+      fontSize: {
+        '2xs': ['0.625rem', { lineHeight: '0.875rem' }],
       },
       boxShadow: {
-        lift: '0 18px 50px rgba(15, 23, 42, 0.08)',
+        'glow-sm': '0 0 20px rgba(52, 211, 153, 0.1)',
+        'glow-md': '0 0 40px rgba(52, 211, 153, 0.15)',
       },
-      backgroundImage: {
-        'soft-radial':
-          'radial-gradient(circle at 20% 20%, rgba(34, 209, 127, 0.18), transparent 45%), radial-gradient(circle at 80% 0%, rgba(31, 154, 224, 0.16), transparent 30%)',
+      borderRadius: {
+        xl: '0.75rem',
+      },
+      animation: {
+        'fade-in': 'fade-in 0.4s ease-out forwards',
+        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
       },
     },
   },
   plugins: [],
 }
-

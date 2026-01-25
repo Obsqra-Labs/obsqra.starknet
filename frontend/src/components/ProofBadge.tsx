@@ -9,6 +9,12 @@ interface ProofBadgeProps {
   status: ProofStatus;
   txHash?: string | null;
   factHash?: string | null;
+  l2FactHash?: string | null;
+  l2VerifiedAt?: string | null;
+  l1FactHash?: string | null;
+  l1VerifiedAt?: string | null;
+  network?: string | null;
+  atlanticQueryId?: string | null;
   submittedAt?: string | null;
   verifiedAt?: string | null;
   proofJobId?: string | null;
@@ -16,7 +22,23 @@ interface ProofBadgeProps {
   proofSize?: number | null;
 }
 
-export function ProofBadge({ hash, status, txHash, factHash, submittedAt, verifiedAt, proofJobId, generationTime, proofSize }: ProofBadgeProps) {
+export function ProofBadge({
+  hash,
+  status,
+  txHash,
+  factHash,
+  l2FactHash,
+  l2VerifiedAt,
+  l1FactHash,
+  l1VerifiedAt,
+  network,
+  atlanticQueryId,
+  submittedAt,
+  verifiedAt,
+  proofJobId,
+  generationTime,
+  proofSize,
+}: ProofBadgeProps) {
   const [showDetails, setShowDetails] = useState(false);
 
   const statusConfig = {
@@ -107,8 +129,28 @@ export function ProofBadge({ hash, status, txHash, factHash, submittedAt, verifi
 
             {factHash && (
               <div>
-                <p className="text-xs text-gray-400 mb-1">Fact Hash (L1):</p>
+                <p className="text-xs text-gray-400 mb-1">Fact Hash:</p>
                 <code className="text-xs text-green-400 break-all">{factHash}</code>
+              </div>
+            )}
+
+            {l2FactHash && (
+              <div>
+                <p className="text-xs text-gray-400 mb-1">L2 Fact:</p>
+                <code className="text-xs text-blue-300 break-all">{l2FactHash}</code>
+                {l2VerifiedAt && (
+                  <p className="text-[11px] text-gray-500">Verified at {new Date(l2VerifiedAt).toLocaleString()}</p>
+                )}
+              </div>
+            )}
+
+            {l1FactHash && (
+              <div>
+                <p className="text-xs text-gray-400 mb-1">L1 Fact:</p>
+                <code className="text-xs text-emerald-300 break-all">{l1FactHash}</code>
+                {l1VerifiedAt && (
+                  <p className="text-[11px] text-gray-500">Verified at {new Date(l1VerifiedAt).toLocaleString()}</p>
+                )}
               </div>
             )}
 
@@ -152,6 +194,12 @@ export function ProofBadge({ hash, status, txHash, factHash, submittedAt, verifi
                 </a>
               </div>
             )}
+            {atlanticQueryId && (
+              <div className="mt-2">
+                <p className="text-xs text-gray-400 mb-1">Atlantic Query ID:</p>
+                <code className="text-xs text-white break-all">{atlanticQueryId}</code>
+              </div>
+            )}
 
             <div className="mt-3 pt-3 border-t border-white/10">
               <p className="text-xs text-gray-400">
@@ -160,6 +208,8 @@ export function ProofBadge({ hash, status, txHash, factHash, submittedAt, verifi
                     ✅ <span className="text-green-400 font-semibold">Locally verified</span> (&lt;1 second)
                     <br />
                     <span className="text-gray-500 text-xs mt-1 block">Cryptographic proof of computation integrity</span>
+                    {l2VerifiedAt && <span className="text-gray-500 text-xs mt-1 block">L2 verified</span>}
+                    {l1VerifiedAt && <span className="text-gray-500 text-xs mt-1 block">L1 settled{network ? ` (${network})` : ''}</span>}
                   </>
                 )}
                 {status === 'verifying' && '⏳ SHARP verification in progress (10-60 min)'}
@@ -180,4 +230,3 @@ export function ProofBadge({ hash, status, txHash, factHash, submittedAt, verifi
     </div>
   );
 }
-

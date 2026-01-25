@@ -7,13 +7,15 @@ from sqlalchemy.future import select
 from sqlalchemy import desc
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
+from typing import Dict
 import uuid
 import logging
 
 from app.database import get_db
 from app.db.session import get_db as get_sync_db
-from app.models import User, RiskHistory, AllocationHistory, ProofJob
+from app.models import User, RiskHistory, AllocationHistory, ProofJob, ProofStatus
 from app.api.routes.auth import get_current_user
+from app.services.performance_service import PerformanceService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -172,11 +174,67 @@ async def get_rebalance_history(
             "proof_status": job.status.value if hasattr(job.status, 'value') else str(job.status),
             "tx_hash": job.tx_hash,
             "fact_hash": job.fact_hash,
+            "l2_fact_hash": getattr(job, "l2_fact_hash", None),
+            "l2_verified_at": job.l2_verified_at.isoformat() if getattr(job, "l2_verified_at", None) else None,
+            "l2_block_number": getattr(job, "l2_block_number", None),
+            "l1_settlement_enabled": getattr(job, "l1_settlement_enabled", False),
+            "atlantic_query_id": getattr(job, "atlantic_query_id", None),
+            "l1_fact_hash": getattr(job, "l1_fact_hash", None),
+            "l1_verified_at": job.l1_verified_at.isoformat() if getattr(job, "l1_verified_at", None) else None,
+            "l1_block_number": getattr(job, "l1_block_number", None),
+            "network": getattr(job, "network", None),
+            "proof_source": getattr(job, "proof_source", None) or (job.metrics.get("proof_source") if job.metrics else None),
+            "error": getattr(job, "error", None) or (job.metrics.get("verification_error") if job.metrics else None),
             "submitted_at": job.submitted_at.isoformat() if job.submitted_at else None,
             "verified_at": job.verified_at.isoformat() if job.verified_at else None,
         }
         for job in proof_jobs
     ]
+
+
+@router.get("/proof-summary")
+async def get_proof_summary(
+    db: Session = Depends(get_sync_db)
+) -> Dict:
+    """
+    Lightweight summary of proof verification state for dashboards.
+    """
+    total = db.query(ProofJob).count()
+    l2_verified = db.query(ProofJob).filter(ProofJob.l2_verified_at.isnot(None)).count()
+    l1_verified = db.query(ProofJob).filter(ProofJob.l1_verified_at.isnot(None)).count()
+    failed = db.query(ProofJob).filter(ProofJob.status == ProofStatus.FAILED).count()
+    pending = db.query(ProofJob).filter(
+        ProofJob.status.notin_([ProofStatus.VERIFIED, ProofStatus.FAILED])
+    ).count()
+
+    latest = db.query(ProofJob).order_by(desc(ProofJob.created_at)).first()
+    latest_info = None
+    if latest:
+        latest_info = {
+            "id": str(latest.id),
+            "proof_hash": latest.proof_hash,
+            "tx_hash": latest.tx_hash,
+            "fact_hash": latest.fact_hash,
+            "l2_fact_hash": getattr(latest, "l2_fact_hash", None),
+            "l2_verified_at": latest.l2_verified_at.isoformat() if latest.l2_verified_at else None,
+            "l1_fact_hash": getattr(latest, "l1_fact_hash", None),
+            "l1_verified_at": latest.l1_verified_at.isoformat() if latest.l1_verified_at else None,
+            "atlantic_query_id": getattr(latest, "atlantic_query_id", None),
+            "status": latest.status.value if hasattr(latest.status, "value") else str(latest.status),
+            "created_at": latest.created_at.isoformat() if latest.created_at else None,
+            "network": getattr(latest, "network", None),
+            "proof_source": getattr(latest, "proof_source", None) or (latest.metrics.get("proof_source") if latest.metrics else None),
+            "error": getattr(latest, "error", None) or (latest.metrics.get("verification_error") if latest.metrics else None),
+        }
+
+    return {
+        "total": total,
+        "l2_verified": l2_verified,
+        "l1_verified": l1_verified,
+        "pending": pending,
+        "failed": failed,
+        "latest": latest_info,
+    }
 
 
 @router.get("/proof/{proof_job_id}/download")
@@ -310,3 +368,22 @@ async def get_protocol_apys(force_refresh: bool = Query(False, description="Forc
             "cached": False,
         }
 
+
+@router.get("/performance/real")
+async def get_real_performance(
+    days: int = Query(30, ge=1, le=365),
+    db: Session = Depends(get_sync_db)
+):
+    """
+    Return real performance from executed rebalances (no demo mode).
+    Source of truth: ProofJob records with tx_hash present.
+    """
+    service = PerformanceService(db)
+    portfolio = service.calculate_portfolio_performance(days=days)
+    timeline = service.get_performance_timeline(days=days)
+    return {
+        "portfolio": portfolio,
+        "timeline": timeline,
+        "period_days": days,
+        "source": "proof_jobs"
+    }

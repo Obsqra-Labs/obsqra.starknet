@@ -18,6 +18,9 @@ from app.db.session import get_db
 from app.models import ProofJob, ProofStatus
 from app.services.luminair_service import get_luminair_service
 from app.workers.sharp_worker import submit_proof_to_sharp
+from app.services.integrity_service import get_integrity_service
+from app.services.atlantic_service import get_atlantic_service
+from app.workers.atlantic_worker import enqueue_atlantic_status_check
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -212,6 +215,7 @@ async def orchestrate_allocation(
     This enables fully automated AI execution without user wallet interaction.
     """
     try:
+        proof_job = None
         logger.info(f"🤖 AI Orchestration Starting...")
         logger.info(f"📊 JediSwap metrics: util={request.jediswap_metrics.utilization}, "
                    f"vol={request.jediswap_metrics.volatility}, liq={request.jediswap_metrics.liquidity}, "
@@ -234,21 +238,106 @@ async def orchestrate_allocation(
         logger.info(f"   Ekubo risk: {proof.output_score_ekubo}")
         logger.info(f"   Generation time: {proof_generation_time:.2f}s")
         
-        # STEP 2: Store proof in database
-        # Set status based on verification result
-        proof_status = ProofStatus.VERIFIED if proof.verified else ProofStatus.GENERATED
+        # STEP 2: Calculate fact hash and verify on L2 (Integrity Verifier)
+        fact_hash = proof.fact_hash or (
+            luminair.calculate_fact_hash(proof.proof_data or b"") if proof.proof_data else None
+        )
+        if not fact_hash:
+            if settings.ALLOW_FAKE_FACT_HASH:
+                fact_hash = luminair.calculate_fact_hash(proof.proof_data or b"")
+                logger.warning("Using fallback fact hash (stub) because LuminAIR did not emit one")
+            else:
+                raise HTTPException(status_code=500, detail="No fact hash from LuminAIR; set ALLOW_FAKE_FACT_HASH=True to override")
+        integrity = get_integrity_service()
+        l2_verified = False
+        l2_verified_at = None
+        verification_error = None
+
+        # Prefer structured Integrity payloads, then bytes; else fall back to hash check
+        verifier_struct = None
+        proof_struct = None
+        verifier_bytes = None
+        proof_bytes = None
+
+        # Structured JSON from operator
+        if getattr(proof, "verifier_config_json", None) and getattr(proof, "stark_proof_json", None):
+            verifier_struct = proof.verifier_config_json
+            proof_struct = proof.stark_proof_json
+        else:
+            # Try base64 JSON if format matches
+            if getattr(proof, "verifier_payload_format", None) == "integrity_json":
+                import base64
+                import json as pyjson
+                try:
+                    if proof.verifier_config_b64:
+                        verifier_struct = pyjson.loads(base64.b64decode(proof.verifier_config_b64))
+                    if proof.stark_proof_b64:
+                        proof_struct = pyjson.loads(base64.b64decode(proof.stark_proof_b64))
+                except Exception as decode_err:
+                    logger.warning(f"Could not decode Integrity JSON payloads: {decode_err}")
+
+        # Bytes fallback
+        try:
+            if proof.verifier_config_path:
+                from pathlib import Path
+                verifier_bytes = Path(proof.verifier_config_path).read_bytes()
+            if proof.stark_proof_path:
+                from pathlib import Path
+                proof_bytes = Path(proof.stark_proof_path).read_bytes()
+        except Exception as read_err:
+            logger.warning(f"Could not read verifier/proof blobs: {read_err}")
+
+        attempted_full = False
+        if verifier_struct and proof_struct:
+            attempted_full = True
+            l2_verified = await integrity.verify_proof_full_and_register_fact(
+                verifier_config=verifier_struct,
+                stark_proof=proof_struct
+            )
+            l2_verified_at = datetime.utcnow() if l2_verified else None
+        elif verifier_bytes and proof_bytes:
+            attempted_full = True
+            l2_verified = await integrity.verify_proof_full_and_register_fact(
+                verifier_config=verifier_bytes,
+                stark_proof=proof_bytes
+            )
+            l2_verified_at = datetime.utcnow() if l2_verified else None
+        else:
+            attempted_full = True
+            try:
+                l2_verified = await integrity.verify_proof_on_l2(fact_hash)
+                l2_verified_at = datetime.utcnow() if l2_verified else None
+                if not l2_verified:
+                    verification_error = "L2 verification failed"
+            except Exception as ver_err:
+                verification_error = str(ver_err)
+                l2_verified = False
+                l2_verified_at = None
+                attempted_full = True
+        
+        # STEP 3: Store proof in database with verification metadata
+        proof_status = ProofStatus.VERIFIED if l2_verified else ProofStatus.FAILED if attempted_full else ProofStatus.GENERATED
+        proof_source = "luminair_mock" if getattr(luminair, "use_mock", False) else "luminair"
         proof_job = ProofJob(
             proof_hash=proof.proof_hash,
             status=proof_status,
+            fact_hash=fact_hash,
+            l2_fact_hash=fact_hash,
+            l2_verified_at=l2_verified_at,
+            proof_source=proof_source,
+            network=settings.STARKNET_NETWORK,
             metrics={
                 "jediswap": request.jediswap_metrics.dict(),
                 "ekubo": request.ekubo_metrics.dict(),
                 "jediswap_risk": proof.output_score_jediswap,
                 "ekubo_risk": proof.output_score_ekubo,
                 "proof_generation_time_seconds": proof_generation_time,
-                "proof_data_size_bytes": len(proof.proof_data) if proof.proof_data else 0
+                "proof_data_size_bytes": len(proof.proof_data) if proof.proof_data else 0,
+                "proof_source": proof_source,
+                "verification_error": verification_error
             },
-            proof_data=proof.proof_data
+            proof_data=proof.proof_data,
+            error=verification_error
         )
         db.add(proof_job)
         db.commit()
@@ -267,11 +356,12 @@ async def orchestrate_allocation(
         
         # Create backend account (AI orchestrator account)
         key_pair = KeyPair.from_private_key(int(settings.BACKEND_WALLET_PRIVATE_KEY, 16))
+        network_chain = StarknetChainId.SEPOLIA if settings.STARKNET_NETWORK.lower() == "sepolia" else StarknetChainId.MAINNET
         account = Account(
             address=int(settings.BACKEND_WALLET_ADDRESS, 16),
             client=rpc_client,
             key_pair=key_pair,
-            chain=StarknetChainId.SEPOLIA
+            chain=network_chain
         )
         
         logger.info(f"✅ Backend account initialized: {settings.BACKEND_WALLET_ADDRESS}")
@@ -361,13 +451,43 @@ async def orchestrate_allocation(
         # Update proof status to executed (on-chain transaction succeeded)
         # Keep VERIFIED status if proof was verified locally, otherwise set to SUBMITTED
         if proof_job.status != ProofStatus.VERIFIED:
-            proof_job.status = ProofStatus.SUBMITTED  # "SUBMITTED" = on-chain execution succeeded
+            # If Integrity already marked as FAILED, keep it; otherwise mark submitted
+            if proof_job.status != ProofStatus.FAILED:
+                proof_job.status = ProofStatus.SUBMITTED  # "SUBMITTED" = on-chain execution succeeded
         proof_job.submitted_at = datetime.utcnow()
+        try:
+            receipt = await rpc_client.get_transaction_receipt(invoke_result.transaction_hash)
+            proof_job.l2_block_number = getattr(receipt, "block_number", None)
+        except Exception as receipt_err:
+            logger.warning(f"⚠️ Could not fetch transaction receipt: {receipt_err}")
         # Set verified_at if proof was verified locally
         if proof.verified and not proof_job.verified_at:
             proof_job.verified_at = datetime.utcnow()
         db.commit()
         db.refresh(proof_job)
+        
+        # Optional L1 settlement (Atlantic) for Sepolia or when enabled
+        if settings.STARKNET_NETWORK.lower() == "sepolia":
+            atlantic = get_atlantic_service()
+            if atlantic:
+                try:
+                    trace_path = await luminair.export_trace(
+                        request.jediswap_metrics.dict(),
+                        request.ekubo_metrics.dict(),
+                        proof_data=proof.proof_data,
+                        trace_path=proof.trace_path
+                    )
+                    submission = await atlantic.submit_trace_for_l1_verification(trace_path)
+                    proof_job.l1_settlement_enabled = True
+                    proof_job.atlantic_query_id = submission.query_id
+                    proof_job.l1_fact_hash = fact_hash
+                    db.commit()
+                    db.refresh(proof_job)
+                    enqueue_atlantic_status_check(submission.query_id, proof_job.id)
+                except Exception as atl_err:
+                    logger.warning(f"⚠️ Atlantic submission failed (non-blocking): {atl_err}")
+            else:
+                logger.info("Atlantic service not configured; skipping L1 submission")
         
         # Trigger background SHARP submission (non-blocking, won't affect orchestration response)
         # Note: SHARP submission is optional - MVP uses mock proofs, real SHARP integration coming
@@ -433,9 +553,24 @@ async def orchestrate_allocation(
         )
         
     except HTTPException as e:
+        # If we already created a proof job, mark it failed with the error
+        try:
+            if 'proof_job' in locals() and proof_job:
+                proof_job.status = ProofStatus.FAILED
+                proof_job.error = str(e.detail) if hasattr(e, "detail") else str(e)
+                db.commit()
+        except Exception:
+            pass
         raise e
     except Exception as e:
         logger.error(f"❌ AI Orchestration failed: {str(e)}", exc_info=True)
+        try:
+            if 'proof_job' in locals() and proof_job:
+                proof_job.status = ProofStatus.FAILED
+                proof_job.error = str(e)
+                db.commit()
+        except Exception:
+            pass
         raise HTTPException(
             status_code=500,
             detail=f"AI execution failed: {str(e)}"

@@ -68,6 +68,8 @@ class PerformanceService:
         
         # Get latest rebalance for current state
         latest = rebalances[0] if rebalances else None
+
+        verified_count = sum(1 for r in rebalances if str(getattr(r, "status", "")).lower() == "verified")
         
         return {
             "total_rebalances": total_rebalances,
@@ -88,12 +90,8 @@ class PerformanceService:
             },
             "proof_metrics": {
                 "total_proofs": total_rebalances,
-                "verified_count": sum(1 for r in rebalances if r.verified),
-                "verified_percentage": round(
-                    (sum(1 for r in rebalances if r.verified) / total_rebalances * 100)
-                    if total_rebalances > 0 else 0,
-                    1
-                ),
+                "verified_count": verified_count,
+                "verified_percentage": round((verified_count / total_rebalances * 100) if total_rebalances > 0 else 0, 1),
             }
         }
     
@@ -160,6 +158,13 @@ class PerformanceService:
         
         timeline = []
         for rebalance in rebalances:
+            verified = False
+            status_val = str(getattr(rebalance, "status", "")).lower()
+            if hasattr(rebalance, "verified_at") and rebalance.verified_at:
+                verified = True
+            elif status_val == "verified":
+                verified = True
+
             timeline.append({
                 "timestamp": rebalance.created_at.isoformat(),
                 "jediswap_pct": (rebalance.jediswap_pct / 100) if rebalance.jediswap_pct else 0,
@@ -169,9 +174,7 @@ class PerformanceService:
                 "tx_hash": rebalance.tx_hash,
                 "proof_hash": rebalance.proof_hash,
                 "proof_status": rebalance.status.value if hasattr(rebalance.status, 'value') else str(rebalance.status),
-                "verified": rebalance.verified or False,
+                "verified": verified,
             })
         
         return timeline
-
-

@@ -5,6 +5,7 @@ import { useStrategyRouter } from '@/hooks/useStrategyRouter';
 import { useStrategyDeposit } from '@/hooks/useStrategyDeposit';
 import { getConfig } from '@/lib/config';
 import { useAccount } from '@starknet-react/core';
+import { useRealPerformance } from '@/hooks/useRealPerformance';
 
 interface ProtocolStats {
   name: string;
@@ -25,6 +26,7 @@ export function AnalyticsDashboard({ allocation }: AnalyticsDashboardProps) {
   const { address } = useAccount();
   const router = useStrategyRouter();
   const strategyDeposit = useStrategyDeposit(getConfig().strategyRouterAddress);
+  const realPerformance = useRealPerformance(30);
   
   // Fetch real portfolio data
   const [protocolAPYs, setProtocolAPYs] = useState<{ jediswap: number | string; ekubo: number | string }>({
@@ -189,8 +191,40 @@ export function AnalyticsDashboard({ allocation }: AnalyticsDashboardProps) {
       <div className={`px-4 py-2 rounded-xl border text-sm font-semibold flex items-center gap-2 ${
         'bg-green-500/10 border-green-500/30 text-green-400'
       }`}>
-        ✅ Live Production Data - Strategy Router v3.5
+        {realPerformance.loading ? '⏳ Loading real performance…' : '✅ Live production data (proof-backed)'}
+        {realPerformance.error && <span className="text-xs text-red-300">({realPerformance.error})</span>}
       </div>
+
+      {/* Real performance quick stats (from ProofJobs) */}
+      {realPerformance.data && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+            <p className="text-xs text-gray-400 mb-1">Total rebalances</p>
+            <p className="text-xl font-bold text-white">{realPerformance.data.portfolio.total_rebalances}</p>
+          </div>
+          <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+            <p className="text-xs text-gray-400 mb-1">Verified proofs</p>
+            <p className="text-xl font-bold text-white">
+              {realPerformance.data.portfolio.proof_metrics.verified_count} / {realPerformance.data.portfolio.proof_metrics.total_proofs}
+            </p>
+            <p className="text-[11px] text-gray-500">
+              {realPerformance.data.portfolio.proof_metrics.verified_percentage}% verified
+            </p>
+          </div>
+          <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+            <p className="text-xs text-gray-400 mb-1">Latest tx</p>
+            <p className="text-sm text-white break-all">
+              {realPerformance.data.portfolio.latest_rebalance?.tx_hash
+                ? `${realPerformance.data.portfolio.latest_rebalance.tx_hash.slice(0, 10)}...`
+                : '—'}
+            </p>
+          </div>
+          <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+            <p className="text-xs text-gray-400 mb-1">Period</p>
+            <p className="text-xl font-bold text-white">{realPerformance.data.period_days}d</p>
+          </div>
+        </div>
+      )}
 
       {/* Portfolio Overview Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

@@ -156,6 +156,20 @@ class ProofJob(Base):
     sharp_job_id = Column(String, nullable=True, index=True)
     fact_hash = Column(String, nullable=True)
     
+    # L2 verification (Integrity Verifier)
+    l2_fact_hash = Column(String, nullable=True, index=True)
+    l2_verified_at = Column(DateTime, nullable=True)
+    l2_block_number = Column(Integer, nullable=True)
+    
+    # L1 settlement (Atlantic)
+    l1_settlement_enabled = Column(Boolean, default=False, index=True)
+    atlantic_query_id = Column(String, nullable=True, index=True)
+    l1_fact_hash = Column(String, nullable=True, index=True)
+    l1_verified_at = Column(DateTime, nullable=True)
+    l1_block_number = Column(Integer, nullable=True)
+    network = Column(String, default="sepolia", nullable=True, index=True)
+    proof_source = Column(String, nullable=True, index=True)  # e.g., luminair, stone_local, atlantic
+    
     status = Column(
         SQLEnum(ProofStatus),
         nullable=False,
@@ -208,6 +222,8 @@ class ProofJobResponse(BaseModel):
     sharp_job_id: Optional[str]
     fact_hash: Optional[str]
     status: ProofStatus
+    proof_source: Optional[str]
+    error: Optional[str]
     created_at: datetime
     submitted_at: Optional[datetime]
     verified_at: Optional[datetime]
@@ -232,4 +248,3 @@ class ProofListResponse(BaseModel):
     """List of proof jobs with stats"""
     proofs: list[ProofJobResponse]
     stats: ProofStatsResponse
-

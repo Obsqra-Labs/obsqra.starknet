@@ -13,6 +13,7 @@ from app.config import settings
 from app.database import init_db
 from app.api import router as api_router
 from app.ml.scheduler import start_ml_scheduler
+from app.workers.atlantic_worker import start_atlantic_poller
 
 # Configure logging
 logging.basicConfig(level=settings.LOG_LEVEL)
@@ -31,6 +32,13 @@ async def lifespan(app: FastAPI):
     # Start ML scheduler for periodic updates
     scheduler_task = start_ml_scheduler()
     logger.info("✅ ML scheduler started")
+
+    # Start Atlantic poller (if configured)
+    atlantic_task = start_atlantic_poller()
+    if atlantic_task:
+        logger.info("✅ Atlantic poller started")
+    else:
+        logger.info("ℹ️ Atlantic poller not started (no API key configured)")
     
     yield
     
@@ -104,4 +112,3 @@ if __name__ == "__main__":
         port=settings.API_PORT,
         reload=settings.DEBUG,
     )
-

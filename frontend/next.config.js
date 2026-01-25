@@ -7,6 +7,8 @@ const nextConfig = {
     // Allow importing the local obsqra.kit package from outside the app directory.
     externalDir: true,
   },
+  // Allow dev asset loads from the hosted domain during testing
+  allowedDevOrigins: ['https://starknet.obsqra.fi'],
   transpilePackages: ['obsqra.kit'],
   webpack: (config) => {
     // Ensure modules resolve from this app's node_modules when importing externalDir packages.

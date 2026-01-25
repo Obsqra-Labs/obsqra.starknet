@@ -6,6 +6,7 @@
     "dev": "next dev -p 3003",
     "build": "next build",
     "start": "next start -H 0.0.0.0 -p 3000",
+    "start:3003": "next start -H 0.0.0.0 -p 3003",
     "lint": "next lint"
   },
   "dependencies": {

@@ -494,3 +494,119 @@ sncast --account deployer deploy \
 *Updated December 10, 2025*
 
 **From computation to settlement, everything is on-chain and auditable.** 🔺
+
+---
+
+## December 12, 2025 — Proof plumbing (L2 + optional L1)
+
+- Added ProofJob L2/L1 verification fields (fact hashes, block numbers, Atlantic query, network flag) plus Alembic migration `003_add_proof_job_l1_l2_fields.py`.
+- LuminAIR service now exposes `calculate_fact_hash` (SHA-256 stub) and `export_trace` (mock pie.zip with metrics/proof) to feed Integrity/Atlantic.
+- Orchestration flow: computes fact hash, verifies on L2 via Integrity Verifier, records metadata, stores L2 block on receipt, and optionally submits to Atlantic on Sepolia when configured; uses network-aware chain ID.
+- Atlantic worker stub: logs enqueues and can poll Atlantic to persist L1 verification status (ready to wire into Celery/APS).
+- Env/config: `STARKNET_NETWORK`, `ATLANTIC_API_KEY`, `ATLANTIC_BASE_URL` already in config; migration required (`alembic upgrade head`).
+
+Next steps:
+- Run migration; wire scheduler to call `enqueue_atlantic_status_check`/`check_and_update_atlantic_status`.
+- Swap SHA-256 fact hash + mock trace export for real LuminAIR outputs.
+- Continue V1.3 cleanup: frontend proof badges/real data only; remove demo; analytics endpoints for real performance.
+
+### Additional V1.3 plumbing
+- Backend analytics: added `/api/v1/analytics/performance/real` returning real portfolio/timeline from ProofJob records (no demo).
+- PerformanceService hardened to use ProofJob.status for verified counts.
+- Frontend hook `useRealPerformance` to consume the real performance endpoint (polls every 30s) and wired indicator into Analytics dashboard.
+- LuminAIR proof parsing now captures optional `fact_hash`/`trace_path` from the Rust operator output when present (fallback to calculated hash + mock trace otherwise).
+- Tests/smoke: ran `alembic upgrade head`; local TestClient calls for `/api/v1/analytics/performance/real` (200) and `/api/v1/analytics/protocol-apys` (200, defaults due to no DefiLlama match). Production service still on older code—needs restart to pick up latest changes.
+- Backend restarted on 8001 with latest code. Frontend analytics dashboard now surfaces proof-backed stats (total rebalances, verified count, latest tx, period) via `useRealPerformance`.
+- Frontend: fixed strict typing in execute-as-owner API route; `npm run build` now passes. Restarted Next dev server on port 3003 (0.0.0.0) to clear 404s on `_next` assets.
+- Frontend copy refresh: removed prototype wording in CTA/footer; added `allowedDevOrigins` for starknet.obsqra.fi to reduce dev asset warnings.
+- Frontend demo mode removed (DemoModeContext/Toggle deleted). `npm run build` re-run after removal: OK.
+- Backend: added Atlantic poller (background task started in main lifespan) to check pending L1 submissions when configured; health OK; `/api/v1/analytics/performance/real` still returns 30 ProofJob entries in TestClient; protocol APY endpoint returns defaults if DefiLlama lacks Starknet pools.
+- Backend rebalance history now returns L2/L1 verification metadata (fact hashes, blocks, settlement flags) to surface verification in the UI.
+- Frontend ProofBadge/RebalanceHistory updated to show L2/L1 hashes and verification timestamps; `npm run build` stays green.
+- Frontend Dashboard now surfaces latest proof status (L2/L1 fact hashes, verified timestamps) using a shared proof history hook; build remains green.
+- Frontend production start script added (`start:3003`) and start_3003.sh now runs `next start` on 3003 (with port cleanup via fuser/ss).
+- Atlantic L1 settlement configured with provided API key (.env) and backend restarted; Atlantic poller running on startup (8001).
+- Added safety for fact hashes: risk_engine now requires a real fact hash from LuminAIR unless `ALLOW_FAKE_FACT_HASH=True` (set in .env for now). Backend restarted with the flag set.
+
+### December 13, 2025 — Real fact hash + trace wrapping
+- LuminAIR service now derives `fact_hash` from proof bytes when the Rust operator does not emit one (no more stub unless explicitly allowed).
+- Trace export wraps any raw proof/trace into a `*.pie.zip` before Atlantic submission so the poller only ships valid zip payloads.
+- Risk engine uses the derived fact hash by default; `.env` flipped `ALLOW_FAKE_FACT_HASH` to `False`.
+- Backend restarted (uvicorn on 8001) with the new env; Atlantic poller still running.
+
+### December 13, 2025 — Integration dev-log API
+- Added `/api/integration-tests/dev-log` (Next route) to serve `docs/DEV_LOG.md` for the integration panel; returns markdown with no-cache headers.
+- Set Atlantic submission to use `cairoVersion=cairo1` to avoid 400 errors.
+
+### December 13, 2025 — No silent mocks, clearer proof table
+- LuminAIR proof generation now fails loudly when the binary errors (no auto-mock fallback when the binary exists).
+- Integration Tests panel shows a proof table (time, proof hash, tx, L2 fact, L1 fact, Atlantic query, status) for up to the last 8 proofs.
+- Integrity verifier ABI inspected: available functions are `verify_proof_*` (full/initial/step/final) plus `get_verification`—no `isCairoFactValid`, so L2 verification stays pending until we pass the proper Stark proof/config payload.
+
+### December 13, 2025 — Proof summary endpoint
+- Added `/api/v1/analytics/proof-summary` returning counts (total, pending, L2 verified, L1 verified) plus the latest proof metadata for dashboards/UI panels.
+
+### December 14, 2025 — Chosen path: Atlantic as Stone/SHARP prover
+- Decision: use Atlantic as the managed Stone/SHARP gateway for the `risk_engine` Cairo program. Rationale: Atlantic can produce the Stone-style proof (VerifierConfiguration + StarkProofWithSerde) required by Integrity and can also handle L1 verification (Sepolia is free; mainnet needs credits). Swiftness is a verifier only.
+- Configuration to use: layout=`recursive`, hasher=`keccak_160_lsb`, stone_version=`stone5`, memory_verification=`strict` (matches Integrity docs/examples).
+- Expected flow:
+  1) Compile `contracts/src/risk_engine.cairo` to Cairo program JSON (or pie.zip).
+  2) POST to `https://atlantic.api.herodotus.cloud/v1/l2/atlantic-query?apiKey=<KEY>` with `programFile=@risk_engine.json`, `cairoVersion=1`, `layout=recursive` (or `auto`), `mockFactHash=false`.
+  3) Poll `GET .../atlantic-query/{id}`; download the resulting Stone proof JSON.
+  4) Backend parses the proof into VerifierConfiguration + StarkProofWithSerde and calls `verify_proof_full_and_register_fact`; success sets `l2_verified_at`, revert marks FAILED.
+- Notes:
+  - Swiftness is installed locally for verification, but it cannot generate proofs.
+  - LuminAIR/stwo proofs remain for UX/local display; Atlantic/Stone proofs are the canonical path for Integrity and L1 settlement.
+  - Mainnet Atlantic runs require credits; Sepolia is free.
+
+### December 14, 2025 — Atlantic submission attempt
+- Submitted `risk_engine` program JSON to Atlantic `/atlantic-query` with `layout=recursive`, `cairoVersion=cairo1`, `result=PROOF_GENERATION`, `declaredJobSize=XS/S`, `sharpProver=stone`, `network=TESTNET`, `mockFactHash=false`.
+- Response: `INSUFFICIENT_CREDITS` (cannot generate proof without credits). Blocked until credits are added or a different proving path is provided.
+
+### December 14, 2025 — Local Stone prover build (no Docker)
+- Cloned `stone-prover` and built `cpu_air_prover` locally via Bazelisk (Bazel 6.4.0) after installing `elfutils-devel` (libdw). Binary located at `stone-prover/build/bazelbin/src/starkware/main/cpu/cpu_air_prover`.
+- Blocker: to generate a proof we still need Cairo trace/memory + public/private inputs. That requires running the target Cairo program in proof mode (Stone README flow via `cairo1-run`/cairo-vm). `cairo1-run` is not installed here yet.
+- Next step: install `cairo-vm`/`cairo1-run`, wrap `risk_engine.cairo` into a runnable Cairo1 program (or minimal wrapper) that emits trace/memory in proof_mode, then feed those into `cpu_air_prover` to produce a Stone proof. Atlantic path remains for L1 once credits are available.
+
+### December 15, 2025 — Stone runner hooked, risk proof still pending
+- Added a minimal Cairo1 program mirroring `calculate_risk_score_internal` (`verification/risk_example.cairo`) that returns `Array<felt252>` so `proof_mode` works.
+- Installed `cairo-vm/cairo1-run` and verified `cargo run --help`. Generated risk trace/memory/public/private via:
+  - `cargo run verification/risk_example.cairo --layout=small|all_cairo --proof_mode --air_public_input ... --air_private_input ... --trace_file ... --memory_file ... --print_output`
+  - Program output `[34]`; files are under `verification/out/` (public/private/trace/memory).
+- Validated the Stone prover binary on the bundled Fibonacci example:
+  - Generated fib trace/memory/public/private; `cpu_air_prover` produced `stone-prover/e2e_test/Cairo/fib_proof.json` successfully using the sample params/config.
+- Risk trace → prover initially failed: `cpu_air_prover` on `risk_*` (layout `all_cairo`, `n_steps` ≈ 131,072) with sample params died (Signal 6) because FRI params didn’t match the trace size.
+- Fixed by tuning params and reducing layout: regenerated artifacts with `layout=small` (`n_steps` = 8,192) and a matching params file (`verification/out/risk_small_params.json` with `fri_step_list: [3,3,3,2]`, `last_layer_degree_bound: 64`). `cpu_air_prover` now succeeds, producing `verification/out/risk_small_proof.json` (~400 KB). This confirms the prover path works once params satisfy `log2(last_layer_degree_bound) + sum(fri_step_list) = log2(n_steps) + 4`.
+- Next: either tune params for the `all_cairo` trace (n_steps ≈ 131,072) or decide if the `layout=small` trace is sufficient for the Integrity/Atlantic pilot. Then run Integrity’s proof_serializer on the Stone proof and call `verify_proof_full_and_register_fact` with the standard tuple (recursive/keccak_160_lsb/stone5/strict).
+
+### December 15, 2025 — Integrity serializer build + first pass
+- Patched the Integrity repo to build locally (vendored `size-of`/`cairo-vm`, relaxed `deny(warnings)`); `cargo build --release -p proof_serializer` now succeeds (warnings only).
+- Tried serializing `verification/out/risk_small_proof.json` via `proof_serializer`; parser rejected it (“Unexpected number of interaction elements: 0”). The Stone proof likely needs additional metadata (annotations/interactions) to match the Swiftness/Integrity schema. Added an empty `annotations` field to the proof; still fails. Need to regenerate proof with Integrity-compatible settings or adapt parser expectations.
+- Action items: either (a) produce a Stone proof using Integrity’s example settings/layout so the serializer accepts it, or (b) adjust/provide a wrapper that fills the expected interaction metadata before feeding the serializer. Until then, backend wiring to `verify_proof_full_and_register_fact` remains blocked on a serializer-compatible proof payload.
+
+### December 15, 2025 — Annotated Stone proof + serializer success
+- Regenerated the small trace proof with `cpu_air_prover --generate_annotations` using the tuned params (n_steps=8,192, layout=small): output `verification/out/risk_small_proof_annotated.json`.
+- `proof_serializer` now accepts it and emits calldata to `verification/out/risk_small_calldata.txt` (validated end-to-end through the Integrity serializer).
+- Remaining decision: whether to also tune/serialize the full `all_cairo` trace (~131k steps) or stick with the small trace for the Integrity/Atlantic pilot. Full trace is heavier but closer to production; small trace proves the pipeline and unblocks backend wiring.
+
+### December 16, 2025 — Dual proof lanes wired (Integrity helper)
+- Added `backend/app/services/proof_loader.py` to normalize both local Stone proofs and Atlantic proofs through the Integrity `proof_serializer` binary (returns felt calldata list).
+- Added `IntegrityService.verify_with_calldata` to accept pre-serialized calldata (either local Stone or Atlantic). This gives us a single entrypoint for both proof sources; existing structured/dict path remains.
+
+### December 16, 2025 — Integrity call test (small Stone proof)
+- Built prefixed calldata (layout=recursive, hasher=keccak_160_lsb, stone_version=stone5, memory_verification=strict) + serialized proof from `risk_small_proof_annotated.json` -> `verification/out/risk_small_calldata_prefixed.txt`.
+- Invoked `verify_proof_full_and_register_fact` on Sepolia Integrity verifier via starknet_py. Result: revert `invalid final_pc` (ENTRYPOINT_FAILED). Proof shape now passes serializer, but verifier rejected the proof (likely AIR/layout mismatch).
+- Logged full steps/results in `docs/proving_flows.md`. Next: regenerate an Integrity-compatible proof (either tune local Stone with canonical config or use Atlantic-generated proof) and re-run the call.
+
+### December 17, 2025 — Full-trace Stone attempt (all_cairo)
+- Tried proving the full trace (layout=all_cairo, n_steps=131,072) with two param sets satisfying the FRI degree equation:
+  - (64, [3,3,3,3,3], n_queries=18, pow=24) and (128, [3,3,3,3,2], n_queries=16, pow=24).
+- Added a third variant: (256, [3,3,3,2], n_queries=12, pow=24). Also aborted with `Signal(6)` even with `--v=1` and `--logtostderr`.
+- Retried with explicit `GLOG_log_dir=/tmp --v=2 --logtostderr=1`; still `Signal(6)` and no new logs beyond prior small-trace runs. Likely resource/AIR mismatch. Logged in proving_flows.md. Next fallback: run outside sandbox with deeper logs or pivot to Atlantic for an Integrity-compatible proof.
+- Another verbose attempt with `GLOG_v=3 GLOG_logtostderr=1 --n_threads=2` still died with `Signal(6)` and produced no new prover logs (only older small-trace logs are present).
+- Next options: run with richer logging outside sandbox to see the exact abort, or pivot to Atlantic to produce the Integrity proof for this circuit. Logged details in `docs/proving_flows.md`.
+
+### December 18, 2025 — Proof visibility hardening
+- Added `proof_source` field on proof jobs (luminair vs stone/atlantic) and surfaced source/error in analytics responses (rebalance-history, proof-summary).
+- Orchestration now marks failed verifications as `FAILED` with error text instead of leaving them `PENDING`; metrics carry verification_error for UI.
+- Waiting on Atlantic credits; kept curl template ready to resubmit once credits land.

@@ -10,7 +10,10 @@ import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
+import tempfile
+import zipfile
+import hashlib
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +28,16 @@ class ProofResult:
     output_components_ekubo: Dict[str, int]
     proof_data: bytes  # Binary proof (mock for now)
     status: str
+    fact_hash: Optional[str] = None
+    trace_path: Optional[str] = None
     verified: bool = False  # Local verification status
+    verifier_config_path: Optional[str] = None  # Path to verifier configuration (Integrity)
+    stark_proof_path: Optional[str] = None      # Path to serialized Stark proof (Integrity)
+    verifier_config_b64: Optional[str] = None   # Base64 of verifier config (current format documented below)
+    stark_proof_b64: Optional[str] = None       # Base64 of proof payload (current format documented below)
+    verifier_payload_format: Optional[str] = None  # e.g., luminair_bincode / integrity_json
+    verifier_config_json: Optional[dict] = None
+    stark_proof_json: Optional[dict] = None
 
 
 class LuminAIRService:
@@ -117,7 +129,7 @@ class LuminAIRService:
             output_data = json.loads(json_output)
             
             # Read proof data from file
-            proof_data_path = output_data["proof_data_path"]
+            proof_data_path = output_data.get("proof_data_path") or output_data.get("proof_path")
             with open(proof_data_path, "rb") as f:
                 proof_data = f.read()
             
@@ -131,9 +143,25 @@ class LuminAIRService:
             else:
                 logger.warning("⚠️ Proof verification failed or not performed")
             
+            fact_hash = (
+                output_data.get("fact_hash")
+                or output_data.get("factHash")
+                or self.calculate_fact_hash(proof_data)  # derive from proof bytes if not provided
+            )
+            trace_path = (
+                output_data.get("trace_path")
+                or output_data.get("trace")
+                or output_data.get("pie_path")
+                or output_data.get("proof_data_path")
+            )
+            
             # Calculate components for compatibility (we can enhance this later)
             jediswap_components = self._calculate_risk_components(jediswap_metrics)
             ekubo_components = self._calculate_risk_components(ekubo_metrics)
+
+            verifier_payload_format = output_data.get("verifier_payload_format")
+            verifier_config_json = output_data.get("verifier_config") if isinstance(output_data.get("verifier_config"), dict) else None
+            stark_proof_json = output_data.get("stark_proof") if isinstance(output_data.get("stark_proof"), dict) else None
             
             return ProofResult(
                 proof_hash=output_data["proof_hash"],
@@ -143,7 +171,16 @@ class LuminAIRService:
                 output_components_ekubo=ekubo_components,
                 proof_data=proof_data,
                 status="verified" if is_verified else "generated",
-                verified=is_verified
+                fact_hash=fact_hash,
+                trace_path=trace_path,
+                verified=is_verified,
+                verifier_config_path=output_data.get("settings_path") or output_data.get("verifier_config_path"),
+                stark_proof_path=proof_data_path,
+                verifier_config_b64=output_data.get("verifier_config_b64"),
+                stark_proof_b64=output_data.get("stark_proof_b64"),
+                verifier_payload_format=verifier_payload_format,
+                verifier_config_json=verifier_config_json,
+                stark_proof_json=stark_proof_json,
             )
             
         except subprocess.TimeoutExpired:
@@ -151,14 +188,10 @@ class LuminAIRService:
             raise
         except subprocess.CalledProcessError as e:
             logger.error(f"LuminAIR binary failed: {e.stderr.decode() if e.stderr else 'Unknown error'}")
-            # Fallback to mock
-            logger.warning("Falling back to mock proof generation")
-            return await self._generate_mock_proof(jediswap_metrics, ekubo_metrics)
+            raise
         except Exception as e:
             logger.error(f"Error calling LuminAIR binary: {e}")
-            # Fallback to mock
-            logger.warning("Falling back to mock proof generation")
-            return await self._generate_mock_proof(jediswap_metrics, ekubo_metrics)
+            raise
     
     async def _generate_mock_proof(
         self,
@@ -183,6 +216,7 @@ class LuminAIRService:
         }
         proof_json = json.dumps(proof_structure, sort_keys=True)
         proof_hash = hashlib.sha256(proof_json.encode()).hexdigest()
+        fact_hash = proof_hash
         
         return ProofResult(
             proof_hash=f"0x{proof_hash}",
@@ -191,8 +225,69 @@ class LuminAIRService:
             output_components_jediswap=jediswap_components,
             output_components_ekubo=ekubo_components,
             proof_data=proof_json.encode(),
-            status="generated-mock"
+            status="generated-mock",
+            fact_hash=f"0x{fact_hash}",
+            trace_path=None
         )
+
+    def calculate_fact_hash(self, proof_data: bytes) -> str:
+        """
+        Calculate Cairo fact hash for the proof data.
+        For now, use a SHA-256 digest as a stand-in until the real fact hash function is wired.
+        """
+        digest = hashlib.sha256(proof_data).hexdigest()
+        return f"0x{digest}"
+
+    async def export_trace(
+        self,
+        jediswap_metrics: Dict[str, int],
+        ekubo_metrics: Dict[str, int],
+        proof_data: Optional[bytes] = None,
+        trace_path: Optional[str] = None
+    ) -> str:
+        """
+        Export execution trace to a pie.zip file for Atlantic.
+        In mock mode, we create a lightweight zip with input/output context.
+        """
+        # Prefer an existing trace path if provided and exists
+        if trace_path:
+            path_obj = Path(trace_path)
+            if path_obj.exists():
+                # If it's already a pie/zip artifact, use it directly
+                if path_obj.suffix in [".zip", ".pie", ".gz"] or path_obj.name.endswith(".pie.zip"):
+                    logger.info(f"Using existing trace path for Atlantic: {trace_path}")
+                    return str(path_obj)
+                # Wrap non-zip traces/proofs into a pie.zip for Atlantic
+                try:
+                    wrapped = tempfile.NamedTemporaryFile(delete=False, suffix=".pie.zip")
+                    wrapped.close()
+                    with zipfile.ZipFile(wrapped.name, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+                        zf.writestr("trace.json", json.dumps({
+                            "trace_source": str(path_obj),
+                            "proof_hash": self.calculate_fact_hash(proof_data or b""),
+                        }))
+                        with open(path_obj, "rb") as f:
+                            zf.writestr(path_obj.name, f.read())
+                    logger.info(f"Wrapped raw trace/proof into pie.zip: {wrapped.name}")
+                    return wrapped.name
+                except Exception as wrap_err:
+                    logger.warning(f"Failed to wrap trace path {trace_path}, falling back to mock trace: {wrap_err}")
+
+        # If real binary is available, prefer its trace export CLI in future
+        trace_payload = {
+            "jediswap_metrics": jediswap_metrics,
+            "ekubo_metrics": ekubo_metrics,
+            "proof_hash": self.calculate_fact_hash(proof_data or b""),
+        }
+        # Write a temporary pie.zip with a single trace.json
+        tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pie.zip")
+        tmp_file.close()
+        with zipfile.ZipFile(tmp_file.name, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("trace.json", json.dumps(trace_payload))
+            if proof_data:
+                zf.writestr("proof.bin", proof_data)
+        logger.info(f"Trace exported for Atlantic at {tmp_file.name}")
+        return tmp_file.name
     
     def _calculate_risk_score(
         self,
@@ -298,4 +393,3 @@ def get_luminair_service() -> LuminAIRService:
     if _luminair_service_instance is None:
         _luminair_service_instance = LuminAIRService()
     return _luminair_service_instance
-

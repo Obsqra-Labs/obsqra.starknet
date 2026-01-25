@@ -8,9 +8,6 @@ import asyncio
 import logging
 from typing import Dict, Optional
 from datetime import datetime, timedelta
-from starknet_py.net import RpcClient
-from starknet_py.net.client import Client
-from starknet_py.contract import Contract
 import os
 import httpx
 
@@ -25,18 +22,11 @@ class ProtocolAPYService:
             "STARKNET_RPC_URL",
             "https://starknet-sepolia-rpc.publicnode.com"
         )
-        self._client: Optional[Client] = None
         
         # Cache for APY data (5 minute TTL)
         self._cache: Optional[Dict] = None
         self._cache_expiry: Optional[datetime] = None
         self._cache_ttl = timedelta(minutes=5)
-    
-    async def _get_client(self) -> Client:
-        """Get or create RPC client"""
-        if self._client is None:
-            self._client = await RpcClient.create(self.rpc_url)
-        return self._client
     
     async def _fetch_defillama_apy(self, protocol_id: str) -> Optional[float]:
         """
@@ -138,7 +128,7 @@ class ProtocolAPYService:
             logger.error(f"Failed to fetch Ekubo APY: {e}")
             return 8.5  # Default fallback
     
-    async def get_all_apys(self, use_cache: bool = True) -> Dict[str, float]:
+    async def get_all_apys(self, use_cache: bool = True, force_refresh: bool = False) -> Dict[str, float]:
         """
         Fetch APY rates for all protocols.
         
@@ -149,7 +139,7 @@ class ProtocolAPYService:
             Dictionary with protocol names and APY rates
         """
         # Check cache first
-        if use_cache and self._cache and self._cache_expiry:
+        if (use_cache and not force_refresh) and self._cache and self._cache_expiry:
             if datetime.utcnow() < self._cache_expiry:
                 logger.debug("Returning cached APY data")
                 return self._cache
@@ -212,4 +202,3 @@ def get_apy_service() -> ProtocolAPYService:
     if _apy_service is None:
         _apy_service = ProtocolAPYService()
     return _apy_service
-

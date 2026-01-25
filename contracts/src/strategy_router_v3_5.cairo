@@ -95,6 +95,7 @@ mod StrategyRouterV35 {
         IJediSwapV2PoolDispatcherTrait,
         ExactInputSingleParams,
         MintParams,
+        DecreaseLiquidityParams,
         I32, // Custom i32 struct for ticks
         CollectParams // For fee collection
     };
@@ -1748,7 +1749,7 @@ mod StrategyRouterV35 {
     ) -> (u256, u256) {
         let caller = get_caller_address();
         let owner = self.owner.read();
-        assert(caller == owner, 'Only owner can recall from protocols');
+        assert(caller == owner, 'Not owner');
         
         let mut total_strk_recalled = 0_u256;
         let mut total_eth_recalled = 0_u256;

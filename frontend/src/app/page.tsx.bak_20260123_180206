@@ -1,0 +1,514 @@
+'use client';
+
+import { Dashboard } from '@/components/Dashboard';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { useEffect, useState } from 'react';
+import { useWallet } from '@/hooks/useWallet';
+
+const GITHUB_URL = 'https://github.com/obsqra-labs';
+
+export default function Home() {
+  const {
+    address,
+    isConnected,
+    isConnecting,
+    connectors,
+    preferredConnector,
+    connect,
+    disconnect,
+    clearError: clearWalletError,
+    wrongNetwork,
+    chainName,
+    expectedChainName,
+  } = useWallet();
+  const [mounted, setMounted] = useState(false);
+  const [showWalletModal, setShowWalletModal] = useState(false);
+
+  const handleLaunch = () => {
+    if (preferredConnector) {
+      connect(preferredConnector);
+    } else {
+      setShowWalletModal(true);
+    }
+  };
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (isConnected) {
+      setShowWalletModal(false);
+    }
+  }, [isConnected]);
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0b]">
+        <div className="w-5 h-5 border border-white/20 border-t-white/80 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (isConnecting) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0b]">
+        <div className="text-center">
+          <div className="w-5 h-5 border border-white/20 border-t-white/80 rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm text-white/60 font-mono">connecting</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {isConnected ? (
+        <ConnectedApp address={address} onDisconnect={disconnect} />
+      ) : (
+        <Landing
+          connectors={connectors}
+          onConnect={connect}
+          onLaunch={handleLaunch}
+          onClearWalletError={clearWalletError}
+          wrongNetwork={wrongNetwork}
+          chainName={chainName}
+          expectedChainName={expectedChainName}
+        />
+      )}
+      {showWalletModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 backdrop-blur-sm">
+          <div className="bg-[#111113] border border-white/10 rounded-xl p-6 max-w-sm w-full mx-4">
+            <p className="text-sm text-white/40 font-mono mb-4">select wallet</p>
+            <div className="space-y-2">
+              {connectors.map((connector) => (
+                <button
+                  key={connector.id}
+                  onClick={async () => {
+                    await connect(connector);
+                    setShowWalletModal(false);
+                  }}
+                  className="w-full px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white text-sm font-medium transition-colors"
+                >
+                  {connector.name || connector.id}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowWalletModal(false)}
+              className="w-full mt-3 px-4 py-2 text-white/40 text-sm hover:text-white/60 transition-colors"
+            >
+              cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+type WalletConnector = ReturnType<typeof useWallet>['connectors'][number];
+
+function Landing({
+  connectors,
+  onConnect,
+  onLaunch,
+  onClearWalletError,
+  wrongNetwork,
+  chainName,
+  expectedChainName,
+}: {
+  connectors: WalletConnector[];
+  onConnect: (connector?: WalletConnector) => Promise<void>;
+  onLaunch: () => void;
+  onClearWalletError: () => void;
+  wrongNetwork?: boolean;
+  chainName?: string;
+  expectedChainName?: string;
+}) {
+  return (
+    <div className="min-h-screen bg-[#0a0a0b] text-white">
+      {/* Header */}
+      <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-[#0a0a0b]/80 backdrop-blur-xl">
+        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded bg-gradient-to-br from-emerald-400 to-cyan-400" />
+            <span className="font-display text-base">obsqra</span>
+          </div>
+          <nav className="hidden md:flex items-center gap-8 text-[13px] text-white/50">
+            <a href="#architecture" className="hover:text-white transition-colors">architecture</a>
+            <a href="#flow" className="hover:text-white transition-colors">flow</a>
+            <a href="#stack" className="hover:text-white transition-colors">stack</a>
+          </nav>
+          <button
+            onClick={() => { onClearWalletError(); onLaunch(); }}
+            className="px-4 py-1.5 text-[13px] font-medium bg-white text-black rounded hover:bg-white/90 transition-colors"
+          >
+            launch
+          </button>
+        </div>
+      </header>
+
+      <main>
+        {/* Hero */}
+        <section className="pt-32 pb-20 px-6">
+          <div className="max-w-6xl mx-auto">
+            <div className="max-w-3xl">
+              <p className="font-mono text-[11px] text-emerald-400 tracking-wider mb-4">STARKNET NATIVE</p>
+              <h1 className="font-display text-4xl md:text-5xl lg:text-6xl leading-[1.1] mb-6">
+                Verifiable AI<br />
+                <span className="text-white/40">execution layer</span>
+              </h1>
+              <p className="text-lg text-white/50 leading-relaxed mb-8 max-w-xl">
+                Every allocation decision generates a STARK proof. Cairo constraints enforce risk limits. 
+                SHARP settles to L1. No trust required.
+              </p>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => { onClearWalletError(); onLaunch(); }}
+                  className="px-6 py-3 bg-white text-black text-sm font-medium rounded hover:bg-white/90 transition-colors"
+                >
+                  Connect Wallet
+                </button>
+                <a
+                  href={GITHUB_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-6 py-3 text-sm text-white/60 hover:text-white transition-colors"
+                >
+                  github
+                </a>
+              </div>
+              {wrongNetwork && (
+                <p className="mt-6 text-sm text-amber-400/80 font-mono">
+                  wrong network: {chainName} — switch to {expectedChainName}
+                </p>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* Metrics Bar */}
+        <section className="border-y border-white/5 py-8 px-6">
+          <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8">
+            <div>
+              <p className="font-mono text-2xl text-white">2-3s</p>
+              <p className="text-[11px] text-white/40 mt-1 tracking-wider">PROOF GENERATION</p>
+            </div>
+            <div>
+              <p className="font-mono text-2xl text-white">&lt;1s</p>
+              <p className="text-[11px] text-white/40 mt-1 tracking-wider">LOCAL VERIFY</p>
+            </div>
+            <div>
+              <p className="font-mono text-2xl text-white">L1</p>
+              <p className="text-[11px] text-white/40 mt-1 tracking-wider">SHARP SETTLEMENT</p>
+            </div>
+            <div>
+              <p className="font-mono text-2xl text-emerald-400">live</p>
+              <p className="text-[11px] text-white/40 mt-1 tracking-wider">SEPOLIA</p>
+            </div>
+          </div>
+        </section>
+
+        {/* Problem / Solution */}
+        <section className="py-24 px-6">
+          <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-16">
+            <div>
+              <p className="font-mono text-[11px] text-white/40 tracking-wider mb-4">THE PROBLEM</p>
+              <p className="text-white/70 leading-relaxed">
+                AI agents in DeFi are black boxes. Users deposit capital into systems where 
+                risk models run opaquely, allocation logic is hidden, and there is no way 
+                to verify that stated policies were followed. Every decision requires trust.
+              </p>
+            </div>
+            <div>
+              <p className="font-mono text-[11px] text-emerald-400 tracking-wider mb-4">THE SOLUTION</p>
+              <p className="text-white/70 leading-relaxed">
+                Obsqra generates STARK proofs for every AI decision. Cairo constraints 
+                enforce DAO-defined limits. Proofs verify locally in under a second. 
+                SHARP submits to Ethereum for permanent settlement. Every decision is auditable.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Architecture */}
+        <section id="architecture" className="py-24 px-6 border-t border-white/5">
+          <div className="max-w-6xl mx-auto">
+            <p className="font-mono text-[11px] text-white/40 tracking-wider mb-2">SYSTEM</p>
+            <h2 className="font-display text-3xl mb-12">Architecture</h2>
+            
+            <div className="grid lg:grid-cols-2 gap-12">
+              {/* Diagram */}
+              <div className="bg-[#111113] border border-white/10 rounded-lg p-6 font-mono text-[13px]">
+                <pre className="text-white/60 leading-7 overflow-x-auto">
+{`┌─────────────────────────────────────┐
+│         Frontend Layer              │
+│   Dashboard · Governance · Audit    │
+└─────────────────────────────────────┘
+                 │
+                 ▼
+┌─────────────────────────────────────┐
+│       Backend (FastAPI)             │
+│   Orchestration · Signing · SHARP   │
+└─────────────────────────────────────┘
+                 │
+                 ▼
+┌─────────────────────────────────────┐
+│      Smart Contracts (Cairo)        │
+│  ┌───────────┐  ┌────────────────┐  │
+│  │RiskEngine │──│StrategyRouter │  │
+│  └───────────┘  └────────────────┘  │
+│         │              │            │
+│         ▼              ▼            │
+│  ┌───────────┐  ┌────────────────┐  │
+│  │   DAO     │  │   Protocols    │  │
+│  │Constraints│  │JediSwap · Ekubo│  │
+│  └───────────┘  └────────────────┘  │
+└─────────────────────────────────────┘`}
+                </pre>
+              </div>
+
+              {/* Description */}
+              <div className="space-y-6">
+                <div className="border-l-2 border-white/10 pl-4">
+                  <p className="text-white text-sm font-medium mb-1">RiskEngine</p>
+                  <p className="text-white/50 text-sm">
+                    5-component risk model. Calculates scores from utilization, volatility, 
+                    liquidity, audit status, and protocol age. Emits proof hash with every decision.
+                  </p>
+                </div>
+                <div className="border-l-2 border-white/10 pl-4">
+                  <p className="text-white text-sm font-medium mb-1">StrategyRouter</p>
+                  <p className="text-white/50 text-sm">
+                    Multi-protocol routing. Only callable by RiskEngine. Manages positions 
+                    on JediSwap V2 and Ekubo. Tracks performance per decision ID.
+                  </p>
+                </div>
+                <div className="border-l-2 border-white/10 pl-4">
+                  <p className="text-white text-sm font-medium mb-1">DAO Constraints</p>
+                  <p className="text-white/50 text-sm">
+                    Governance-controlled bounds. Min/max allocation per protocol, 
+                    risk thresholds, volatility limits. All enforced on-chain.
+                  </p>
+                </div>
+                <div className="border-l-2 border-emerald-400/50 pl-4">
+                  <p className="text-white text-sm font-medium mb-1">SHARP Settlement</p>
+                  <p className="text-white/50 text-sm">
+                    Background worker submits proofs to SHARP. Verification in 10-60 minutes. 
+                    Fact hash recorded on Ethereum L1. Permanent audit trail.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Proof Flow */}
+        <section id="flow" className="py-24 px-6 border-t border-white/5">
+          <div className="max-w-6xl mx-auto">
+            <p className="font-mono text-[11px] text-white/40 tracking-wider mb-2">EXECUTION</p>
+            <h2 className="font-display text-3xl mb-12">Proof Flow</h2>
+            
+            <div className="bg-[#111113] border border-white/10 rounded-lg p-6 font-mono text-[13px] mb-8">
+              <pre className="text-white/60 leading-7 overflow-x-auto">
+{`Request → Risk Calculation → STARK Proof (2-3s) → Local Verify (<1s) → Execute TX → SHARP Submit
+                                                                                         │
+                                                        User sees result immediately ◄───┘
+                                                                 │
+                                                        Background: SHARP verifies (10-60min)
+                                                                 │
+                                                        Fact hash settles on Ethereum L1`}
+              </pre>
+            </div>
+
+            <div className="grid md:grid-cols-4 gap-4">
+              <div className="bg-[#111113] border border-white/10 rounded-lg p-4">
+                <p className="font-mono text-[11px] text-white/40 mb-2">01</p>
+                <p className="text-white text-sm font-medium">Ingest</p>
+                <p className="text-white/40 text-[13px] mt-1">Protocol metrics: utilization, volatility, liquidity depth</p>
+              </div>
+              <div className="bg-[#111113] border border-white/10 rounded-lg p-4">
+                <p className="font-mono text-[11px] text-white/40 mb-2">02</p>
+                <p className="text-white text-sm font-medium">Compute</p>
+                <p className="text-white/40 text-[13px] mt-1">Cairo risk engine with 15 AIR constraints, Q16 fixed-point</p>
+              </div>
+              <div className="bg-[#111113] border border-white/10 rounded-lg p-4">
+                <p className="font-mono text-[11px] text-white/40 mb-2">03</p>
+                <p className="text-white text-sm font-medium">Prove</p>
+                <p className="text-white/40 text-[13px] mt-1">LuminAIR generates STARK proof, 18-column execution trace</p>
+              </div>
+              <div className="bg-[#111113] border border-white/10 rounded-lg p-4">
+                <p className="font-mono text-[11px] text-white/40 mb-2">04</p>
+                <p className="text-white text-sm font-medium">Settle</p>
+                <p className="text-white/40 text-[13px] mt-1">SHARP verification, fact hash on L1, permanent record</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Stack */}
+        <section id="stack" className="py-24 px-6 border-t border-white/5">
+          <div className="max-w-6xl mx-auto">
+            <p className="font-mono text-[11px] text-white/40 tracking-wider mb-2">DEPLOYED</p>
+            <h2 className="font-display text-3xl mb-12">Stack</h2>
+            
+            <div className="grid md:grid-cols-3 gap-6">
+              <div className="bg-[#111113] border border-white/10 rounded-lg p-5">
+                <p className="font-mono text-[11px] text-emerald-400 mb-3">CONTRACTS</p>
+                <ul className="space-y-2 text-[13px]">
+                  <li className="flex justify-between">
+                    <span className="text-white/60">RiskEngine</span>
+                    <span className="font-mono text-white/30">sepolia</span>
+                  </li>
+                  <li className="flex justify-between">
+                    <span className="text-white/60">StrategyRouter v3.5</span>
+                    <span className="font-mono text-white/30">sepolia</span>
+                  </li>
+                  <li className="flex justify-between">
+                    <span className="text-white/60">DAOConstraints</span>
+                    <span className="font-mono text-white/30">sepolia</span>
+                  </li>
+                </ul>
+              </div>
+              <div className="bg-[#111113] border border-white/10 rounded-lg p-5">
+                <p className="font-mono text-[11px] text-cyan-400 mb-3">INTEGRATIONS</p>
+                <ul className="space-y-2 text-[13px]">
+                  <li className="flex justify-between">
+                    <span className="text-white/60">JediSwap V2</span>
+                    <span className="font-mono text-emerald-400/60">live</span>
+                  </li>
+                  <li className="flex justify-between">
+                    <span className="text-white/60">Ekubo</span>
+                    <span className="font-mono text-emerald-400/60">live</span>
+                  </li>
+                  <li className="flex justify-between">
+                    <span className="text-white/60">Nostra</span>
+                    <span className="font-mono text-white/30">planned</span>
+                  </li>
+                </ul>
+              </div>
+              <div className="bg-[#111113] border border-white/10 rounded-lg p-5">
+                <p className="font-mono text-[11px] text-white/40 mb-3">INFRASTRUCTURE</p>
+                <ul className="space-y-2 text-[13px]">
+                  <li className="flex justify-between">
+                    <span className="text-white/60">LuminAIR</span>
+                    <span className="font-mono text-white/30">prover</span>
+                  </li>
+                  <li className="flex justify-between">
+                    <span className="text-white/60">SHARP</span>
+                    <span className="font-mono text-white/30">L1</span>
+                  </li>
+                  <li className="flex justify-between">
+                    <span className="text-white/60">FastAPI</span>
+                    <span className="font-mono text-white/30">backend</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Thesis */}
+        <section className="py-24 px-6 border-t border-white/5">
+          <div className="max-w-6xl mx-auto">
+            <div className="max-w-2xl">
+              <p className="font-mono text-[11px] text-white/40 tracking-wider mb-4">THESIS</p>
+              <blockquote className="text-xl md:text-2xl text-white/80 leading-relaxed mb-6">
+                "Starknet is the forge. Ethereum is the settlement layer. 
+                Obsqra is the arc between them."
+              </blockquote>
+              <p className="text-white/40 text-sm">
+                Cairo enables provable computation natively. SHARP provides shared proving 
+                infrastructure. The result: verifiable AI at scale, with cryptographic 
+                guarantees that settle on Ethereum.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* CTA */}
+        <section className="py-24 px-6 border-t border-white/5">
+          <div className="max-w-6xl mx-auto text-center">
+            <p className="font-mono text-[11px] text-white/40 tracking-wider mb-4">GET STARTED</p>
+            <h2 className="font-display text-3xl mb-8">Connect and explore</h2>
+            <div className="flex items-center justify-center gap-4">
+              <button
+                onClick={() => { onClearWalletError(); onLaunch(); }}
+                className="px-8 py-3 bg-white text-black text-sm font-medium rounded hover:bg-white/90 transition-colors"
+              >
+                Launch App
+              </button>
+              <a
+                href={GITHUB_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="px-8 py-3 text-sm text-white/60 border border-white/20 rounded hover:border-white/40 transition-colors"
+              >
+                Obsqra Labs
+              </a>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t border-white/5 py-8 px-6">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 rounded bg-gradient-to-br from-emerald-400 to-cyan-400" />
+            <span className="text-sm text-white/40">obsqra labs</span>
+          </div>
+          <a
+            href={GITHUB_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="text-sm text-white/40 hover:text-white/60 transition-colors"
+          >
+            github
+          </a>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+function ConnectedApp({
+  address,
+  onDisconnect,
+}: {
+  address?: string;
+  onDisconnect: () => void;
+}) {
+  const walletTag = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '';
+
+  return (
+    <div className="min-h-screen bg-[#0a0a0b] text-white">
+      <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-[#0a0a0b]/80 backdrop-blur-xl">
+        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded bg-gradient-to-br from-emerald-400 to-cyan-400" />
+            <span className="font-display text-base">obsqra</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="font-mono text-[13px] text-white/40">{walletTag}</span>
+            <button
+              onClick={onDisconnect}
+              className="px-4 py-1.5 text-[13px] text-white/60 border border-white/20 rounded hover:border-white/40 transition-colors"
+            >
+              disconnect
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="pt-14">
+        <div className="max-w-6xl mx-auto px-6 py-8">
+          <ErrorBoundary>
+            <Dashboard />
+          </ErrorBoundary>
+        </div>
+      </main>
+    </div>
+  );
+}

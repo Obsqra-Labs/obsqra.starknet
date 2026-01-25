@@ -1,0 +1,120 @@
+{
+  "jediswap_risk": 4348,
+  "ekubo_risk": 4534,
+  "proof_hash": "0x19e7cce93273dd58",
+  "proof_data_path": "/tmp/risk_proof.bin",
+  "settings_path": "/tmp/risk_settings.bin",
+  "verifier_config_path": "/tmp/risk_settings.bin",
+  "stark_proof_path": "/tmp/risk_proof.bin",
+  "verifier_config_b64": "eyJoYXNoZXIiOiIweDAiLCJsYXlvdXQiOiIweDAiLCJtZW1vcnlfdmVyaWZpY2F0aW9uIjoiMHgwIiwic3RvbmVfdmVyc2lvbiI6IjB4MCJ9",
+  "stark_proof_b64": "eyJjb25maWciOnsiY29tcG9zaXRpb24iOnsibl9jb2x1bW5zIjoiMHgwIiwidmVjdG9yIjp7ImhlaWdodCI6IjB4MCIsIm5fdmVyaWZpZXJfZnJpZW5kbHlfY29tbWl0bWVudF9sYXllcnMiOiIweDAifX0sImZyaSI6eyJmcmlfc3RlcF9zaXplcyI6W10sImlubmVyX2xheWVycyI6W10sImxvZ19pbnB1dF9zaXplIjoiMHgwIiwibG9nX2xhc3RfbGF5ZXJfZGVncmVlX2JvdW5kIjoiMHgwIiwibl9sYXllcnMiOiIweDAifSwibG9nX25fY29zZXRzIjoiMHgwIiwibG9nX3RyYWNlX2RvbWFpbl9zaXplIjoiMHgwIiwibl9xdWVyaWVzIjoiMHgwIiwibl92ZXJpZmllcl9mcmllbmRseV9jb21taXRtZW50X2xheWVycyI6IjB4MCIsInByb29mX29mX3dvcmsiOnsibl9iaXRzIjowfSwidHJhY2VzIjp7ImludGVyYWN0aW9uIjp7Im5fY29sdW1ucyI6IjB4MCIsInZlY3RvciI6eyJoZWlnaHQiOiIweDAiLCJuX3ZlcmlmaWVyX2ZyaWVuZGx5X2NvbW1pdG1lbnRfbGF5ZXJzIjoiMHgwIn19LCJvcmlnaW5hbCI6eyJuX2NvbHVtbnMiOiIweDAiLCJ2ZWN0b3IiOnsiaGVpZ2h0IjoiMHgwIiwibl92ZXJpZmllcl9mcmllbmRseV9jb21taXRtZW50X2xheWVycyI6IjB4MCJ9fX19LCJwdWJsaWNfaW5wdXQiOnsiY29udGludW91c19wYWdlX2hlYWRlcnMiOltdLCJkeW5hbWljX3BhcmFtcyI6W10sImxheW91dCI6IjB4MCIsImxvZ19uX3N0ZXBzIjoiMHgwIiwibWFpbl9wYWdlIjpbXSwicGFkZGluZ19hZGRyIjoiMHgwIiwicGFkZGluZ192YWx1ZSI6IjB4MCIsInJhbmdlX2NoZWNrX21heCI6IjB4MCIsInJhbmdlX2NoZWNrX21pbiI6IjB4MCIsInNlZ21lbnRzIjpbXX0sInVuc2VudF9jb21taXRtZW50Ijp7ImNvbXBvc2l0aW9uIjoiMHgwIiwiZnJpIjp7ImlubmVyX2xheWVycyI6W10sImxhc3RfbGF5ZXJfY29lZmZpY2llbnRzIjpbXX0sIm9vZHNfdmFsdWVzIjpbXSwicHJvb2Zfb2Zfd29yayI6eyJub25jZSI6MH0sInRyYWNlcyI6eyJpbnRlcmFjdGlvbiI6IjB4MCIsIm9yaWdpbmFsIjoiMHgwIn19LCJ3aXRuZXNzIjp7ImNvbXBvc2l0aW9uX2RlY29tbWl0bWVudCI6eyJ2YWx1ZXMiOltdfSwiY29tcG9zaXRpb25fd2l0bmVzcyI6eyJ2ZWN0b3IiOnsiYXV0aGVudGljYXRpb25zIjpbXX19LCJmcmlfd2l0bmVzcyI6eyJsYXllcnMiOltdfSwidHJhY2VzX2RlY29tbWl0bWVudCI6eyJpbnRlcmFjdGlvbiI6eyJ2YWx1ZXMiOltdfSwib3JpZ2luYWwiOnsidmFsdWVzIjpbXX19LCJ0cmFjZXNfd2l0bmVzcyI6eyJpbnRlcmFjdGlvbiI6eyJ2ZWN0b3IiOnsiYXV0aGVudGljYXRpb25zIjpbXX19LCJvcmlnaW5hbCI6eyJ2ZWN0b3IiOnsiYXV0aGVudGljYXRpb25zIjpbXX19fX19",
+  "verifier_payload_format": "integrity_json",
+  "verifier_config": {
+    "hasher": "0x0",
+    "layout": "0x0",
+    "memory_verification": "0x0",
+    "stone_version": "0x0"
+  },
+  "stark_proof": {
+    "config": {
+      "composition": {
+        "n_columns": "0x0",
+        "vector": {
+          "height": "0x0",
+          "n_verifier_friendly_commitment_layers": "0x0"
+        }
+      },
+      "fri": {
+        "fri_step_sizes": [],
+        "inner_layers": [],
+        "log_input_size": "0x0",
+        "log_last_layer_degree_bound": "0x0",
+        "n_layers": "0x0"
+      },
+      "log_n_cosets": "0x0",
+      "log_trace_domain_size": "0x0",
+      "n_queries": "0x0",
+      "n_verifier_friendly_commitment_layers": "0x0",
+      "proof_of_work": {
+        "n_bits": 0
+      },
+      "traces": {
+        "interaction": {
+          "n_columns": "0x0",
+          "vector": {
+            "height": "0x0",
+            "n_verifier_friendly_commitment_layers": "0x0"
+          }
+        },
+        "original": {
+          "n_columns": "0x0",
+          "vector": {
+            "height": "0x0",
+            "n_verifier_friendly_commitment_layers": "0x0"
+          }
+        }
+      }
+    },
+    "public_input": {
+      "continuous_page_headers": [],
+      "dynamic_params": [],
+      "layout": "0x0",
+      "log_n_steps": "0x0",
+      "main_page": [],
+      "padding_addr": "0x0",
+      "padding_value": "0x0",
+      "range_check_max": "0x0",
+      "range_check_min": "0x0",
+      "segments": []
+    },
+    "unsent_commitment": {
+      "composition": "0x0",
+      "fri": {
+        "inner_layers": [],
+        "last_layer_coefficients": []
+      },
+      "oods_values": [],
+      "proof_of_work": {
+        "nonce": 0
+      },
+      "traces": {
+        "interaction": "0x0",
+        "original": "0x0"
+      }
+    },
+    "witness": {
+      "composition_decommitment": {
+        "values": []
+      },
+      "composition_witness": {
+        "vector": {
+          "authentications": []
+        }
+      },
+      "fri_witness": {
+        "layers": []
+      },
+      "traces_decommitment": {
+        "interaction": {
+          "values": []
+        },
+        "original": {
+          "values": []
+        }
+      },
+      "traces_witness": {
+        "interaction": {
+          "vector": {
+            "authentications": []
+          }
+        },
+        "original": {
+          "vector": {
+            "authentications": []
+          }
+        }
+      }
+    }
+  },
+  "verified": true
+}
