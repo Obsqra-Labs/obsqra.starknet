@@ -21,6 +21,10 @@ class ZkmlProofConfig:
     proof_json_path: Optional[Path]
     calldata_path: Optional[Path]
     serializer_bin: Optional[Path]
+    layout: str
+    hasher: str
+    stone_version: str
+    memory_verification: str
 
 
 class ZkmlProofService:
@@ -30,15 +34,32 @@ class ZkmlProofService:
         self.integrity = integrity
         self.config = config
 
+    @staticmethod
+    def _string_to_felt(value: str) -> int:
+        """
+        Encode an ASCII string into a felt (same as verify-on-starknet.sh).
+        """
+        return int.from_bytes(value.encode("ascii"), "big")
+
     def load_calldata(self) -> List[int]:
         if self.config.calldata_path and self.config.calldata_path.exists():
-            return load_calldata_file(self.config.calldata_path)
-        if self.config.proof_json_path and self.config.serializer_bin:
-            return serialize_stone_proof(
+            calldata = load_calldata_file(self.config.calldata_path)
+        elif self.config.proof_json_path and self.config.serializer_bin:
+            calldata = serialize_stone_proof(
                 proof_json_path=self.config.proof_json_path,
                 serializer_bin=self.config.serializer_bin,
             )
-        raise FileNotFoundError("No zkML proof calldata or proof JSON configured.")
+        else:
+            raise FileNotFoundError("No zkML proof calldata or proof JSON configured.")
+
+        # Prefix verifier settings expected by Integrity FactRegistry
+        config_felts = [
+            self._string_to_felt(self.config.layout),
+            self._string_to_felt(self.config.hasher),
+            self._string_to_felt(self.config.stone_version),
+            self._string_to_felt(self.config.memory_verification),
+        ]
+        return [*config_felts, *calldata]
 
     async def verify_demo(self) -> bool:
         calldata = self.load_calldata()

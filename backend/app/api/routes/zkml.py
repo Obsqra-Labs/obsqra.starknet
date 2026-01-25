@@ -66,6 +66,10 @@ async def zkml_verify_demo():
         proof_json_path=Path(settings.ZKML_PROOF_JSON_PATH) if settings.ZKML_PROOF_JSON_PATH else None,
         calldata_path=Path(settings.ZKML_PROOF_CALLDATA_PATH) if settings.ZKML_PROOF_CALLDATA_PATH else None,
         serializer_bin=Path(settings.INTEGRITY_PROOF_SERIALIZER_BIN) if settings.INTEGRITY_PROOF_SERIALIZER_BIN else None,
+        layout=settings.INTEGRITY_LAYOUT,
+        hasher=settings.INTEGRITY_HASHER,
+        stone_version=settings.INTEGRITY_STONE_VERSION,
+        memory_verification=settings.INTEGRITY_MEMORY_VERIFICATION,
     )
     if not config.calldata_path and not config.proof_json_path:
         return {"verified": False, "calldata_source": "missing", "detail": "ZKML proof paths not configured"}

@@ -76,6 +76,11 @@ class Settings(BaseSettings):
     ZKML_PROOF_JSON_PATH: str = ""
     ZKML_PROOF_CALLDATA_PATH: str = ""
     INTEGRITY_PROOF_SERIALIZER_BIN: str = ""
+    # Integrity proof settings (match verify-on-starknet.sh)
+    INTEGRITY_LAYOUT: str = "recursive"
+    INTEGRITY_HASHER: str = "keccak_160_lsb"
+    INTEGRITY_STONE_VERSION: str = "stone5"
+    INTEGRITY_MEMORY_VERIFICATION: str = "strict"
     # Ekubo API pair for metrics (default: ETH/USDC on Starknet mainnet)
     EKUBO_CHAIN_ID: str = "0x534e5f4d41494e"  # SN_MAIN
     EKUBO_TOKEN_A: str = "0x49d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7"  # ETH

@@ -9,6 +9,8 @@ import json
 from typing import Optional
 from starknet_py.contract import Contract
 from starknet_py.net.full_node_client import FullNodeClient
+from starknet_py.net.client_models import Call
+from starknet_py.hash.selector import get_selector_from_name
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -126,18 +128,14 @@ class IntegrityService:
         - Atlantic proofs (downloaded proof JSON -> proof_serializer -> calldata)
         """
         try:
-            contract = await Contract.from_address(
-                address=self.verifier_address,
-                provider=self.rpc_client
+            selector = get_selector_from_name("verify_proof_full_and_register_fact")
+            call = Call(
+                to_addr=self.verifier_address,
+                selector=selector,
+                calldata=calldata,
             )
-            fn = contract.functions.get("verify_proof_full_and_register_fact")
-            if not fn:
-                logger.error("Integrity contract missing verify_proof_full_and_register_fact")
-                return False
-
-            # Starknet.py expects args expanded; calldata is a flat list of felts.
-            result = await fn.call(*calldata)
-            logger.info("Integrity verify_proof_full_and_register_fact call returned OK (calldata path)")
+            result = await self.rpc_client.call_contract(call)
+            logger.info("Integrity verify_proof_full_and_register_fact call returned OK (raw calldata)")
             return True if result is not None else False
         except Exception as e:
             logger.error(f"Integrity calldata verification failed: {e}", exc_info=True)
@@ -272,4 +270,3 @@ def get_integrity_service(rpc_url: str = None, network: str = None) -> Integrity
         _integrity_service_instance = IntegrityService(rpc_url=rpc_url, network=network)
     
     return _integrity_service_instance
-
