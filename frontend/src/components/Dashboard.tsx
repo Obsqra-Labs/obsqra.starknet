@@ -733,6 +733,10 @@ export function Dashboard() {
                 </button>
               </div>
             </div>
+            <p className="text-[11px] text-gray-500 mb-4">
+              Cairo0 = legacy Cairo compiler/runtime (older Starknet programs). Cairo1 = new Rust-based compiler/runtime with
+              safer types and a modern language. Both are just proof formats here.
+            </p>
 
             {zkmlVerification.error && (
               <div className="mb-3 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded p-2">
