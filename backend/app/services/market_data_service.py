@@ -40,12 +40,17 @@ class MarketDataService:
 
         # Get latest block info for auditability
         block_info = await self.client.get_block_hash_and_number()
-        block = await self.client.get_block(block_number=block_info.block_number)
+        # Use raw RPC to avoid schema mismatches on older starknet-py
+        raw_block = await self.client._client.call(
+            method_name="getBlockWithTxHashes",
+            params={"block_id": {"block_number": block_info.block_number}},
+        )
+        timestamp = int(raw_block.get("timestamp", 0))
 
         return MarketSnapshot(
             block_number=block_info.block_number,
             block_hash=hex(block_info.block_hash),
-            timestamp=block.timestamp,
+            timestamp=timestamp,
             apys={
                 "jediswap": apys.get("jediswap", 0.0),
                 "ekubo": apys.get("ekubo", 0.0),
