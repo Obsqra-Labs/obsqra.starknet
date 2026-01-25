@@ -1025,17 +1025,19 @@ async def execute_allocation(
 
         rpc_urls = get_rpc_urls()
 
-        async def _submit_with_client(client: FullNodeClient, _rpc_url: str):
+        # execute_v3 currently fails on some RPCs due to missing l1_data_gas in fee params
+        # (starknet_py version mismatch). Use v1 invoke for compatibility.
+        async def _submit_with_client_v1(client: FullNodeClient, _rpc_url: str):
             account = Account(
                 address=int(settings.BACKEND_WALLET_ADDRESS, 16),
                 client=client,
                 key_pair=key_pair,
                 chain=network_chain,
             )
-            return await account.execute_v3(calls=[call], auto_estimate=True)
+            return await account.execute_v1(calls=[call], auto_estimate=True)
 
         invoke_result, submit_rpc = await with_rpc_fallback(
-            _submit_with_client, urls=rpc_urls
+            _submit_with_client_v1, urls=rpc_urls
         )
 
         tx_hash = hex(invoke_result.transaction_hash)
