@@ -23,6 +23,7 @@ import { getConfig } from '@/lib/config';
 import { useProofHistory } from '@/hooks/useProofHistory';
 import { ProofBadge } from './ProofBadge';
 import { useMarketSnapshot } from '@/hooks/useMarketSnapshot';
+import { useMarketMetrics } from '@/hooks/useMarketMetrics';
 
 type TabType = 'overview' | 'analytics' | 'history' | 'integration-tests';
 
@@ -62,6 +63,7 @@ export function Dashboard() {
   const proofHistory = useProofHistory(5);
   const latestProof = proofHistory.data[0];
   const marketSnapshot = useMarketSnapshot();
+  const marketMetrics = useMarketMetrics();
   
   // Fetch user's STRK balance on mount and when address changes
   useEffect(() => {
@@ -651,6 +653,48 @@ export function Dashboard() {
                   {marketSnapshot.data?.block_hash ? `${marketSnapshot.data.block_hash.slice(0, 12)}...` : '—'}
                 </p>
               </div>
+            </div>
+          </div>
+
+          {/* Derived Metrics */}
+          <div className="bg-slate-900/70 border border-white/10 rounded-xl p-6 shadow-lg">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-white">Derived Risk Inputs</h2>
+                <p className="text-xs text-gray-400">Read‑only proxies (market → metrics)</p>
+              </div>
+              <button
+                onClick={() => marketMetrics.refetch()}
+                className="px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors flex items-center gap-2"
+              >
+                🔄 Refresh
+              </button>
+            </div>
+
+            {marketMetrics.error && (
+              <div className="mb-3 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded p-2">
+                ⚠️ {marketMetrics.error}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+              {(['jediswap', 'ekubo'] as const).map((protocol) => {
+                const metrics = marketMetrics.data?.[protocol];
+                return (
+                  <div key={protocol} className="bg-slate-800/50 rounded-lg p-3">
+                    <p className="text-xs text-gray-400 mb-1">{protocol.toUpperCase()}</p>
+                    <p className="text-xs text-gray-300">
+                      util: {metrics ? metrics.utilization : '—'} · vol: {metrics ? metrics.volatility : '—'}
+                    </p>
+                    <p className="text-xs text-gray-300">
+                      liq: {metrics ? metrics.liquidity : '—'} · audit: {metrics ? metrics.audit_score : '—'}
+                    </p>
+                    <p className="text-[11px] text-gray-500 mt-1">
+                      source: {metrics?.source ?? '—'} · apy: {metrics ? metrics.apy.toFixed(2) : '—'}%
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
