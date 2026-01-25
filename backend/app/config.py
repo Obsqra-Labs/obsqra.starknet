@@ -75,6 +75,10 @@ class Settings(BaseSettings):
     # Optional zkML proof paths (Integrity/Stone)
     ZKML_PROOF_JSON_PATH: str = ""
     ZKML_PROOF_CALLDATA_PATH: str = ""
+    ZKML_PROOF_JSON_PATH_CAIRO0: str = ""
+    ZKML_PROOF_JSON_PATH_CAIRO1: str = ""
+    ZKML_PROOF_CALLDATA_PATH_CAIRO0: str = ""
+    ZKML_PROOF_CALLDATA_PATH_CAIRO1: str = ""
     INTEGRITY_PROOF_SERIALIZER_BIN: str = ""
     # Integrity proof settings (match verify-on-starknet.sh)
     INTEGRITY_LAYOUT: str = "recursive"

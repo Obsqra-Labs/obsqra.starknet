@@ -39,6 +39,7 @@ export function Dashboard() {
   const [riskError, setRiskError] = useState<string | null>(null);
   const [lastTxHash, setLastTxHash] = useState<string | null>(null);
   const [generatingProofType, setGeneratingProofType] = useState<'risk' | 'allocation' | null>(null);
+  const [zkmlProfile, setZkmlProfile] = useState<'cairo0' | 'cairo1'>('cairo0');
   const [depositAmount, setDepositAmount] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [isDepositing, setIsDepositing] = useState(false);
@@ -707,13 +708,30 @@ export function Dashboard() {
                 <h2 className="text-xl font-bold text-white">zkML Proof Demo</h2>
                 <p className="text-xs text-gray-400">Integrity verification (precomputed proof)</p>
               </div>
-              <button
-                onClick={() => zkmlVerification.verify()}
-                disabled={zkmlVerification.loading}
-                className="px-3 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-500 text-white rounded transition-colors flex items-center gap-2 disabled:opacity-50"
-              >
-                {zkmlVerification.loading ? 'Verifying…' : 'Verify zkML Proof'}
-              </button>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center rounded-full border border-white/10 bg-slate-800/60 p-0.5 text-[11px] text-gray-300">
+                  {(['cairo0', 'cairo1'] as const).map((profile) => (
+                    <button
+                      key={profile}
+                      onClick={() => setZkmlProfile(profile)}
+                      className={`px-2.5 py-1 rounded-full transition-colors ${
+                        zkmlProfile === profile
+                          ? 'bg-indigo-600 text-white'
+                          : 'text-gray-300 hover:text-white'
+                      }`}
+                    >
+                      {profile.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => zkmlVerification.verify(zkmlProfile)}
+                  disabled={zkmlVerification.loading}
+                  className="px-3 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-500 text-white rounded transition-colors flex items-center gap-2 disabled:opacity-50"
+                >
+                  {zkmlVerification.loading ? 'Verifying…' : 'Verify zkML Proof'}
+                </button>
+              </div>
             </div>
 
             {zkmlVerification.error && (
@@ -740,7 +758,10 @@ export function Dashboard() {
               <div className="bg-slate-800/50 rounded-lg p-3">
                 <p className="text-xs text-gray-400 mb-1">Notes</p>
                 <p className="text-gray-300 text-xs">
-                  Configure proof paths to enable full demo.
+                  Profile: {zkmlProfile.toUpperCase()} ·
+                  {zkmlVerification.result?.profile
+                    ? ` last check: ${zkmlVerification.result.profile.toUpperCase()}`
+                    : ' ready to verify'}
                 </p>
               </div>
             </div>

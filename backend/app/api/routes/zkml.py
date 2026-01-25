@@ -1,5 +1,5 @@
 """zkML demo endpoints."""
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.services.zkml_service import get_zkml_service
@@ -53,32 +53,70 @@ async def zkml_infer(request: ZkmlRequest):
 
 
 @router.post("/verify-demo", tags=["zkML"])
-async def zkml_verify_demo():
+async def zkml_verify_demo(profile: str = Query("cairo0", description="Proof profile: cairo0 | cairo1")):
     """
     Verify a precomputed zkML proof via Integrity.
 
     Uses either:
-    - ZKML_PROOF_CALLDATA_PATH (preferred), or
+    - ZKML_PROOF_CALLDATA_PATH_* (preferred), or
     - ZKML_PROOF_JSON_PATH + INTEGRITY_PROOF_SERIALIZER_BIN
     """
     integrity = get_integrity_service()
+    normalized = profile.strip().lower()
+    if normalized not in {"cairo0", "cairo1"}:
+        raise HTTPException(status_code=400, detail="Invalid profile. Use cairo0 or cairo1.")
+
+    def resolve_path(primary: str, fallback: str) -> Path | None:
+        if primary:
+            return Path(primary)
+        if fallback:
+            candidate = Path(fallback)
+            return candidate if candidate.exists() else None
+        return None
+
+    if normalized == "cairo1":
+        calldata_default = "data/zkml_demo_cairo1.calldata"
+        json_default = ""
+        calldata_path = resolve_path(
+            settings.ZKML_PROOF_CALLDATA_PATH_CAIRO1 or settings.ZKML_PROOF_CALLDATA_PATH,
+            calldata_default,
+        )
+        proof_json_path = resolve_path(
+            settings.ZKML_PROOF_JSON_PATH_CAIRO1 or settings.ZKML_PROOF_JSON_PATH,
+            json_default,
+        )
+        memory_verification = "cairo1"
+    else:
+        calldata_default = "data/zkml_demo_cairo0.calldata"
+        json_default = ""
+        calldata_path = resolve_path(
+            settings.ZKML_PROOF_CALLDATA_PATH_CAIRO0 or settings.ZKML_PROOF_CALLDATA_PATH,
+            calldata_default,
+        )
+        proof_json_path = resolve_path(
+            settings.ZKML_PROOF_JSON_PATH_CAIRO0 or settings.ZKML_PROOF_JSON_PATH,
+            json_default,
+        )
+        memory_verification = settings.INTEGRITY_MEMORY_VERIFICATION
+
     config = ZkmlProofConfig(
-        proof_json_path=Path(settings.ZKML_PROOF_JSON_PATH) if settings.ZKML_PROOF_JSON_PATH else None,
-        calldata_path=Path(settings.ZKML_PROOF_CALLDATA_PATH) if settings.ZKML_PROOF_CALLDATA_PATH else None,
+        proof_json_path=proof_json_path,
+        calldata_path=calldata_path,
         serializer_bin=Path(settings.INTEGRITY_PROOF_SERIALIZER_BIN) if settings.INTEGRITY_PROOF_SERIALIZER_BIN else None,
         layout=settings.INTEGRITY_LAYOUT,
         hasher=settings.INTEGRITY_HASHER,
         stone_version=settings.INTEGRITY_STONE_VERSION,
-        memory_verification=settings.INTEGRITY_MEMORY_VERIFICATION,
+        memory_verification=memory_verification,
     )
     if not config.calldata_path and not config.proof_json_path:
-        return {"verified": False, "calldata_source": "missing", "detail": "ZKML proof paths not configured"}
+        return {"verified": False, "calldata_source": "missing", "detail": "ZKML proof paths not configured", "profile": normalized}
     service = ZkmlProofService(integrity=integrity, config=config)
     try:
         verified = await service.verify_demo()
     except FileNotFoundError as exc:
-        return {"verified": False, "calldata_source": "missing", "detail": str(exc)}
+        return {"verified": False, "calldata_source": "missing", "detail": str(exc), "profile": normalized}
     return {
         "verified": verified,
         "calldata_source": "file" if config.calldata_path else "serialized" if config.proof_json_path else "missing",
+        "profile": normalized,
     }

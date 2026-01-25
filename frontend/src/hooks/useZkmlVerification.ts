@@ -5,6 +5,7 @@ import { useCallback, useState } from "react";
 export interface ZkmlVerificationResult {
   verified: boolean;
   calldata_source: string;
+  profile?: string;
 }
 
 export function useZkmlVerification() {
@@ -12,13 +13,13 @@ export function useZkmlVerification() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ZkmlVerificationResult | null>(null);
 
-  const verify = useCallback(async () => {
+  const verify = useCallback(async (profile: "cairo0" | "cairo1" = "cairo0") => {
     setLoading(true);
     setError(null);
     setResult(null);
 
     try {
-      const res = await fetch("/api/v1/zkml/verify-demo", {
+      const res = await fetch(`/api/v1/zkml/verify-demo?profile=${profile}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
