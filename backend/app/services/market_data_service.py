@@ -11,6 +11,7 @@ import logging
 from starknet_py.net.full_node_client import FullNodeClient
 
 from app.services.protocol_apy_service import get_apy_service
+from app.utils.rpc import get_rpc_urls, with_rpc_fallback
 
 logger = logging.getLogger(__name__)
 
@@ -32,18 +33,27 @@ class MarketDataService:
     def __init__(self, rpc_url: str, network: str):
         self.rpc_url = rpc_url
         self.network = network
-        self.client = FullNodeClient(node_url=rpc_url)
+        fallback_urls = get_rpc_urls()
+        if rpc_url:
+            self.rpc_urls = [rpc_url] + [url for url in fallback_urls if url != rpc_url]
+        else:
+            self.rpc_urls = fallback_urls
 
     async def get_snapshot(self, force_refresh: bool = False) -> MarketSnapshot:
         apy_service = get_apy_service()
         apys = await apy_service.get_all_apys(force_refresh=force_refresh)
 
-        # Get latest block info for auditability
-        block_info = await self.client.get_block_hash_and_number()
-        # Use raw RPC to avoid schema mismatches on older starknet-py
-        raw_block = await self.client._client.call(
-            method_name="getBlockWithTxHashes",
-            params={"block_id": {"block_number": block_info.block_number}},
+        async def _fetch_block(client: FullNodeClient, _rpc_url: str):
+            block_info = await client.get_block_hash_and_number()
+            raw_block = await client._client.call(
+                method_name="getBlockWithTxHashes",
+                params={"block_id": {"block_number": block_info.block_number}},
+            )
+            return block_info, raw_block
+
+        (block_info, raw_block), rpc_used = await with_rpc_fallback(
+            _fetch_block,
+            urls=self.rpc_urls,
         )
         timestamp = int(raw_block.get("timestamp", 0))
 
@@ -57,7 +67,7 @@ class MarketDataService:
             },
             apy_source=apys.get("source", "unknown"),
             network=self.network,
-            rpc_url=self.rpc_url,
+            rpc_url=rpc_used,
         )
 
 

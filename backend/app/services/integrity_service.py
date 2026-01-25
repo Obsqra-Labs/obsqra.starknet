@@ -12,6 +12,7 @@ from starknet_py.net.full_node_client import FullNodeClient
 from starknet_py.net.client_models import Call
 from starknet_py.hash.selector import get_selector_from_name
 from dataclasses import dataclass
+from app.utils.rpc import get_rpc_urls, with_rpc_fallback
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,12 @@ class IntegrityService:
             rpc_url: Starknet RPC URL
             network: Network name ('sepolia' or 'mainnet')
         """
-        self.rpc_client = FullNodeClient(node_url=rpc_url)
+        fallback_urls = get_rpc_urls()
+        if rpc_url:
+            self.rpc_urls = [rpc_url] + [url for url in fallback_urls if url != rpc_url]
+        else:
+            self.rpc_urls = fallback_urls
+        self.rpc_client = FullNodeClient(node_url=self.rpc_urls[0])
         self.network = network.lower()
         self.verifier_address = (
             INTEGRITY_VERIFIER_SEPOLIA if self.network == "sepolia" 
@@ -60,61 +66,67 @@ class IntegrityService:
         Accepts either ABI-shaped dicts (preferred) or raw byte blobs (chunked to felts).
         """
         try:
-            contract = await Contract.from_address(
-                address=self.verifier_address,
-                provider=self.rpc_client
-            )
-
-            # Preferred path: ABI-shaped dicts
-            if isinstance(verifier_config, dict) and isinstance(stark_proof, dict):
-                logger.info("Calling Integrity with structured verifier_config/stark_proof")
-                result = await contract.functions["verify_proof_full_and_register_fact"].call(
-                    verifier_config,
-                    stark_proof,
+            async def _call(client: FullNodeClient, _rpc_url: str):
+                contract = await Contract.from_address(
+                    address=self.verifier_address,
+                    provider=client,
                 )
-                logger.info("Integrity verify_proof_full_and_register_fact call returned OK (structured)")
+
+                # Preferred path: ABI-shaped dicts
+                if isinstance(verifier_config, dict) and isinstance(stark_proof, dict):
+                    logger.info("Calling Integrity with structured verifier_config/stark_proof")
+                    result = await contract.functions["verify_proof_full_and_register_fact"].call(
+                        verifier_config,
+                        stark_proof,
+                    )
+                    logger.info("Integrity verify_proof_full_and_register_fact call returned OK (structured)")
+                    return True if result is not None else False
+
+                # Allow JSON strings by decoding
+                local_verifier = verifier_config
+                local_proof = stark_proof
+                if isinstance(local_verifier, str):
+                    try:
+                        local_verifier = json.loads(local_verifier)
+                    except Exception:
+                        pass
+                if isinstance(local_proof, str):
+                    try:
+                        local_proof = json.loads(local_proof)
+                    except Exception:
+                        pass
+                if isinstance(local_verifier, dict) and isinstance(local_proof, dict):
+                    logger.info("Calling Integrity with JSON-decoded structs")
+                    result = await contract.functions["verify_proof_full_and_register_fact"].call(
+                        local_verifier,
+                        local_proof,
+                    )
+                    logger.info("Integrity verify_proof_full_and_register_fact call returned OK (json)")
+                    return True if result is not None else False
+
+                # Fallback: raw bytes -> felts
+                verifier_felts = self._bytes_to_felts(local_verifier or b"")
+                proof_felts = self._bytes_to_felts(local_proof or b"")
+
+                # Integrity expects (Span<felt>, Span<felt>)
+                calldata = [
+                    len(verifier_felts),
+                    *verifier_felts,
+                    len(proof_felts),
+                    *proof_felts,
+                ]
+
+                fn = contract.functions.get("verify_proof_full_and_register_fact")
+                if not fn:
+                    logger.error("Integrity contract missing verify_proof_full_and_register_fact")
+                    return False
+
+                result = await fn.call(*calldata)
+                logger.info("Integrity verify_proof_full_and_register_fact call returned OK (felts fallback)")
                 return True if result is not None else False
 
-            # Allow JSON strings by decoding
-            if isinstance(verifier_config, str):
-                try:
-                    verifier_config = json.loads(verifier_config)
-                except Exception:
-                    pass
-            if isinstance(stark_proof, str):
-                try:
-                    stark_proof = json.loads(stark_proof)
-                except Exception:
-                    pass
-            if isinstance(verifier_config, dict) and isinstance(stark_proof, dict):
-                logger.info("Calling Integrity with JSON-decoded structs")
-                result = await contract.functions["verify_proof_full_and_register_fact"].call(
-                    verifier_config,
-                    stark_proof,
-                )
-                logger.info("Integrity verify_proof_full_and_register_fact call returned OK (json)")
-                return True if result is not None else False
-
-            # Fallback: raw bytes -> felts
-            verifier_felts = self._bytes_to_felts(verifier_config or b"")
-            proof_felts = self._bytes_to_felts(stark_proof or b"")
-
-            # Integrity expects (Span<felt>, Span<felt>)
-            calldata = [
-                len(verifier_felts),
-                *verifier_felts,
-                len(proof_felts),
-                *proof_felts,
-            ]
-
-            fn = contract.functions.get("verify_proof_full_and_register_fact")
-            if not fn:
-                logger.error("Integrity contract missing verify_proof_full_and_register_fact")
-                return False
-
-            result = await fn.call(*calldata)
-            logger.info("Integrity verify_proof_full_and_register_fact call returned OK (felts fallback)")
-            return True if result is not None else False
+            result, _ = await with_rpc_fallback(_call, urls=self.rpc_urls)
+            return bool(result)
         except Exception as e:
             logger.error(f"Integrity full-proof verification failed: {e}", exc_info=True)
             return False
@@ -129,12 +141,16 @@ class IntegrityService:
         """
         try:
             selector = get_selector_from_name("verify_proof_full_and_register_fact")
-            call = Call(
-                to_addr=self.verifier_address,
-                selector=selector,
-                calldata=calldata,
-            )
-            result = await self.rpc_client.call_contract(call)
+
+            async def _call(client: FullNodeClient, _rpc_url: str):
+                call = Call(
+                    to_addr=self.verifier_address,
+                    selector=selector,
+                    calldata=calldata,
+                )
+                return await client.call_contract(call)
+
+            result, _ = await with_rpc_fallback(_call, urls=self.rpc_urls)
             logger.info("Integrity verify_proof_full_and_register_fact call returned OK (raw calldata)")
             return True if result is not None else False
         except Exception as e:
@@ -166,38 +182,41 @@ class IntegrityService:
             else:
                 fact_hash_int = fact_hash
             
-            contract = await Contract.from_address(
-                address=self.verifier_address,
-                provider=self.rpc_client
-            )
-
-            # Pick the first available verifier entrypoint
-            fn_name = None
-            for candidate in [
-                "isCairoFactValid",
-                "is_valid",
-                "isValid",
-                "is_fact_valid",
-            ]:
-                if candidate in contract.functions:
-                    fn_name = candidate
-                    break
-
-            if not fn_name:
-                logger.error("Integrity verifier ABI missing expected entrypoint")
-                return False
-
-            # Try calling with (fact_hash, is_mocked); if that fails, try single-arg
-            is_mocked_int = 1 if is_mocked else 0
-            try:
-                result = await contract.functions[fn_name].call(
-                    fact_hash_int,
-                    is_mocked_int
+            async def _call(client: FullNodeClient, _rpc_url: str):
+                contract = await Contract.from_address(
+                    address=self.verifier_address,
+                    provider=client,
                 )
-            except Exception:
-                result = await contract.functions[fn_name].call(fact_hash_int)
 
-            is_valid = bool(result[0]) if result else False
+                # Pick the first available verifier entrypoint
+                fn_name = None
+                for candidate in [
+                    "isCairoFactValid",
+                    "is_valid",
+                    "isValid",
+                    "is_fact_valid",
+                ]:
+                    if candidate in contract.functions:
+                        fn_name = candidate
+                        break
+
+                if not fn_name:
+                    logger.error("Integrity verifier ABI missing expected entrypoint")
+                    return False
+
+                # Try calling with (fact_hash, is_mocked); if that fails, try single-arg
+                is_mocked_int = 1 if is_mocked else 0
+                try:
+                    result = await contract.functions[fn_name].call(
+                        fact_hash_int,
+                        is_mocked_int,
+                    )
+                except Exception:
+                    result = await contract.functions[fn_name].call(fact_hash_int)
+
+                return bool(result[0]) if result else False
+
+            is_valid, _ = await with_rpc_fallback(_call, urls=self.rpc_urls)
             
             logger.info(
                 f"L2 verification result: {is_valid} for fact_hash {hex(fact_hash_int)[:16]}... "
@@ -226,18 +245,20 @@ class IntegrityService:
             Verification hash or None
         """
         try:
-            contract = await Contract.from_address(
-                address=self.verifier_address,
-                provider=self.rpc_client
-            )
-            
-            # Try to call get_verification if it exists
-            # This is optional and may not be available on all contracts
-            if "get_verification" in contract.functions:
-                result = await contract.functions["get_verification"].call(fact_hash)
-                return hex(result[0]) if result else None
-            
-            return None
+            async def _call(client: FullNodeClient, _rpc_url: str):
+                contract = await Contract.from_address(
+                    address=self.verifier_address,
+                    provider=client,
+                )
+
+                if "get_verification" in contract.functions:
+                    result = await contract.functions["get_verification"].call(fact_hash)
+                    return hex(result[0]) if result else None
+
+                return None
+
+            result, _ = await with_rpc_fallback(_call, urls=self.rpc_urls)
+            return result
         except Exception as e:
             logger.debug(f"Could not get verification hash: {e}")
             return None

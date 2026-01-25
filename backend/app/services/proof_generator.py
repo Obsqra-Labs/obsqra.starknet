@@ -13,6 +13,7 @@ import asyncio
 from starknet_py.contract import Contract
 from starknet_py.net.full_node_client import FullNodeClient
 from app.config import get_settings
+from app.utils.rpc import with_rpc_fallback
 
 settings = get_settings()
 
@@ -90,23 +91,20 @@ class ProofGenerator:
         Compute risk score by calling the actual Risk Engine Cairo contract.
         Returns computation trace based on real on-chain computation.
         """
-        # Initialize RPC client
-        rpc_client = FullNodeClient(node_url=settings.STARKNET_RPC_URL)
-        
-        # Create contract instance (address must be int)
-        contract = await Contract.from_address(
-            address=int(settings.RISK_ENGINE_ADDRESS, 16),
-            provider=rpc_client
-        )
-        
-        # Call calculate_risk_score on the contract
-        result = await contract.functions["calculate_risk_score"].call(
-            utilization,
-            volatility,
-            liquidity,
-            audit_score,
-            age_days
-        )
+        async def _call(client: FullNodeClient, _rpc_url: str):
+            contract = await Contract.from_address(
+                address=int(settings.RISK_ENGINE_ADDRESS, 16),
+                provider=client,
+            )
+            return await contract.functions["calculate_risk_score"].call(
+                utilization,
+                volatility,
+                liquidity,
+                audit_score,
+                age_days,
+            )
+
+        result, _ = await with_rpc_fallback(_call)
         
         # Extract risk_score from contract result
         total_risk = int(result[0])
@@ -149,26 +147,21 @@ class ProofGenerator:
         Compute optimal allocation by calling the actual Risk Engine Cairo contract.
         Returns computation trace based on real on-chain computation.
         """
-        # Initialize RPC client
-        rpc_client = FullNodeClient(node_url=settings.STARKNET_RPC_URL)
-        
-        # Create contract instance (address must be int)
-        contract = await Contract.from_address(
-            address=int(settings.RISK_ENGINE_ADDRESS, 16),
-            provider=rpc_client
-        )
-        
-        # Call calculate_allocation on the contract
-        # Note: Contract expects 3 protocols (nostra/zklend/ekubo)
-        # We map jediswap -> nostra and set zklend to 0 (not used)
-        result = await contract.functions["calculate_allocation"].call(
-            jediswap_risk,  # nostra_risk (mapped from jediswap)
-            0,              # zklend_risk (not used, set to 0)
-            ekubo_risk,     # ekubo_risk
-            jediswap_apy,   # nostra_apy (mapped from jediswap)
-            0,              # zklend_apy (not used, set to 0)
-            ekubo_apy       # ekubo_apy
-        )
+        async def _call(client: FullNodeClient, _rpc_url: str):
+            contract = await Contract.from_address(
+                address=int(settings.RISK_ENGINE_ADDRESS, 16),
+                provider=client,
+            )
+            return await contract.functions["calculate_allocation"].call(
+                jediswap_risk,  # nostra_risk (mapped from jediswap)
+                0,              # zklend_risk (not used, set to 0)
+                ekubo_risk,     # ekubo_risk
+                jediswap_apy,   # nostra_apy (mapped from jediswap)
+                0,              # zklend_apy (not used, set to 0)
+                ekubo_apy,      # ekubo_apy
+            )
+
+        result, _ = await with_rpc_fallback(_call)
         
         # Extract allocation percentages from contract result
         # Contract returns ((nostra_pct, zklend_pct, ekubo_pct),) - nested tuple
@@ -315,4 +308,3 @@ class ProofGenerator:
             return recomputed.computation_hash == trace["computation_hash"]
 
         return False
-
