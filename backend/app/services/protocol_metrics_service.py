@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from typing import Optional, Dict
 
 from app.services.protocol_apy_service import get_apy_service
+from app.services.ekubo_api_service import EkuboApiService
+from app.config import get_settings
 
 
 @dataclass
@@ -30,6 +32,8 @@ class ProtocolMetricsService:
 
     def __init__(self):
         self.apy_service = get_apy_service()
+        self.ekubo_api = EkuboApiService()
+        self.settings = get_settings()
 
     @staticmethod
     def _liquidity_tier(tvl_usd: Optional[float]) -> int:
@@ -88,18 +92,67 @@ class ProtocolMetricsService:
 
     async def get_protocol_metrics(self) -> Dict[str, ProtocolMetricsSnapshot]:
         apys = await self.apy_service.get_all_apys(force_refresh=False)
+        jedi_metrics = self._proxy_metrics(
+            apy=float(apys.get("jediswap", 0.0)),
+            source=apys.get("source", "default"),
+        )
 
-        # DefiLlama yields endpoint doesn't always provide tvl/mean data in current call path.
-        # For now we return proxies based on APY and a shared source label.
+        ekubo_metrics = self._proxy_metrics(
+            apy=float(apys.get("ekubo", 0.0)),
+            source=apys.get("source", "default"),
+        )
+
+        # Try Ekubo API for real pool-derived proxies
+        try:
+            stats = await self.ekubo_api.get_pair_top_pool(
+                chain_id=self.settings.EKUBO_CHAIN_ID,
+                token_a=self.settings.EKUBO_TOKEN_A,
+                token_b=self.settings.EKUBO_TOKEN_B,
+                min_tvl_usd=1000,
+            )
+            if stats:
+                tvl_total = stats.tvl0_total + stats.tvl1_total
+                volume_total = stats.volume0_24h + stats.volume1_24h
+                delta_total = abs(stats.tvl0_delta_24h) + abs(stats.tvl1_delta_24h)
+
+                utilization = 0
+                if tvl_total > 0:
+                    utilization = min(10000, int(volume_total * 10000 / tvl_total))
+
+                volatility = 0
+                if tvl_total > 0:
+                    volatility = min(10000, int(delta_total * 10000 / tvl_total))
+                if volatility == 0:
+                    volatility = 2000
+
+                # depth_percent -> liquidity tier
+                depth = stats.depth_percent or 0.0
+                if depth >= 0.08:
+                    liquidity = 0
+                elif depth >= 0.04:
+                    liquidity = 1
+                elif depth >= 0.01:
+                    liquidity = 2
+                else:
+                    liquidity = 3
+
+                ekubo_metrics = ProtocolMetricsSnapshot(
+                    utilization=utilization,
+                    volatility=volatility,
+                    liquidity=liquidity,
+                    audit_score=92,
+                    age_days=365,
+                    source="ekubo_api",
+                    apy=float(apys.get("ekubo", 0.0)),
+                    tvl_usd=None,
+                    apy_mean_30d=None,
+                )
+        except Exception:
+            pass
+
         return {
-            "jediswap": self._proxy_metrics(
-                apy=float(apys.get("jediswap", 0.0)),
-                source=apys.get("source", "default"),
-            ),
-            "ekubo": self._proxy_metrics(
-                apy=float(apys.get("ekubo", 0.0)),
-                source=apys.get("source", "default"),
-            ),
+            "jediswap": jedi_metrics,
+            "ekubo": ekubo_metrics,
         }
 
 
