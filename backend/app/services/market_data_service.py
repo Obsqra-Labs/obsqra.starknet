@@ -9,7 +9,6 @@ from typing import Optional, Dict, Any
 import logging
 
 from starknet_py.net.full_node_client import FullNodeClient
-from starknet_py.net.client_models import BlockId
 
 from app.services.protocol_apy_service import get_apy_service
 
@@ -41,7 +40,7 @@ class MarketDataService:
 
         # Get latest block info for auditability
         block_info = await self.client.get_block_hash_and_number()
-        block = await self.client.get_block(BlockId(number=block_info.block_number))
+        block = await self.client.get_block(block_number=block_info.block_number)
 
         return MarketSnapshot(
             block_number=block_info.block_number,
