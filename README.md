@@ -84,6 +84,7 @@ scripts/    Integration/testing scripts
 ## Start here (docs)
 
 - [Architecture](ARCHITECTURE.md)
+- [Proof Train (why zkML fits)](docs/PROOF_TRAIN.md)
 - [Production Deployment](PRODUCTION_LIVE.md)
 - [SHARP Integration](SHARP_ARCHITECTURE.md)
 - [LuminAIR Implementation Status](LUMINAIR_IMPLEMENTATION_STATUS.md)

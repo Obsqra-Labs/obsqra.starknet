@@ -734,8 +734,8 @@ export function Dashboard() {
               </div>
             </div>
             <p className="text-[11px] text-gray-500 mb-4">
-              Cairo0 = legacy Cairo compiler/runtime (older Starknet programs). Cairo1 = new Rust-based compiler/runtime with
-              safer types and a modern language. Both are just proof formats here.
+              This attests the model step in the decision pipeline. Today it verifies a precomputed proof, but it uses the
+              same Integrity verifier path the live model will use. Cairo0 = legacy Cairo runtime; Cairo1 = modern Cairo.
             </p>
 
             {zkmlVerification.error && (
