@@ -972,131 +972,138 @@ async def execute_allocation(
     """
     Execute a previously proposed allocation once proof is verified.
     """
-    proof_job = db.query(ProofJob).filter(ProofJob.id == request.proof_job_id).first()
-    if not proof_job:
-        raise HTTPException(status_code=404, detail="Proposal not found")
+    try:
+        proof_job = db.query(ProofJob).filter(ProofJob.id == request.proof_job_id).first()
+        if not proof_job:
+            raise HTTPException(status_code=404, detail="Proposal not found")
 
-    can_execute = (proof_job.status == ProofStatus.VERIFIED)
-    if not can_execute and settings.ALLOW_UNVERIFIED_EXECUTION:
-        can_execute = True
+        can_execute = (proof_job.status == ProofStatus.VERIFIED)
+        if not can_execute and settings.ALLOW_UNVERIFIED_EXECUTION:
+            can_execute = True
 
-    if not can_execute:
-        raise HTTPException(status_code=400, detail="Proof not verified. Execution blocked.")
+        if not can_execute:
+            raise HTTPException(status_code=400, detail="Proof not verified. Execution blocked.")
 
-    # Build orchestration request from stored metrics
-    metrics = proof_job.metrics or {}
-    jediswap_metrics = metrics.get("jediswap", {})
-    ekubo_metrics = metrics.get("ekubo", {})
+        # Build orchestration request from stored metrics
+        metrics = proof_job.metrics or {}
+        jediswap_metrics = metrics.get("jediswap", {})
+        ekubo_metrics = metrics.get("ekubo", {})
 
-    orchestration_request = OrchestrationRequest(
-        jediswap_metrics=RiskMetricsRequest(**jediswap_metrics),
-        ekubo_metrics=RiskMetricsRequest(**ekubo_metrics),
-    )
-
-    # Execute on-chain using existing orchestration flow (without regenerating proof)
-    # --- Begin execute block (adapted from orchestrate_allocation) ---
-    if not settings.BACKEND_WALLET_PRIVATE_KEY or not settings.BACKEND_WALLET_ADDRESS:
-        raise HTTPException(
-            status_code=500,
-            detail="Backend wallet not configured. Set BACKEND_WALLET_PRIVATE_KEY in .env"
+        orchestration_request = OrchestrationRequest(
+            jediswap_metrics=RiskMetricsRequest(**jediswap_metrics),
+            ekubo_metrics=RiskMetricsRequest(**ekubo_metrics),
         )
 
-    rpc_client = FullNodeClient(node_url=settings.STARKNET_RPC_URL)
-    key_pair = KeyPair.from_private_key(int(settings.BACKEND_WALLET_PRIVATE_KEY, 16))
-    network_chain = StarknetChainId.SEPOLIA if settings.STARKNET_NETWORK.lower() == "sepolia" else StarknetChainId.MAINNET
-    account = Account(
-        address=int(settings.BACKEND_WALLET_ADDRESS, 16),
-        client=rpc_client,
-        key_pair=key_pair,
-        chain=network_chain
-    )
+        if not settings.BACKEND_WALLET_PRIVATE_KEY or not settings.BACKEND_WALLET_ADDRESS:
+            raise HTTPException(
+                status_code=500,
+                detail="Backend wallet not configured. Set BACKEND_WALLET_PRIVATE_KEY in .env"
+            )
 
-    contract = await Contract.from_address(
-        address=int(settings.RISK_ENGINE_ADDRESS, 16),
-        provider=account
-    )
+        rpc_client = FullNodeClient(node_url=settings.STARKNET_RPC_URL)
+        key_pair = KeyPair.from_private_key(int(settings.BACKEND_WALLET_PRIVATE_KEY, 16))
+        network_chain = StarknetChainId.SEPOLIA if settings.STARKNET_NETWORK.lower() == "sepolia" else StarknetChainId.MAINNET
+        account = Account(
+            address=int(settings.BACKEND_WALLET_ADDRESS, 16),
+            client=rpc_client,
+            key_pair=key_pair,
+            chain=network_chain
+        )
 
-    from starknet_py.hash.selector import get_selector_from_name
-    selector = get_selector_from_name("propose_and_execute_allocation")
+        contract = await Contract.from_address(
+            address=int(settings.RISK_ENGINE_ADDRESS, 16),
+            provider=account
+        )
 
-    calldata = [
-        orchestration_request.jediswap_metrics.utilization,
-        orchestration_request.jediswap_metrics.volatility,
-        orchestration_request.jediswap_metrics.liquidity,
-        orchestration_request.jediswap_metrics.audit_score,
-        orchestration_request.jediswap_metrics.age_days,
-        orchestration_request.ekubo_metrics.utilization,
-        orchestration_request.ekubo_metrics.volatility,
-        orchestration_request.ekubo_metrics.liquidity,
-        orchestration_request.ekubo_metrics.audit_score,
-        orchestration_request.ekubo_metrics.age_days,
-    ]
+        from starknet_py.hash.selector import get_selector_from_name
+        selector = get_selector_from_name("propose_and_execute_allocation")
 
-    from starknet_py.net.client_models import Call
-    call = Call(
-        to_addr=int(settings.RISK_ENGINE_ADDRESS, 16),
-        selector=selector,
-        calldata=calldata
-    )
+        calldata = [
+            orchestration_request.jediswap_metrics.utilization,
+            orchestration_request.jediswap_metrics.volatility,
+            orchestration_request.jediswap_metrics.liquidity,
+            orchestration_request.jediswap_metrics.audit_score,
+            orchestration_request.jediswap_metrics.age_days,
+            orchestration_request.ekubo_metrics.utilization,
+            orchestration_request.ekubo_metrics.volatility,
+            orchestration_request.ekubo_metrics.liquidity,
+            orchestration_request.ekubo_metrics.audit_score,
+            orchestration_request.ekubo_metrics.age_days,
+        ]
 
-    invoke_result = await account.execute_v3(
-        calls=[call],
-        auto_estimate=True
-    )
+        from starknet_py.net.client_models import Call
+        call = Call(
+            to_addr=int(settings.RISK_ENGINE_ADDRESS, 16),
+            selector=selector,
+            calldata=calldata
+        )
 
-    tx_hash = hex(invoke_result.transaction_hash)
-    proof_job.tx_hash = tx_hash
-    if proof_job.status != ProofStatus.VERIFIED:
-        proof_job.status = ProofStatus.SUBMITTED
-    proof_job.submitted_at = datetime.utcnow()
-    db.commit()
-    db.refresh(proof_job)
+        invoke_result = await account.execute_v3(
+            calls=[call],
+            auto_estimate=True
+        )
 
-    await rpc_client.wait_for_tx(invoke_result.transaction_hash)
+        tx_hash = hex(invoke_result.transaction_hash)
+        proof_job.tx_hash = tx_hash
+        if proof_job.status != ProofStatus.VERIFIED:
+            proof_job.status = ProofStatus.SUBMITTED
+        proof_job.submitted_at = datetime.utcnow()
+        db.commit()
+        db.refresh(proof_job)
 
-    try:
-        receipt = await rpc_client.get_transaction_receipt(invoke_result.transaction_hash)
-        proof_job.l2_block_number = getattr(receipt, "block_number", None)
-    except Exception as receipt_err:
-        logger.warning(f"⚠️ Could not fetch transaction receipt: {receipt_err}")
+        await rpc_client.wait_for_tx(invoke_result.transaction_hash)
 
-    # Fetch latest decision from RiskEngine
-    decision_count_result = await contract.functions["get_decision_count"].call()
-    decision_count = int(decision_count_result[0]) if decision_count_result else 0
-    if decision_count <= 0:
-        raise HTTPException(status_code=500, detail="Execution succeeded but no decision found")
+        try:
+            receipt = await rpc_client.get_transaction_receipt(invoke_result.transaction_hash)
+            proof_job.l2_block_number = getattr(receipt, "block_number", None)
+        except Exception as receipt_err:
+            logger.warning(f"⚠️ Could not fetch transaction receipt: {receipt_err}")
 
-    latest_decision_result = await contract.functions["get_decision"].call(decision_count)
-    decision_data = latest_decision_result[0] if latest_decision_result else None
-    if not decision_data:
-        raise HTTPException(status_code=500, detail="Execution succeeded but decision data missing")
+        # Fetch latest decision from RiskEngine
+        decision_count_result = await contract.functions["get_decision_count"].call()
+        decision_count = int(decision_count_result[0]) if decision_count_result else 0
+        if decision_count <= 0:
+            raise HTTPException(status_code=500, detail="Execution succeeded but no decision found")
 
-    proof_job.decision_id = int(decision_data['decision_id'])
-    proof_job.jediswap_pct = int(decision_data['jediswap_pct'])
-    proof_job.ekubo_pct = int(decision_data['ekubo_pct'])
-    proof_job.jediswap_risk = int(decision_data['jediswap_risk'])
-    proof_job.ekubo_risk = int(decision_data['ekubo_risk'])
-    db.commit()
-    db.refresh(proof_job)
+        latest_decision_result = await contract.functions["get_decision"].call(decision_count)
+        decision_data = latest_decision_result[0] if latest_decision_result else None
+        if not decision_data:
+            raise HTTPException(status_code=500, detail="Execution succeeded but decision data missing")
 
-    return OrchestrationResponse(
-        decision_id=int(decision_data['decision_id']),
-        block_number=int(decision_data['block_number']),
-        timestamp=int(decision_data['timestamp']),
-        jediswap_pct=int(decision_data['jediswap_pct']),
-        ekubo_pct=int(decision_data['ekubo_pct']),
-        jediswap_risk=int(decision_data['jediswap_risk']),
-        ekubo_risk=int(decision_data['ekubo_risk']),
-        jediswap_apy=int(decision_data['jediswap_apy']),
-        ekubo_apy=int(decision_data['ekubo_apy']),
-        rationale_hash=str(decision_data['rationale_hash']),
-        strategy_router_tx=str(decision_data['strategy_router_tx']),
-        tx_hash=tx_hash,
-        message=f"✅ Executed decision #{decision_count} on-chain (tx: {tx_hash})",
-        proof_job_id=str(proof_job.id),
-        proof_hash=proof_job.proof_hash,
-        proof_status=proof_job.status.value if hasattr(proof_job.status, 'value') else str(proof_job.status),
-    )
+        proof_job.decision_id = int(decision_data['decision_id'])
+        proof_job.jediswap_pct = int(decision_data['jediswap_pct'])
+        proof_job.ekubo_pct = int(decision_data['ekubo_pct'])
+        proof_job.jediswap_risk = int(decision_data['jediswap_risk'])
+        proof_job.ekubo_risk = int(decision_data['ekubo_risk'])
+        db.commit()
+        db.refresh(proof_job)
+
+        return OrchestrationResponse(
+            decision_id=int(decision_data['decision_id']),
+            block_number=int(decision_data['block_number']),
+            timestamp=int(decision_data['timestamp']),
+            jediswap_pct=int(decision_data['jediswap_pct']),
+            ekubo_pct=int(decision_data['ekubo_pct']),
+            jediswap_risk=int(decision_data['jediswap_risk']),
+            ekubo_risk=int(decision_data['ekubo_risk']),
+            jediswap_apy=int(decision_data['jediswap_apy']),
+            ekubo_apy=int(decision_data['ekubo_apy']),
+            rationale_hash=str(decision_data['rationale_hash']),
+            strategy_router_tx=str(decision_data['strategy_router_tx']),
+            tx_hash=tx_hash,
+            message=f"✅ Executed decision #{decision_count} on-chain (tx: {tx_hash})",
+            proof_job_id=str(proof_job.id),
+            proof_hash=proof_job.proof_hash,
+            proof_status=proof_job.status.value if hasattr(proof_job.status, 'value') else str(proof_job.status),
+        )
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        message = str(e)
+        if "Client failed with code 502" in message:
+            message = "Starknet RPC returned 502 (bad gateway). Try again or switch RPC."
+        logger.error(f"❌ Execution failed: {message}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Execution failed: {message}")
 
 
 @router.post("/orchestrate-from-market", response_model=OrchestrationResponse, tags=["Risk Engine"])

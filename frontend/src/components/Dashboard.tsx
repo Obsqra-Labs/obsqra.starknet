@@ -580,187 +580,12 @@ export function Dashboard() {
 
       {/* Integration Tests Tab */}
       {activeTab === 'integration-tests' && (
-        <div className="bg-slate-900/70 border border-white/10 rounded-xl p-6 shadow-lg">
-          <IntegrationTests />
-        </div>
-      )}
-
-      {/* History Tab */}
-      {activeTab === 'history' && (
-        <div className="bg-slate-900/70 border border-white/10 rounded-xl p-6 shadow-lg">
-          <TransactionHistory />
-        </div>
-      )}
-
-      {/* Overview Tab */}
-      {activeTab === 'overview' && (
         <div className="space-y-6">
-          {/* Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="bg-gradient-to-br from-purple-900/60 via-slate-900/70 to-slate-900/80 border border-purple-400/30 rounded-xl p-5 shadow-lg">
-              <p className="text-sm text-purple-200 mb-1">Vault TVL (Total Deposits)</p>
-              <p className="text-3xl font-bold text-white">{tvlDisplay} <span className="text-lg text-purple-200">STRK</span></p>
-              <div className="mt-2 pt-2 border-t border-purple-400/20">
-                <p className="text-xs text-purple-300 mb-1">Total Yield Accrued</p>
-                <p className="text-xl font-bold text-green-400">{yieldDisplay} <span className="text-sm text-purple-200">STRK</span></p>
-              </div>
-              <div className="mt-2 pt-2 border-t border-purple-400/20">
-                <p className="text-xs text-purple-300 mb-1">Protocol TVL (Deployed)</p>
-                <div className="grid grid-cols-2 gap-2 text-xs mt-1">
-                  <div>
-                    <p className="text-purple-300 mb-0.5">JediSwap</p>
-                    <p className="text-white font-semibold">{jediTvlDisplay} STRK</p>
-                  </div>
-                  <div>
-                    <p className="text-purple-300 mb-0.5">Ekubo</p>
-                    <p className="text-white font-semibold">{ekuboTvlDisplay} STRK</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gradient-to-br from-blue-900/60 via-slate-900/70 to-slate-900/80 border border-blue-400/30 rounded-xl p-5 shadow-lg">
-              <p className="text-sm text-blue-200 mb-1">🔄 JediSwap</p>
-              <p className="text-3xl font-bold text-white">{allocation.jediswap.toFixed(1)}%</p>
-              <p className="text-xs text-blue-300 mt-1">TVL: {jediTvlDisplay} STRK</p>
-            </div>
-            <div className="bg-gradient-to-br from-amber-900/60 via-slate-900/70 to-slate-900/80 border border-amber-400/30 rounded-xl p-5 shadow-lg">
-              <p className="text-sm text-orange-200 mb-1">🌀 Ekubo</p>
-              <p className="text-3xl font-bold text-white">{allocation.ekubo.toFixed(1)}%</p>
-              <p className="text-xs text-orange-300 mt-1">TVL: {ekuboTvlDisplay} STRK</p>
-            </div>
-          </div>
-
-          {/* Market Snapshot */}
           <div className="bg-slate-900/70 border border-white/10 rounded-xl p-6 shadow-lg">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-xl font-bold text-white">Read‑Only Market Snapshot</h2>
-                <p className="text-xs text-gray-400">Mainnet data feed (no writes)</p>
-              </div>
-              <button
-                onClick={() => marketSnapshot.refetch()}
-                className="px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors flex items-center gap-2"
-              >
-                🔄 Refresh
-              </button>
-            </div>
-
-            {marketSnapshot.error && (
-              <div className="mb-3 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded p-2">
-                ⚠️ {marketSnapshot.error}
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-              <div className="bg-slate-800/50 rounded-lg p-3">
-                <p className="text-xs text-gray-400 mb-1">Block</p>
-                <p className="text-white font-semibold">
-                  {marketSnapshot.loading ? '...' : marketSnapshot.data?.block_number ?? '—'}
-                </p>
-                <p className="text-[11px] text-gray-500 mt-1">
-                  {marketSnapshot.data?.timestamp
-                    ? new Date(marketSnapshot.data.timestamp * 1000).toLocaleString()
-                    : '—'}
-                </p>
-              </div>
-              <div className="bg-slate-800/50 rounded-lg p-3">
-                <p className="text-xs text-gray-400 mb-1">APY (JediSwap / Ekubo)</p>
-                <p className="text-white font-semibold">
-                  {marketSnapshot.loading
-                    ? '...'
-                    : `${marketSnapshot.data?.apys?.jediswap?.toFixed(2) ?? '—'}% / ${marketSnapshot.data?.apys?.ekubo?.toFixed(2) ?? '—'}%`}
-                </p>
-                <p className="text-[11px] text-gray-500 mt-1">
-                  Source: {marketSnapshot.data?.apy_source ?? '—'}
-                </p>
-              </div>
-              <div className="bg-slate-800/50 rounded-lg p-3">
-                <p className="text-xs text-gray-400 mb-1">Network</p>
-                <p className="text-white font-semibold">
-                  {marketSnapshot.data?.network ?? '—'}
-                </p>
-                <p className="text-[11px] text-gray-500 mt-1">
-                  {marketSnapshot.data?.block_hash ? `${marketSnapshot.data.block_hash.slice(0, 12)}...` : '—'}
-                </p>
-              </div>
-            </div>
+            <IntegrationTests />
           </div>
 
-          {/* Derived Metrics */}
-          <div className="bg-slate-900/70 border border-white/10 rounded-xl p-6 shadow-lg">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-xl font-bold text-white">Derived Risk Inputs</h2>
-                <p className="text-xs text-gray-400">Read‑only proxies (market → metrics)</p>
-              </div>
-              <button
-                onClick={() => marketMetrics.refetch()}
-                className="px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors flex items-center gap-2"
-              >
-                🔄 Refresh
-              </button>
-            </div>
-
-            {marketMetrics.error && (
-              <div className="mb-3 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded p-2">
-                ⚠️ {marketMetrics.error}
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-              {(['jediswap', 'ekubo'] as const).map((protocol) => {
-                const metrics = marketMetrics.data?.[protocol];
-                return (
-                  <div key={protocol} className="bg-slate-800/50 rounded-lg p-3">
-                    <p className="text-xs text-gray-400 mb-1">{protocol.toUpperCase()}</p>
-                    <p className="text-xs text-gray-300">
-                      util: {metrics ? metrics.utilization : '—'} · vol: {metrics ? metrics.volatility : '—'}
-                    </p>
-                    <p className="text-xs text-gray-300">
-                      liq: {metrics ? metrics.liquidity : '—'} · audit: {metrics ? metrics.audit_score : '—'}
-                    </p>
-                    <p className="text-[11px] text-gray-500 mt-1">
-                      source: {metrics?.source ?? '—'} · apy: {metrics ? metrics.apy.toFixed(2) : '—'}%
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Proof Train */}
-          <div className="bg-slate-900/70 border border-white/10 rounded-xl p-6 shadow-lg">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-xl font-bold text-white">Proof Train</h2>
-                <p className="text-xs text-gray-400">Snapshot → Metrics → Proof → Allocation → Execution</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-3 text-sm">
-              <div className="bg-slate-800/50 rounded-lg p-3">
-                <p className="text-xs text-gray-400 mb-1">Snapshot</p>
-                <p className="text-white font-semibold">{proofTrainSnapshot ? '✅ Locked' : '⏳ Pending'}</p>
-              </div>
-              <div className="bg-slate-800/50 rounded-lg p-3">
-                <p className="text-xs text-gray-400 mb-1">Metrics</p>
-                <p className="text-white font-semibold">{proofTrainMetricsReady ? '✅ Ready' : '⏳ Pending'}</p>
-              </div>
-              <div className="bg-slate-800/50 rounded-lg p-3">
-                <p className="text-xs text-gray-400 mb-1">zkML Proof</p>
-                <p className="text-white font-semibold">{proofTrainProofReady ? '✅ Verified' : '⏳ Waiting'}</p>
-              </div>
-              <div className="bg-slate-800/50 rounded-lg p-3">
-                <p className="text-xs text-gray-400 mb-1">Allocation</p>
-                <p className="text-white font-semibold">{proofTrainAllocationReady ? '✅ Proposed' : '⏳ Pending'}</p>
-              </div>
-              <div className="bg-slate-800/50 rounded-lg p-3">
-                <p className="text-xs text-gray-400 mb-1">Execution</p>
-                <p className="text-white font-semibold">{proofTrainTxReady ? '✅ Executed' : '⏳ Locked'}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* zkML Proof Demo */}
+          {/* zkML Proof Demo (moved to Integration Tests) */}
           <div className="bg-slate-900/70 border border-white/10 rounded-xl p-6 shadow-lg">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -829,6 +654,187 @@ export function Dashboard() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* History Tab */}
+      {activeTab === 'history' && (
+        <div className="bg-slate-900/70 border border-white/10 rounded-xl p-6 shadow-lg">
+          <TransactionHistory />
+        </div>
+      )}
+
+      {/* Overview Tab */}
+      {activeTab === 'overview' && (
+        <div className="space-y-6">
+          {/* Stats */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="bg-gradient-to-br from-purple-900/60 via-slate-900/70 to-slate-900/80 border border-purple-400/30 rounded-xl p-5 shadow-lg">
+              <p className="text-sm text-purple-200 mb-1">Vault TVL (Total Deposits)</p>
+              <p className="text-3xl font-bold text-white">{tvlDisplay} <span className="text-lg text-purple-200">STRK</span></p>
+              <div className="mt-2 pt-2 border-t border-purple-400/20">
+                <p className="text-xs text-purple-300 mb-1">Total Yield Accrued</p>
+                <p className="text-xl font-bold text-green-400">{yieldDisplay} <span className="text-sm text-purple-200">STRK</span></p>
+              </div>
+              <div className="mt-2 pt-2 border-t border-purple-400/20">
+                <p className="text-xs text-purple-300 mb-1">Protocol TVL (Deployed)</p>
+                <div className="grid grid-cols-2 gap-2 text-xs mt-1">
+                  <div>
+                    <p className="text-purple-300 mb-0.5">JediSwap</p>
+                    <p className="text-white font-semibold">{jediTvlDisplay} STRK</p>
+                  </div>
+                  <div>
+                    <p className="text-purple-300 mb-0.5">Ekubo</p>
+                    <p className="text-white font-semibold">{ekuboTvlDisplay} STRK</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="bg-gradient-to-br from-blue-900/60 via-slate-900/70 to-slate-900/80 border border-blue-400/30 rounded-xl p-5 shadow-lg">
+              <p className="text-sm text-blue-200 mb-1">🔄 JediSwap</p>
+              <p className="text-3xl font-bold text-white">{allocation.jediswap.toFixed(1)}%</p>
+              <p className="text-xs text-blue-300 mt-1">TVL: {jediTvlDisplay} STRK</p>
+            </div>
+            <div className="bg-gradient-to-br from-amber-900/60 via-slate-900/70 to-slate-900/80 border border-amber-400/30 rounded-xl p-5 shadow-lg">
+              <p className="text-sm text-orange-200 mb-1">🌀 Ekubo</p>
+              <p className="text-3xl font-bold text-white">{allocation.ekubo.toFixed(1)}%</p>
+              <p className="text-xs text-orange-300 mt-1">TVL: {ekuboTvlDisplay} STRK</p>
+            </div>
+          </div>
+
+          {/* Proof-Gated Rebalance */}
+          <div className="bg-gradient-to-br from-indigo-900/60 via-slate-900/70 to-slate-900/80 border border-indigo-400/30 rounded-xl p-6 shadow-lg">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-white">Proof‑Gated Rebalance</h2>
+                <p className="text-xs text-indigo-300">Snapshot → Metrics → Proof → Proposal → Execute</p>
+              </div>
+              <button
+                onClick={() => {
+                  marketSnapshot.refetch();
+                  marketMetrics.refetch();
+                }}
+                className="px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors flex items-center gap-2"
+              >
+                🔄 Refresh data
+              </button>
+            </div>
+
+            {(riskError || marketSnapshot.error || marketMetrics.error) && (
+              <div className="mb-3 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded p-2">
+                ⚠️ {riskError || marketSnapshot.error || marketMetrics.error}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 text-sm">
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-xs text-gray-400 mb-1">Snapshot</p>
+                <p className="text-white font-semibold">
+                  {marketSnapshot.loading ? '...' : marketSnapshot.data?.block_number ?? '—'}
+                </p>
+                <p className="text-[11px] text-gray-500 mt-1">
+                  {marketSnapshot.data?.timestamp
+                    ? new Date(marketSnapshot.data.timestamp * 1000).toLocaleString()
+                    : '—'}
+                </p>
+                <p className="text-[11px] text-gray-500 mt-1">
+                  APY: {marketSnapshot.data?.apys?.jediswap?.toFixed(2) ?? '—'}% / {marketSnapshot.data?.apys?.ekubo?.toFixed(2) ?? '—'}% · {marketSnapshot.data?.apy_source ?? '—'}
+                </p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-xs text-gray-400 mb-1">Derived Metrics</p>
+                <p className="text-xs text-gray-300">
+                  JediSwap: {marketMetrics.data?.jediswap ? `${marketMetrics.data.jediswap.utilization} util · ${marketMetrics.data.jediswap.volatility} vol · ${marketMetrics.data.jediswap.liquidity} liq` : '—'}
+                </p>
+                <p className="text-xs text-gray-300 mt-1">
+                  Ekubo: {marketMetrics.data?.ekubo ? `${marketMetrics.data.ekubo.utilization} util · ${marketMetrics.data.ekubo.volatility} vol · ${marketMetrics.data.ekubo.liquidity} liq` : '—'}
+                </p>
+                <p className="text-[11px] text-gray-500 mt-2">
+                  source: {marketMetrics.data?.jediswap?.source ?? '—'} / {marketMetrics.data?.ekubo?.source ?? '—'}
+                </p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-xs text-gray-400 mb-1">Proposal + Proof</p>
+                {proposal ? (
+                  <>
+                    <p className="text-white font-semibold">
+                      {((proposal.jediswap_pct ?? 0) / 100).toFixed(1)}% / {((proposal.ekubo_pct ?? 0) / 100).toFixed(1)}%
+                    </p>
+                    <p className="text-[11px] text-gray-500 mt-1">
+                      proof: {proposal.proof_status ?? 'pending'}
+                      {proposal.can_execute && proposal.proof_status !== 'verified' ? ' (demo override)' : ''}
+                    </p>
+                    {proposal.proof_hash && (
+                      <p className="text-[11px] text-gray-500 mt-1">
+                        {proposal.proof_hash.slice(0, 12)}… · {proposal.proof_source ?? '—'}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-xs text-gray-400">No proposal yet. Generate one to unlock execution.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3 text-xs mt-4">
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-gray-400 mb-1">Snapshot</p>
+                <p className="text-white font-semibold">{proofTrainSnapshot ? '✅ Locked' : '⏳ Pending'}</p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-gray-400 mb-1">Metrics</p>
+                <p className="text-white font-semibold">{proofTrainMetricsReady ? '✅ Ready' : '⏳ Pending'}</p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-gray-400 mb-1">Proof</p>
+                <p className="text-white font-semibold">{proofTrainProofReady ? '✅ Verified' : '⏳ Waiting'}</p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-gray-400 mb-1">Allocation</p>
+                <p className="text-white font-semibold">{proofTrainAllocationReady ? '✅ Proposed' : '⏳ Pending'}</p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-gray-400 mb-1">Execution</p>
+                <p className="text-white font-semibold">{proofTrainTxReady ? '✅ Executed' : '⏳ Locked'}</p>
+              </div>
+            </div>
+
+            <div className="flex flex-col md:flex-row gap-3 mt-4">
+              <button
+                onClick={handleMarketOrchestration}
+                disabled={isCalculatingRisk || backendOrchestration.isLoading}
+                className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-white rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {(isCalculatingRisk || backendOrchestration.isLoading) ? (
+                  <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Generating...</>
+                ) : (
+                  '🌍 Generate Proposal (Market Data)'
+                )}
+              </button>
+              <button
+                onClick={handleExecuteAllocation}
+                disabled={isCalculatingRisk || !proposal?.can_execute}
+                className="flex-1 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isCalculatingRisk ? (
+                  <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Executing...</>
+                ) : (
+                  proposal?.can_execute ? '✅ Execute Allocation' : '🔒 Execute (waiting for proof)'
+                )}
+              </button>
+              <button
+                onClick={handleAIOchestration}
+                disabled={isCalculatingRisk || riskEngineOrchestration.isLoading}
+                className="flex-1 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {(isCalculatingRisk || riskEngineOrchestration.isLoading) ? (
+                  <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Generating...</>
+                ) : (
+                  '🤖 Demo Proposal'
+                )}
+              </button>
+            </div>
+          </div>
 
           {/* Allocation Bar */}
           <div className="bg-slate-900/70 border border-white/10 rounded-xl p-6 shadow-lg">
@@ -883,20 +889,6 @@ export function Dashboard() {
             )}
           </div>
 
-          {/* Pool Selection - Coming Soon */}
-          <div className="bg-slate-900/70 border border-white/10 rounded-xl p-6 shadow-lg">
-            <h2 className="text-xl font-bold text-white mb-4">Select Your Pool</h2>
-            <p className="text-sm text-gray-400 mb-4">Choose a risk profile that matches your investment goals</p>
-            <div className="text-center py-8">
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                <span className="text-blue-400">🚧</span>
-                <span className="text-blue-300 text-sm">Pool selection feature coming soon</span>
-              </div>
-              <p className="text-gray-500 text-xs mt-4">
-                For now, use the AI Risk Engine orchestration to automatically optimize allocations
-              </p>
-            </div>
-          </div>
 
           {/* Deposit & Withdraw */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1123,115 +1115,6 @@ export function Dashboard() {
             </div>
           </div>
 
-          {/* Risk Engine Calculation */}
-          <div className="bg-gradient-to-br from-indigo-900/60 via-slate-900/70 to-slate-900/80 border border-indigo-400/30 rounded-xl p-6 shadow-lg">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-2xl">🧠</span>
-              <div>
-                <h2 className="text-xl font-bold text-white">Verifiable AI Risk Engine</h2>
-                <p className="text-xs text-indigo-300">Cairo-powered risk scoring on Starknet</p>
-              </div>
-            </div>
-            <p className="text-sm text-gray-300 mb-4">
-              Generate a proof‑gated proposal first, then manually execute once the proof verifies. This keeps the flow
-              deterministic and user‑controlled.
-            </p>
-            
-            <button
-              onClick={handleAIOchestration}
-              disabled={isCalculatingRisk || riskEngineOrchestration.isLoading}
-              className="w-full py-3 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mb-4"
-            >
-              {(isCalculatingRisk || riskEngineOrchestration.isLoading) ? (
-                <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Generating proposal...</>
-              ) : (
-                '🤖 Generate Proposal (Demo Inputs)'
-              )}
-            </button>
-
-            <button
-              onClick={handleMarketOrchestration}
-              disabled={isCalculatingRisk || backendOrchestration.isLoading}
-              className="w-full py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-white rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mb-4"
-            >
-              {(isCalculatingRisk || backendOrchestration.isLoading) ? (
-                <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Using market data...</>
-              ) : (
-                '🌍 Generate Proposal from Market Data'
-              )}
-            </button>
-
-            <button
-              onClick={handleExecuteAllocation}
-              disabled={isCalculatingRisk || !proposal?.can_execute}
-              className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mb-4"
-            >
-              {isCalculatingRisk ? (
-                <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Executing...</>
-              ) : (
-                proposal?.can_execute ? '✅ Execute Verified Allocation' : '🔒 Execute (waiting for proof)'
-              )}
-            </button>
-
-            {/* Risk Error Display */}
-            {riskError && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-4">
-                <p className="text-red-400 text-sm">⚠️ {riskError}</p>
-              </div>
-            )}
-
-            {proposal && (
-              <div className="space-y-3 pt-4 border-t border-indigo-400/20">
-                <p className="text-xs text-indigo-300 font-semibold">PROPOSAL (PROOF‑GATED)</p>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-                    <p className="text-gray-400 text-xs mb-1">JediSwap</p>
-                    <p className="text-indigo-300 font-bold">{(proposal.jediswap_pct / 100).toFixed(1)}%</p>
-                  </div>
-                  <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-                    <p className="text-gray-400 text-xs mb-1">Ekubo</p>
-                    <p className="text-indigo-300 font-bold">{(proposal.ekubo_pct / 100).toFixed(1)}%</p>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between text-xs text-gray-300">
-                  <span>Proof status</span>
-                  <span className="text-white">
-                    {(proposal.proof_status ?? 'pending')}{proposal.can_execute && proposal.proof_status !== 'verified' ? ' (demo override)' : ''}
-                  </span>
-                </div>
-                {proposal.proof_hash && (
-                  <p className="text-[11px] text-gray-500">
-                    proof: {proposal.proof_hash.slice(0, 12)}… · source: {proposal.proof_source ?? '—'}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Risk Calculation Results */}
-            {riskEngine.lastAllocation && (
-              <div className="space-y-3 pt-4 border-t border-indigo-400/20">
-                <p className="text-xs text-indigo-300 font-semibold">ALLOCATION RESULTS (from Risk Engine)</p>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-                    <p className="text-gray-400 text-xs mb-1">JediSwap</p>
-                    <p className="text-indigo-300 font-bold">{(riskEngine.lastAllocation.jediswapPct / 100).toFixed(1)}%</p>
-                  </div>
-                  <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-                    <p className="text-gray-400 text-xs mb-1">Ekubo</p>
-                    <p className="text-indigo-300 font-bold">{(riskEngine.lastAllocation.ekuboPct / 100).toFixed(1)}%</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Transaction Status */}
-            {txStatus && (
-              <div className="mt-4 pt-4 border-t border-indigo-400/20">
-                <p className="text-xs text-indigo-300 font-semibold mb-2">CALCULATION STATUS</p>
-                <p className="text-sm text-green-400">✅ Risk calculation confirmed on-chain</p>
-              </div>
-            )}
-          </div>
 
           {/* Latest proof status (L2/L1) */}
           {latestProof && (
