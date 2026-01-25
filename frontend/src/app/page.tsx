@@ -4,6 +4,7 @@ import { Dashboard } from '@/components/Dashboard';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useEffect, useState } from 'react';
 import { useWallet } from '@/hooks/useWallet';
+import { useMarketSnapshot } from '@/hooks/useMarketSnapshot';
 
 const GITHUB_URL = 'https://github.com/Obsqra-Labs/obsqra.starknet';
 
@@ -176,6 +177,7 @@ function Landing({
   const [proofGenerating, setProofGenerating] = useState(false);
   const [proofResult, setProofResult] = useState<any>(null);
   const [proofError, setProofError] = useState<string | null>(null);
+  const marketSnapshot = useMarketSnapshot(60000);
 
   useEffect(() => {
     // Check backend health
@@ -758,6 +760,49 @@ function Landing({
                     )}
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Market Snapshot */}
+            <div className="bg-[#111113] border border-white/10 rounded-xl p-6">
+              <p className="font-mono text-[11px] text-white/40 tracking-wider mb-6">READ-ONLY MARKET SNAPSHOT</p>
+              {marketSnapshot.error && (
+                <div className="bg-red-400/10 border border-red-400/30 rounded-lg px-4 py-3 mb-4">
+                  <p className="text-sm text-red-400/90 font-mono">{marketSnapshot.error}</p>
+                </div>
+              )}
+              <div className="grid grid-cols-1 gap-3 text-sm">
+                <div className="bg-black/30 border border-white/10 rounded-lg p-4">
+                  <p className="text-[10px] text-white/40 font-mono mb-1">Block</p>
+                  <p className="text-[12px] text-white/70 font-mono">
+                    {marketSnapshot.loading ? '...' : marketSnapshot.data?.block_number ?? '—'}
+                  </p>
+                  <p className="text-[11px] text-white/45 font-mono">
+                    {marketSnapshot.data?.timestamp
+                      ? new Date(marketSnapshot.data.timestamp * 1000).toLocaleString()
+                      : '—'}
+                  </p>
+                </div>
+                <div className="bg-black/30 border border-white/10 rounded-lg p-4">
+                  <p className="text-[10px] text-white/40 font-mono mb-1">APY (Jedi / Ekubo)</p>
+                  <p className="text-[12px] text-white/70 font-mono">
+                    {marketSnapshot.loading
+                      ? '...'
+                      : `${marketSnapshot.data?.apys?.jediswap?.toFixed(2) ?? '—'}% / ${marketSnapshot.data?.apys?.ekubo?.toFixed(2) ?? '—'}%`}
+                  </p>
+                  <p className="text-[11px] text-white/45 font-mono">
+                    Source: {marketSnapshot.data?.apy_source ?? '—'}
+                  </p>
+                </div>
+                <div className="bg-black/30 border border-white/10 rounded-lg p-4">
+                  <p className="text-[10px] text-white/40 font-mono mb-1">Network</p>
+                  <p className="text-[12px] text-white/70 font-mono">
+                    {marketSnapshot.data?.network ?? '—'}
+                  </p>
+                  <p className="text-[11px] text-white/45 font-mono">
+                    {marketSnapshot.data?.block_hash ? `${marketSnapshot.data.block_hash.slice(0, 12)}...` : '—'}
+                  </p>
+                </div>
               </div>
             </div>
 
