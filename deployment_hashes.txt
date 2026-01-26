@@ -1,0 +1,18 @@
+=
+STARKNET DEPLOYMENT RESULTS
+Time: Sun Jan 25 08:04:22 PM UTC 2026
+=
+
+================================================
+RiskEngine Declaration
+================================================
+WARNING: setting keystore passwords via --password is generally considered insecure, as they will be stored in your shell history or other log files.
+Not declaring class as it's already declared. Class hash:
+0x03ea934f4442de174715b458377bf5d1900c2a7c2a1d5e7486fcde9e522e2216
+
+WARNING: setting keystore passwords via --password is generally considered insecure, as they will be stored in your shell history or other log files.
+Sierra compiler version not specified. Attempting to automatically decide version to use...
+Network detected: sepolia. Using the default compiler version for this network: 2.6.2. Use the --compiler-version flag to choose a different version.
+Declaring Cairo 1 class: 0x065a9febfaa0ba0066c1a04802863f99d7cdec3c55547b2bb16a949d1f7d42b7
+Compiling Sierra class to CASM with compiler version 2.6.2...
+Error: Cannot compile Sierra version 1.7.0 with the current compiler (sierra version: 1.5.0)

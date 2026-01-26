@@ -3,6 +3,19 @@
 import { useState, useCallback } from 'react';
 import { getConfig } from '@/lib/config';
 
+async function readErrorDetail(response: Response, fallback: string): Promise<string> {
+  const rawText = await response.text().catch(() => '');
+  if (!rawText) {
+    return fallback;
+  }
+  try {
+    const parsed = JSON.parse(rawText);
+    return parsed.detail || parsed.message || rawText;
+  } catch {
+    return rawText;
+  }
+}
+
 /**
  * Protocol metrics for backend orchestration
  */
@@ -34,6 +47,7 @@ export interface AllocationDecision {
   proof_job_id?: string;
   proof_hash?: string;
   proof_status?: string;
+  proof_error?: string;
 }
 
 /**
@@ -53,6 +67,7 @@ export interface AllocationProposal {
   proof_job_id: string;
   proof_hash?: string;
   proof_status?: string;
+  proof_error?: string;
   proof_source?: string;
   l2_verified_at?: string;
   can_execute?: boolean;
@@ -144,10 +159,11 @@ export function useRiskEngineBackendOrchestration(): UseRiskEngineBackendOrchest
         });
 
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(
-            errorData.detail || `Backend orchestration failed: ${response.statusText}`
+          const detail = await readErrorDetail(
+            response,
+            `Backend orchestration failed: ${response.status} ${response.statusText}`
           );
+          throw new Error(detail);
         }
 
         const data = await response.json();
@@ -168,6 +184,7 @@ export function useRiskEngineBackendOrchestration(): UseRiskEngineBackendOrchest
           proof_job_id: data.proof_job_id,
           proof_hash: data.proof_hash,
           proof_status: data.proof_status,
+          proof_error: data.proof_error,
           proof_source: data.proof_source,
           l2_verified_at: data.l2_verified_at,
           can_execute: data.can_execute,
@@ -208,10 +225,11 @@ export function useRiskEngineBackendOrchestration(): UseRiskEngineBackendOrchest
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.detail || `Market orchestration failed: ${response.statusText}`
+        const detail = await readErrorDetail(
+          response,
+          `Market orchestration failed: ${response.status} ${response.statusText}`
         );
+        throw new Error(detail);
       }
 
       const data = await response.json();
@@ -230,6 +248,7 @@ export function useRiskEngineBackendOrchestration(): UseRiskEngineBackendOrchest
         proof_job_id: data.proof_job_id,
         proof_hash: data.proof_hash,
         proof_status: data.proof_status,
+        proof_error: data.proof_error,
         proof_source: data.proof_source,
         l2_verified_at: data.l2_verified_at,
         can_execute: data.can_execute,
@@ -269,10 +288,11 @@ export function useRiskEngineBackendOrchestration(): UseRiskEngineBackendOrchest
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.detail || `Execution failed: ${response.statusText}`
+        const detail = await readErrorDetail(
+          response,
+          `Execution failed: ${response.status} ${response.statusText}`
         );
+        throw new Error(detail);
       }
 
       const data = await response.json();
@@ -294,6 +314,7 @@ export function useRiskEngineBackendOrchestration(): UseRiskEngineBackendOrchest
         proof_job_id: data.proof_job_id,
         proof_hash: data.proof_hash,
         proof_status: data.proof_status,
+        proof_error: data.proof_error,
       };
 
       return decision;

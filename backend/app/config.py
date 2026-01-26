@@ -68,6 +68,7 @@ class Settings(BaseSettings):
     STARKNET_RPC_URLS: str = ""
     STARKNET_RPC_RETRY_ATTEMPTS: int = 2
     STARKNET_RPC_RETRY_BACKOFF_SEC: float = 0.75
+    STARKNET_MAX_FEE_WEI: int = 20000000000000000  # 0.02 STRK default
     STARKNET_NETWORK: str = "sepolia"  # 'sepolia' or 'mainnet'
     RISK_ENGINE_ADDRESS: str = "0x007c2463376a0d21dbccde4c6d59bf8b0649973ca1f88865466b58d81dcbe86d"  # v2.2 with fixed 2-protocol allocation
     STRATEGY_ROUTER_ADDRESS: str = "0x01888e3f3d6cd137e63ff1a090a1e2c9ed5754162a8d5739364aba657fab20e4"  # v2 with ETH + protocol integration + deposit function (redeployed 2025-12-09 with new class hash)

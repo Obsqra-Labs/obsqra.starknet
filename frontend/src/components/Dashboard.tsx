@@ -120,6 +120,20 @@ export function Dashboard() {
   const proofTrainProofReady = proposal?.proof_status === 'verified' || proposal?.can_execute;
   const proofTrainAllocationReady = Boolean(proposal?.jediswap_pct || proposal?.ekubo_pct);
   const proofTrainTxReady = Boolean(latestDecision?.decisionId || lastTxHash);
+  const proposalStatusDisplay = proposal
+    ? proposal.proof_status === 'verified'
+      ? 'verified'
+      : proposal.can_execute
+        ? 'unverified (demo)'
+        : proposal.proof_status ?? 'pending'
+    : null;
+  const proofStageLabel = proposal
+    ? proposal.proof_status === 'verified'
+      ? '✅ Verified'
+      : proposal.can_execute
+        ? '⚠️ Unverified'
+        : '⏳ Waiting'
+    : '⏳ Waiting';
 
   // Handle deposit - STRK deposit
   const handleDeposit = async () => {
@@ -761,12 +775,16 @@ export function Dashboard() {
                       {((proposal.jediswap_pct ?? 0) / 100).toFixed(1)}% / {((proposal.ekubo_pct ?? 0) / 100).toFixed(1)}%
                     </p>
                     <p className="text-[11px] text-gray-500 mt-1">
-                      proof: {proposal.proof_status ?? 'pending'}
-                      {proposal.can_execute && proposal.proof_status !== 'verified' ? ' (demo override)' : ''}
+                      proof: {proposalStatusDisplay ?? 'pending'}
                     </p>
                     {proposal.proof_hash && (
                       <p className="text-[11px] text-gray-500 mt-1">
                         {proposal.proof_hash.slice(0, 12)}… · {proposal.proof_source ?? '—'}
+                      </p>
+                    )}
+                    {proposal.proof_error && (
+                      <p className="text-[11px] text-red-400 mt-1">
+                        {proposal.proof_error}
                       </p>
                     )}
                   </>
@@ -787,7 +805,7 @@ export function Dashboard() {
               </div>
               <div className="bg-slate-800/50 rounded-lg p-3">
                 <p className="text-gray-400 mb-1">Proof</p>
-                <p className="text-white font-semibold">{proofTrainProofReady ? '✅ Verified' : '⏳ Waiting'}</p>
+                <p className="text-white font-semibold">{proofStageLabel}</p>
               </div>
               <div className="bg-slate-800/50 rounded-lg p-3">
                 <p className="text-gray-400 mb-1">Allocation</p>
@@ -843,7 +861,7 @@ export function Dashboard() {
               <div className="flex items-center gap-2">
                 <div className="px-3 py-1.5 text-xs bg-slate-800/70 border border-white/10 rounded-full text-gray-300">
                   {proposal
-                    ? `Proposal: ${proposal.proof_status ?? 'pending'}${proposal.can_execute && proposal.proof_status !== 'verified' ? ' (demo)' : ''}`
+                    ? `Proposal: ${proposalStatusDisplay ?? 'pending'}`
                     : latestDecision?.decisionId
                     ? `Last exec: #${latestDecision.decisionId}`
                     : 'No proposal yet'}

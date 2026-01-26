@@ -1,0 +1,4 @@
+[profile.sepolia]
+account_address = "0x05fe812551bec726f1bf5026d5fb88f06ed411a753fb4468f9e19ebf8ced1b3d"
+private_key_path = "/root/.starkli-wallets/deployer/keystore.json"
+rpc_url = "https://starknet-sepolia-rpc.publicnode.com"

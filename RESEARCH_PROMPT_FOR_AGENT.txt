@@ -1,0 +1,317 @@
+RESEARCH PROMPT FOR AGENT: STONE PROVER PIPELINE FEASIBILITY
+
+PROJECT CONTEXT:
+We're building a DeFi protocol on Starknet called Obsqura. It executes allocation decisions (transfer funds, update risk constraints) and needs cryptographic proofs to verify those decisions are sound according to a Risk Engine contract.
+
+Currently we use mock proofs (LuminAIR - always fail verification). We want to implement REAL proofs using two paths:
+1. Atlantic: Managed service by Herodotus (wrapper around Stone prover + SHARP)
+2. Stone: Local CPU AIR prover binary (we have it compiled, need to wire it)
+
+We want both because: Stone gives us independence + learning + $0 cost, Atlantic gives us safety + immediate working baseline.
+
+Before we build the Stone pipeline, we need answers to 7 research questions. Your job is to research these thoroughly and return findings.
+
+---
+
+RESEARCH GAP #1: CAIRO TRACE SERIALIZATION FORMAT
+
+Question: How do we serialize allocation context into a format that cairo-run accepts as input?
+
+Specific Details to Find:
+- Our Risk Engine Cairo contract expects inputs: (amount: u256, token: ContractAddress, recipient: ContractAddress)
+- How does cairo-run accept input data? (stdin? file? environment variables?)
+- What is the exact serialization format for u256 and ContractAddress types?
+- Are there Cairo 2.11 stdlib I/O modules that handle this? (cairo::io::read()? starknet::io::?)
+- Can you find example Cairo programs that read inputs and execute in proof mode?
+- What happens if serialization format is wrong? (error message? silent corruption?)
+
+Search Strategy:
+- Look at Cairo 2.11 stdlib documentation for I/O module
+- Search GitHub for "cairo-run" + "stdin" + "input"
+- Check Starknet SDK (starknet.py) source for serialization patterns
+- Look for Herodotus integration tests that show how they serialize inputs
+- Find cairo_test! macro examples that use --proof_mode
+- Check Starknet Cairo book for input handling best practices
+
+Return Format:
+```
+CAIRO TRACE SERIALIZATION:
+- Input method: [describe how cairo-run takes input]
+- u256 serialization: [describe format]
+- ContractAddress serialization: [describe format]
+- Example: [show example input file if found]
+- Stdlib module: [if found, where in stdlib]
+- Error handling: [what happens with bad input]
+- Key references: [URLs/repos where you found this]
+```
+
+---
+
+RESEARCH GAP #2: PROOF SIZE VS TRACE SIZE RELATIONSHIP
+
+Question: How does allocation complexity (trace size) affect proof size and latency?
+
+Specific Details to Find:
+- For a simple allocation (just transfer): what's typical trace size? proof size? latency?
+- For a complex allocation (transfer + multiple constraint updates): trace size? proof size? latency?
+- Is the relationship linear (2x trace = 2x proof) or exponential?
+- How much overhead does VerifierConfiguration add to proof size?
+- What's the approximate calldata size for submitting proof on-chain?
+- How does trace size correlate with proof generation time?
+
+Search Strategy:
+- Find Stone prover documentation on proof size vs trace size
+- Look for published benchmarks from Starknet/Herodotus
+- Search GitHub for "cpu_air_prover" output analysis
+- Check if there are published performance metrics for different program sizes
+- Find Cairo execution benchmarks
+- Look for Starknet gas cost models for proof verification
+
+Return Format:
+```
+PROOF/TRACE SIZING:
+- Simple allocation: trace_size = ??? KB/MB, proof_size = ??? KB/MB, latency = ??? ms
+- Complex allocation: trace_size = ??? KB/MB, proof_size = ??? KB/MB, latency = ??? ms
+- Relationship: [linear/exponential/other] - 2x trace leads to ~???x proof
+- VerifierConfiguration overhead: ~??? % of total proof size
+- On-chain calldata overhead: [estimate]
+- Storage implications: [is 1GB/day trace storage feasible for 1000 allocations?]
+- Key references: [URLs where you found this]
+```
+
+---
+
+RESEARCH GAP #3: INTEGRITY VERIFIER COMPATIBILITY
+
+Question: Does Stone proof format match exactly what Herodotus Integrity verifier expects?
+
+Specific Details to Find:
+- What exact fields are in VerifierConfiguration? (complete schema with types)
+- What exact fields are in StarkProofWithSerde? (complete schema with types)
+- Where does Atlantic add transformation on top of raw Stone output?
+- If there's a transformation layer, can we replicate it locally?
+- Are there example proofs we can examine to see the format?
+- Does Integrity verifier accept Stone proofs directly or only Atlantic-wrapped proofs?
+
+Search Strategy:
+- Find Herodotus GitHub repositories (atlanticapi, integrity-verifier, etc)
+- Look for Integrity verifier contract source code (Cairo or Solidity)
+- Check if Herodotus publishes proof format documentation
+- Search for "VerifierConfiguration" + "StarkProofWithSerde" in public repos
+- Look for Herodotus API documentation showing proof response format
+- Find integration examples in Starknet ecosystem that use Integrity verifier
+- Check if anyone has published analysis of proof format
+
+Return Format:
+```
+INTEGRITY VERIFIER SCHEMA:
+- VerifierConfiguration fields: [complete list with types]
+- StarkProofWithSerde fields: [complete list with types]
+- Atlantic transformation: [describe any transformation layer]
+- Format compatibility: [does Stone output need transformation?]
+- Example proof: [if found, show structure]
+- Known working proofs: [Atlantic format documented?]
+- Key references: [URLs where you found this]
+```
+
+---
+
+RESEARCH GAP #4: STONE VERSION COMPATIBILITY
+
+Question: Which stone_version should we use, and what stone_version does Sepolia's Integrity verifier expect?
+
+Specific Details to Find:
+- What is the "stone_version" parameter in VerifierConfiguration?
+- What versions exist? (stone4? stone5? stone6? stone7?)
+- How do you determine which version a cpu_air_prover binary generates?
+- What version does the Sepolia Integrity contract expect? (check its source code)
+- Can you request a specific stone_version from cpu_air_prover or is it fixed?
+- What's the difference between stone versions? (protocol change?)
+- Is version compatibility critical or can you mix versions?
+
+Search Strategy:
+- Find stone-prover GitHub repo and check git tags for version history
+- Look at stone-prover releases/changelog for version notes
+- Search Herodotus Integrity contract (Sepolia) for stone_version constant
+- Check Starknet documentation for stone version details
+- Find cpu_air_prover help/docs for version information
+- Look for compatibility matrix between stone versions and Starknet releases
+- Check your local build (git log in stone-prover/): when was Dec 12 commit? What version?
+
+Return Format:
+```
+STONE VERSION COMPATIBILITY:
+- Available versions: [list: stone4, stone5, stone6, ...]
+- Sepolia Integrity expects: stone_version = ???
+- Our cpu_air_prover generates: stone_version = ??? (or how to determine it?)
+- How to specify version: [can we choose or is it fixed?]
+- Version differences: [what changes between versions?]
+- Compatibility: [can different versions work together?]
+- Your local build (Dec 12): likely version = ???
+- Key references: [URLs/code locations]
+```
+
+---
+
+RESEARCH GAP #5: LATENCY BREAKDOWN & BOTTLENECK IDENTIFICATION
+
+Question: Which step is slowest? Can Stone beat Atlantic's 10-20s total latency?
+
+Specific Details to Find:
+- How long does "scarb build --target sierra" take? (one-time vs cached?)
+- How long does cairo-run take to execute and dump trace for typical allocation?
+- How long does cpu_air_prover take to generate proof from trace?
+- How long does JSON deserialization take for VerifierConfiguration + proof?
+- How long does Integrity contract call take (RPC latency + verification)?
+- Which step has most variability/unpredictability?
+- Can steps be parallelized or are they sequential?
+
+Search Strategy:
+- Find Stone prover performance benchmarks (official or community)
+- Look for Cairo execution performance data
+- Check if Herodotus publishes latency metrics for Atlantic
+- Search GitHub for "stone prover" + "benchmark" + "latency"
+- Find Starknet L2 RPC latency benchmarks
+- Check if there are published comparisons of proof generation latencies
+- Look for profiling guides for cairo-run and cpu_air_prover
+
+Return Format:
+```
+LATENCY BREAKDOWN:
+- scarb build --target sierra: ~??? ms (first run), ~??? ms (cached)
+- cairo-run execution + trace: ~??? ms (for simple allocation)
+- cpu_air_prover proof generation: ~??? ms (for simple trace)
+- VerifierConfiguration deserialization: ~??? ms
+- StarkProofWithSerde deserialization: ~??? ms
+- Integrity contract call: ~??? ms (RPC + verification)
+- Total end-to-end: ~??? ms (stone_latency + integrity_verification)
+- Bottleneck: [which step is slowest?]
+- Parallelization: [which steps can run in parallel?]
+- Comparison: Atlantic is 10-20s (~10,000-20,000ms), can Stone beat it?
+- Key references: [URLs where you found this]
+```
+
+---
+
+RESEARCH GAP #6: FAILURE MODE ANALYSIS & ERROR HANDLING
+
+Question: When Stone pipeline breaks, what are common failure modes and how do we detect them?
+
+Specific Details to Find:
+- What errors does cpu_air_prover produce on bad input? (exit code? stderr format?)
+- What errors does cairo-run produce on bad input? (same?)
+- What errors does Integrity contract return if proof is invalid? (revert message?)
+- How do you distinguish between: bad serialization, bad proof, bad verification logic?
+- Can these errors be caught and handled gracefully?
+- What telemetry should we log to debug failures?
+- Are there any known failure modes in Stone or Cairo execution?
+
+Search Strategy:
+- Check cpu_air_prover CLI help and error messages
+- Look for Stone prover error handling documentation
+- Check cairo-run error codes and messages
+- Search GitHub for "Stone prover" issues and error reports
+- Find Starknet/Herodotus integration issues related to proof verification
+- Look for error handling best practices in similar projects
+- Check if there are failure case discussions in Starknet forums/Discord
+
+Return Format:
+```
+FAILURE MODES & ERROR HANDLING:
+- cpu_air_prover errors: [list common errors and their causes]
+- cairo-run errors: [list common errors and their causes]
+- Integrity verifier errors: [list common rejection reasons]
+- Distinguishing errors: [how to tell if it's serialization vs correctness vs verification?]
+- Telemetry: [what should we log for debugging?]
+- Recovery: [graceful fallback to Atlantic?]
+- Testing: [how to simulate failures locally?]
+- Known issues: [any reported problems in Stone/Cairo integration?]
+- Key references: [URLs where you found this]
+```
+
+---
+
+RESEARCH GAP #7: ATLANTIC PRICING & OPERATIONAL MODEL
+
+Question: What's the cost structure, quotas, and operational constraints for Atlantic?
+
+Specific Details to Find:
+- Cost per proof on Sepolia (free tier? how many free proofs?)
+- Cost per proof on mainnet (what's the pricing?)
+- Are there volume discounts?
+- Rate limits (max proofs per second? per day?)
+- API response time SLA (guaranteed latency?)
+- Uptime SLA (what reliability guarantee?)
+- How to handle quota exhaustion (fallback mechanism?)
+- Are there any known limitations or gotchas?
+
+Search Strategy:
+- Visit https://herodotus.cloud/pricing (get official pricing)
+- Look for Herodotus documentation on Atlantic API
+- Search for Herodotus rate limiting documentation
+- Find any public discussions about Atlantic pricing (forums, Discord, Twitter)
+- Check if there are published case studies with cost data
+- Look for Herodotus SLA documentation
+- Search for user feedback on Atlantic cost-effectiveness
+
+Return Format:
+```
+ATLANTIC PRICING & OPERATIONS:
+- Sepolia: [free? free tier? cost per proof after?]
+- Mainnet: [cost per proof?]
+- Volume discounts: [any available?]
+- Rate limits: [max proofs per second/day/month?]
+- Latency SLA: [guaranteed latency?]
+- Uptime SLA: [guaranteed availability?]
+- Quota management: [what happens when you exceed quota?]
+- Gotchas: [any known limitations or surprises?]
+- Breakeven point: [at what volume does Stone $0 beat Atlantic $X per proof?]
+- Key references: [URLs where you found this]
+```
+
+---
+
+DELIVERY FORMAT
+
+Return your findings as a single plain-text document with sections for each research gap. For each gap:
+
+1. Start with a clear summary sentence ("VerifierConfiguration contains these 5 fields...")
+2. Provide detailed findings with supporting evidence
+3. Quote or cite specific sources (GitHub URLs, documentation links, code snippets)
+4. Flag any contradictions or uncertainties ("Multiple sources disagree on...")
+5. Note what you could NOT find ("No published benchmarks found for...")
+6. Provide actionable next steps ("We need to empirically test...")
+
+Format as:
+
+---
+RESEARCH GAP #N: [GAP NAME]
+
+Summary: [1-2 sentence answer to the main question]
+
+Findings:
+[Detailed explanation with evidence]
+
+Sources:
+- [URL/reference 1]
+- [URL/reference 2]
+
+Gaps/Uncertainties:
+[What you couldn't find or contradictory info]
+
+Next Steps:
+[What we should do to verify/fill gaps]
+
+---
+
+IMPORTANT NOTES:
+
+- Be thorough but concise (500-1000 words per gap is good)
+- If you can't find exact numbers, provide ranges or estimates with confidence level
+- Always cite sources so we can verify or dig deeper
+- Flag assumptions ("Assuming SHARP proofs are equivalent to Stone proofs...")
+- If a gap is completely blocked (no public info available), say so clearly
+
+Your research will directly inform whether we build the Stone pipeline, how we optimize it, and how we integrate both paths. Make it count.
+
+Return as: plain text document, one consolidated file, ready to be saved as STONE_RESEARCH_FINDINGS.md

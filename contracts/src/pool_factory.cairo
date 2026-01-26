@@ -33,7 +33,7 @@ mod PoolFactory {
         ContractAddress, ClassHash, get_caller_address, get_block_timestamp,
         syscalls::deploy_syscall,
         storage::{
-            Map, Vec, VecTrait, MutableVecTrait,
+            Map,
             StoragePointerReadAccess, StoragePointerWriteAccess,
             StoragePathEntry
         }
@@ -46,8 +46,8 @@ mod PoolFactory {
         // Owner (Obsqra multisig, later DAO)
         owner: ContractAddress,
         
-        // Pool tracking
-        pools: Vec<ContractAddress>,
+        // Pool tracking (Map instead of Vec for Cairo 2.8.5 compatibility)
+        pools_by_index: Map<u32, ContractAddress>,
         pool_by_id: Map<felt252, ContractAddress>,
         is_pool_map: Map<ContractAddress, bool>,
         pool_count: u32,
@@ -179,7 +179,7 @@ mod PoolFactory {
             ).expect('Pool deploy failed');
             
             // Track pool
-            self.pools.push(pool_address);
+            self.pools_by_index.entry(pool_count).write(pool_address);
             self.pool_by_id.entry(pool_id).write(pool_address);
             self.is_pool_map.entry(pool_address).write(true);
             self.pool_count.write(pool_count + 1);
@@ -268,7 +268,7 @@ mod PoolFactory {
         }
         
         fn get_pool_by_index(self: @ContractState, index: u64) -> ContractAddress {
-            self.pools.at(index).read()
+            self.pools_by_index.entry(index.try_into().unwrap()).read()
         }
         
         fn get_pool_by_id(self: @ContractState, pool_id: felt252) -> ContractAddress {

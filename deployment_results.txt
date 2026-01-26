@@ -1,0 +1,7 @@
+=
+STARKNET DEPLOYMENT WITH STARKLI
+=
+Account: 0x05fe812551bec726f1bf5026d5fb88f06ed411a753fb4468f9e19ebf8ced1b3d
+Network: sepolia
+Time: Sun Jan 25 07:59:56 PM UTC 2026
+

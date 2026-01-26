@@ -44,23 +44,60 @@ class MarketDataService:
         apys = await apy_service.get_all_apys(force_refresh=force_refresh)
 
         async def _fetch_block(client: FullNodeClient, _rpc_url: str):
-            block_info = await client.get_block_hash_and_number()
-            raw_block = await client._client.call(
-                method_name="getBlockWithTxHashes",
-                params={"block_id": {"block_number": block_info.block_number}},
-            )
-            return block_info, raw_block
+            # Prefer latest block via raw RPC to avoid "block not found" races.
+            try:
+                raw_block = await client._client.call(
+                    method_name="getBlockWithTxHashes",
+                    params={"block_id": "latest"},
+                )
+                block_number = raw_block.get("block_number")
+                block_hash = raw_block.get("block_hash")
+                timestamp = int(raw_block.get("timestamp", 0))
+                if block_number is not None and block_hash:
+                    return block_number, block_hash, timestamp
+            except Exception as exc:
+                logger.warning("Latest block RPC fetch failed, falling back: %s", exc)
 
-        (block_info, raw_block), rpc_used = await with_rpc_fallback(
+            # Fallback to hash+number, then hydrate timestamp.
+            block_info = await client.get_block_hash_and_number()
+            block_number = block_info.block_number
+            block_hash = hex(block_info.block_hash)
+            timestamp = 0
+
+            try:
+                raw_block = await client._client.call(
+                    method_name="getBlockWithTxHashes",
+                    params={"block_id": {"block_number": block_number}},
+                )
+                timestamp = int(raw_block.get("timestamp", 0))
+                block_hash = raw_block.get("block_hash", block_hash) or block_hash
+            except Exception as exc:
+                logger.warning("Block %s fetch failed, trying previous: %s", block_number, exc)
+                if block_number > 0:
+                    try:
+                        prev_block = block_number - 1
+                        raw_block = await client._client.call(
+                            method_name="getBlockWithTxHashes",
+                            params={"block_id": {"block_number": prev_block}},
+                        )
+                        block_number = prev_block
+                        block_hash = raw_block.get("block_hash", block_hash) or block_hash
+                        timestamp = int(raw_block.get("timestamp", 0))
+                    except Exception as exc_prev:
+                        logger.warning("Previous block fetch failed: %s", exc_prev)
+
+            return block_number, block_hash, timestamp
+
+        (block_number, block_hash, timestamp), rpc_used = await with_rpc_fallback(
             _fetch_block,
             urls=self.rpc_urls,
         )
-        timestamp = int(raw_block.get("timestamp", 0))
+        block_hash_hex = block_hash if isinstance(block_hash, str) else hex(block_hash)
 
         return MarketSnapshot(
-            block_number=block_info.block_number,
-            block_hash=hex(block_info.block_hash),
-            timestamp=timestamp,
+            block_number=block_number,
+            block_hash=block_hash_hex,
+            timestamp=int(timestamp),
             apys={
                 "jediswap": apys.get("jediswap", 0.0),
                 "ekubo": apys.get("ekubo", 0.0),

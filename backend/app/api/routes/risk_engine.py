@@ -5,6 +5,7 @@ import asyncio
 import time
 from datetime import datetime
 from typing import Optional
+from pathlib import Path
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 import logging
@@ -13,6 +14,7 @@ from starknet_py.contract import Contract
 from starknet_py.net.full_node_client import FullNodeClient
 from starknet_py.net.account.account import Account
 from starknet_py.net.signer.stark_curve_signer import KeyPair
+from starknet_py.net.client_models import ResourceBounds, ResourceBoundsMapping, SierraContractClass
 from starknet_py.net.models import StarknetChainId
 from app.config import get_settings
 from app.db.session import get_db
@@ -30,6 +32,96 @@ from app.utils.rpc import with_rpc_fallback, get_rpc_urls, is_retryable_rpc_erro
 logger = logging.getLogger(__name__)
 router = APIRouter()
 settings = get_settings()
+_RISK_ENGINE_ABI = None
+
+# Manual resource bounds to avoid estimate_fee (which uses unsupported block tags on some RPCs).
+DEFAULT_RESOURCE_BOUNDS = ResourceBoundsMapping(
+    l1_gas=ResourceBounds(max_amount=30000, max_price_per_unit=100000000000000),
+    l1_data_gas=ResourceBounds(max_amount=30000, max_price_per_unit=1000000000000),
+    l2_gas=ResourceBounds(max_amount=3000000, max_price_per_unit=20000000000),
+)
+
+
+def _load_risk_engine_abi() -> list:
+    global _RISK_ENGINE_ABI
+    if _RISK_ENGINE_ABI is not None:
+        return _RISK_ENGINE_ABI
+
+    repo_root = Path(__file__).resolve().parents[4]
+    abi_path = repo_root / "contracts" / "target" / "dev" / "obsqra_contracts_RiskEngine.contract_class.json"
+    if not abi_path.exists():
+        raise FileNotFoundError(f"RiskEngine ABI not found at {abi_path}")
+
+    import json
+    payload = json.loads(abi_path.read_text())
+    _RISK_ENGINE_ABI = payload.get("abi", [])
+    return _RISK_ENGINE_ABI
+
+
+async def _get_risk_engine_contract(client: FullNodeClient) -> Contract:
+    abi = _load_risk_engine_abi()
+    return Contract(
+        address=int(settings.RISK_ENGINE_ADDRESS, 16),
+        abi=abi,
+        provider=client,
+    )
+
+
+async def _init_backend_account(
+    client: FullNodeClient,
+    key_pair: KeyPair,
+    network_chain: StarknetChainId,
+) -> Account:
+    account = Account(
+        address=int(settings.BACKEND_WALLET_ADDRESS, 16),
+        client=client,
+        key_pair=key_pair,
+        chain=network_chain,
+    )
+    try:
+        contract_class = await client.get_class_at(
+            contract_address=account.address,
+            block_number="latest",
+        )
+        account._cairo_version = 1 if isinstance(contract_class, SierraContractClass) else 0
+    except Exception as err:
+        account._cairo_version = 1
+        logger.warning("⚠️ Could not resolve account Cairo version; defaulting to Cairo 1: %s", err)
+    return account
+
+
+async def _wait_for_receipt_raw(
+    tx_hash: int | str,
+    urls: list[str],
+    timeout_sec: int = 120,
+    poll_interval_sec: float = 2.0,
+) -> dict:
+    tx_hash_hex = hex(tx_hash) if isinstance(tx_hash, int) else str(tx_hash)
+
+    async def _poll(client: FullNodeClient, _rpc_url: str):
+        deadline = time.monotonic() + timeout_sec
+        while time.monotonic() < deadline:
+            try:
+                receipt = await client._client.call(
+                    method_name="getTransactionReceipt",
+                    params={"transaction_hash": tx_hash_hex},
+                )
+                finality = receipt.get("status") or receipt.get("finality_status")
+                execution = receipt.get("execution_status")
+                if execution in {"REVERTED", "REJECTED"}:
+                    reason = receipt.get("revert_reason") or receipt.get("rejection_reason") or ""
+                    raise RuntimeError(f"Transaction {execution}: {reason}".strip())
+                if finality in {"ACCEPTED_ON_L2", "ACCEPTED_ON_L1", "ACCEPTED", "FINALIZED"}:
+                    return receipt
+            except Exception as exc:  # noqa: BLE001 - retry on not-found
+                msg = str(exc).lower()
+                if "not found" not in msg and "unknown transaction" not in msg:
+                    raise
+            await asyncio.sleep(poll_interval_sec)
+        raise TimeoutError("Timed out waiting for transaction acceptance")
+
+    receipt, _ = await with_rpc_fallback(_poll, urls=urls)
+    return receipt
 
 
 class RiskMetricsRequest(BaseModel):
@@ -73,16 +165,14 @@ async def calculate_risk_score(request: RiskMetricsRequest):
         logger.info(f"📊 Calculating risk score via contract: {request.dict()}")
         
         async def _call_risk(client: FullNodeClient, _rpc_url: str):
-            contract = await Contract.from_address(
-                address=int(settings.RISK_ENGINE_ADDRESS, 16),
-                provider=client,
-            )
+            contract = await _get_risk_engine_contract(client)
             return await contract.functions["calculate_risk_score"].call(
                 request.utilization,
                 request.volatility,
                 request.liquidity,
                 request.audit_score,
                 request.age_days,
+                block_number="latest",
             )
 
         result, _ = await with_rpc_fallback(_call_risk)
@@ -130,17 +220,15 @@ async def calculate_allocation(request: AllocationRequest):
         logger.info(f"📊 Calculating allocation via contract: {request.dict()}")
         
         async def _call_allocation(client: FullNodeClient, _rpc_url: str):
-            contract = await Contract.from_address(
-                address=int(settings.RISK_ENGINE_ADDRESS, 16),
-                provider=client,
-            )
+            contract = await _get_risk_engine_contract(client)
             return await contract.functions["calculate_allocation"].call(
                 request.jediswap_risk,  # nostra_risk (mapped from jediswap)
                 0,                       # zklend_risk (not used, set to 0)
                 request.ekubo_risk,      # ekubo_risk
                 request.jediswap_apy,    # nostra_apy (mapped from jediswap)
                 0,                       # zklend_apy (not used, set to 0)
-                request.ekubo_apy        # ekubo_apy
+                request.ekubo_apy,       # ekubo_apy
+                block_number="latest",
             )
 
         result, _ = await with_rpc_fallback(_call_allocation)
@@ -192,6 +280,7 @@ class OrchestrationResponse(BaseModel):
     proof_job_id: str = None
     proof_hash: str = None
     proof_status: str = None
+    proof_error: Optional[str] = None
 
 
 class ProposalResponse(BaseModel):
@@ -209,6 +298,7 @@ class ProposalResponse(BaseModel):
     proof_job_id: str
     proof_hash: str = None
     proof_status: str = None
+    proof_error: Optional[str] = None
     proof_source: Optional[str] = None
     l2_verified_at: Optional[str] = None
     can_execute: bool = False
@@ -257,6 +347,7 @@ async def _create_proof_job(
     l2_verified = False
     l2_verified_at = None
     verification_error = None
+    skip_integrity = bool(getattr(luminair, "use_mock", False))
 
     verifier_struct = None
     proof_struct = None
@@ -266,6 +357,7 @@ async def _create_proof_job(
     if getattr(proof, "verifier_config_json", None) and getattr(proof, "stark_proof_json", None):
         verifier_struct = proof.verifier_config_json
         proof_struct = proof.stark_proof_json
+        logger.info(f"Using verifier_config_json and stark_proof_json from proof object")
     else:
         if getattr(proof, "verifier_payload_format", None) == "integrity_json":
             import base64
@@ -273,8 +365,10 @@ async def _create_proof_job(
             try:
                 if proof.verifier_config_b64:
                     verifier_struct = pyjson.loads(base64.b64decode(proof.verifier_config_b64))
+                    logger.info(f"Decoded verifier_config from base64, keys: {list(verifier_struct.keys()) if verifier_struct else 'None'}")
                 if proof.stark_proof_b64:
                     proof_struct = pyjson.loads(base64.b64decode(proof.stark_proof_b64))
+                    logger.info(f"Decoded stark_proof from base64, keys: {list(proof_struct.keys()) if proof_struct else 'None'}")
             except Exception as decode_err:
                 logger.warning(f"Could not decode Integrity JSON payloads: {decode_err}")
 
@@ -282,39 +376,59 @@ async def _create_proof_job(
         if proof.verifier_config_path:
             from pathlib import Path
             verifier_bytes = Path(proof.verifier_config_path).read_bytes()
+            logger.info(f"Read verifier_config from path: {len(verifier_bytes)} bytes")
         if proof.stark_proof_path:
             from pathlib import Path
             proof_bytes = Path(proof.stark_proof_path).read_bytes()
+            logger.info(f"Read stark_proof from path: {len(proof_bytes)} bytes")
     except Exception as read_err:
         logger.warning(f"Could not read verifier/proof blobs: {read_err}")
 
     attempted_full = False
-    if verifier_struct and proof_struct:
+    if skip_integrity:
+        verification_error = "Integrity verification skipped (mock proof)"
+        logger.warning(f"Skipping Integrity verification: LuminAIR is in mock mode")
+    elif verifier_struct and proof_struct:
         attempted_full = True
+        logger.info(f"Attempting Integrity verification with structured proof (verifier keys: {list(verifier_struct.keys())}, proof keys: {list(proof_struct.keys())})")
         l2_verified = await integrity.verify_proof_full_and_register_fact(
             verifier_config=verifier_struct,
             stark_proof=proof_struct
         )
         l2_verified_at = datetime.utcnow() if l2_verified else None
+        if l2_verified:
+            logger.info(f"✅ Integrity verification PASSED")
+        else:
+            logger.warning(f"⚠️ Integrity verification FAILED")
     elif verifier_bytes and proof_bytes:
         attempted_full = True
+        logger.info(f"Attempting Integrity verification with raw bytes ({len(verifier_bytes)} verifier, {len(proof_bytes)} proof)")
         l2_verified = await integrity.verify_proof_full_and_register_fact(
             verifier_config=verifier_bytes,
             stark_proof=proof_bytes
         )
         l2_verified_at = datetime.utcnow() if l2_verified else None
+        if l2_verified:
+            logger.info(f"✅ Integrity verification PASSED")
+        else:
+            logger.warning(f"⚠️ Integrity verification FAILED")
     else:
         attempted_full = True
+        logger.warning(f"No structured proof or raw bytes available, attempting L2 verification only with fact_hash: {fact_hash[:20]}...")
         try:
             l2_verified = await integrity.verify_proof_on_l2(fact_hash)
             l2_verified_at = datetime.utcnow() if l2_verified else None
             if not l2_verified:
                 verification_error = "L2 verification failed"
+                logger.warning(f"⚠️ L2 verification FAILED for fact_hash {fact_hash[:20]}...")
+            else:
+                logger.info(f"✅ L2 verification PASSED for fact_hash {fact_hash[:20]}...")
         except Exception as ver_err:
             verification_error = str(ver_err)
             l2_verified = False
             l2_verified_at = None
             attempted_full = True
+            logger.error(f"L2 verification exception: {ver_err}", exc_info=True)
 
     proof_status = ProofStatus.VERIFIED if l2_verified else ProofStatus.FAILED if attempted_full else ProofStatus.GENERATED
     proof_source = "luminair_mock" if getattr(luminair, "use_mock", False) else "luminair"
@@ -378,14 +492,11 @@ async def _compute_allocation_preview(
     Returns (jediswap_pct, ekubo_pct, jediswap_apy, ekubo_apy).
     """
     rpc_client = FullNodeClient(node_url=settings.STARKNET_RPC_URL)
-    contract = await Contract.from_address(
-        address=int(settings.RISK_ENGINE_ADDRESS, 16),
-        provider=rpc_client
-    )
+    contract = await _get_risk_engine_contract(rpc_client)
 
     # Read on-chain APYs (stored values)
-    jediswap_apy_result = await contract.functions["query_jediswap_apy"].call()
-    ekubo_apy_result = await contract.functions["query_ekubo_apy"].call()
+    jediswap_apy_result = await contract.functions["query_jediswap_apy"].call(block_number="latest")
+    ekubo_apy_result = await contract.functions["query_ekubo_apy"].call(block_number="latest")
     jediswap_apy = int(jediswap_apy_result[0]) if jediswap_apy_result else 0
     ekubo_apy = int(ekubo_apy_result[0]) if ekubo_apy_result else 0
 
@@ -397,6 +508,7 @@ async def _compute_allocation_preview(
         jediswap_apy,   # nostra_apy (mapped)
         0,              # zklend_apy (unused)
         ekubo_apy,      # ekubo_apy
+        block_number="latest",
     )
 
     allocation_tuple = allocation_result[0] if allocation_result else (0, 0, 0)
@@ -466,6 +578,7 @@ async def orchestrate_allocation(
         l2_verified = False
         l2_verified_at = None
         verification_error = None
+        skip_integrity = bool(getattr(luminair, "use_mock", False))
 
         # Prefer structured Integrity payloads, then bytes; else fall back to hash check
         verifier_struct = None
@@ -502,7 +615,9 @@ async def orchestrate_allocation(
             logger.warning(f"Could not read verifier/proof blobs: {read_err}")
 
         attempted_full = False
-        if verifier_struct and proof_struct:
+        if skip_integrity:
+            verification_error = "Integrity verification skipped (mock proof)"
+        elif verifier_struct and proof_struct:
             attempted_full = True
             l2_verified = await integrity.verify_proof_full_and_register_fact(
                 verifier_config=verifier_struct,
@@ -578,27 +693,11 @@ async def orchestrate_allocation(
                 status_code=500,
                 detail="Backend wallet not configured. Set BACKEND_WALLET_PRIVATE_KEY in .env"
             )
-        
-        # Initialize RPC client
-        rpc_client = FullNodeClient(node_url=settings.STARKNET_RPC_URL)
-        
+
         # Create backend account (AI orchestrator account)
         key_pair = KeyPair.from_private_key(int(settings.BACKEND_WALLET_PRIVATE_KEY, 16))
         network_chain = StarknetChainId.SEPOLIA if settings.STARKNET_NETWORK.lower() == "sepolia" else StarknetChainId.MAINNET
-        account = Account(
-            address=int(settings.BACKEND_WALLET_ADDRESS, 16),
-            client=rpc_client,
-            key_pair=key_pair,
-            chain=network_chain
-        )
-        
         logger.info(f"✅ Backend account initialized: {settings.BACKEND_WALLET_ADDRESS}")
-        
-        # Load Risk Engine contract with the account (for invoke operations)
-        contract = await Contract.from_address(
-            address=int(settings.RISK_ENGINE_ADDRESS, 16),
-            provider=account
-        )
         
         # Prepare protocol metrics as Python dicts (starknet.py maps to Cairo structs)
         jediswap_metrics = {
@@ -655,9 +754,20 @@ async def orchestrate_allocation(
             calldata=calldata
         )
         
-        invoke_result = await account.execute_v3(
-            calls=[call],
-            auto_estimate=True
+        rpc_urls = get_rpc_urls()
+
+        # Use v3 invoke with manual resource bounds (avoid estimate_fee + unsupported block tags).
+        async def _submit_with_client_v3(client: FullNodeClient, _rpc_url: str):
+            account = await _init_backend_account(client, key_pair, network_chain)
+            nonce = await account.get_nonce(block_number="latest")
+            return await account.execute_v3(
+                calls=[call],
+                nonce=nonce,
+                resource_bounds=DEFAULT_RESOURCE_BOUNDS,
+            )
+
+        invoke_result, submit_rpc = await with_rpc_fallback(
+            _submit_with_client_v3, urls=rpc_urls
         )
         
         tx_hash = hex(invoke_result.transaction_hash)
@@ -670,12 +780,16 @@ async def orchestrate_allocation(
         db.refresh(proof_job)
         
         logger.info(f"⏳ Waiting for acceptance...")
-        
-        # Wait for transaction to be accepted
-        await rpc_client.wait_for_tx(invoke_result.transaction_hash)
-        
+
+        wait_urls = [submit_rpc] + [url for url in rpc_urls if url != submit_rpc]
+        # Wait for transaction to be accepted (raw receipt to avoid RPC schema mismatch)
+        receipt = await _wait_for_receipt_raw(
+            invoke_result.transaction_hash,
+            urls=wait_urls,
+        )
+
         logger.info(f"✅ Transaction accepted on-chain!")
-        
+
         # Update proof status to executed (on-chain transaction succeeded)
         # Keep VERIFIED status if proof was verified locally, otherwise set to SUBMITTED
         if proof_job.status != ProofStatus.VERIFIED:
@@ -684,10 +798,9 @@ async def orchestrate_allocation(
                 proof_job.status = ProofStatus.SUBMITTED  # "SUBMITTED" = on-chain execution succeeded
         proof_job.submitted_at = datetime.utcnow()
         try:
-            receipt = await rpc_client.get_transaction_receipt(invoke_result.transaction_hash)
-            proof_job.l2_block_number = getattr(receipt, "block_number", None)
+            proof_job.l2_block_number = receipt.get("block_number")
         except Exception as receipt_err:
-            logger.warning(f"⚠️ Could not fetch transaction receipt: {receipt_err}")
+            logger.warning(f"⚠️ Could not extract transaction receipt: {receipt_err}")
         # Set verified_at if proof was verified locally
         if proof.verified and not proof_job.verified_at:
             proof_job.verified_at = datetime.utcnow()
@@ -734,11 +847,23 @@ async def orchestrate_allocation(
             logger.info(f"⏭️ Skipping SHARP submission (proof_data not available - MVP mode)")
         
         # Now fetch the decision that was just created
-        decision_count_result = await contract.functions["get_decision_count"].call()
+        async def _get_decision_count(client: FullNodeClient, _rpc_url: str):
+            contract = await _get_risk_engine_contract(client)
+            return await contract.functions["get_decision_count"].call(block_number="latest")
+
+        decision_count_result, _ = await with_rpc_fallback(
+            _get_decision_count, urls=wait_urls
+        )
         decision_count = int(decision_count_result[0]) if decision_count_result else 0
         
         if decision_count > 0:
-            latest_decision_result = await contract.functions["get_decision"].call(decision_count)
+            async def _get_decision(client: FullNodeClient, _rpc_url: str):
+                contract = await _get_risk_engine_contract(client)
+                return await contract.functions["get_decision"].call(decision_count, block_number="latest")
+
+            latest_decision_result, _ = await with_rpc_fallback(
+                _get_decision, urls=wait_urls
+            )
             decision_data = latest_decision_result[0] if latest_decision_result else None
             
             if decision_data:
@@ -772,7 +897,8 @@ async def orchestrate_allocation(
                     # Proof information
                     proof_job_id=str(proof_job.id),
                     proof_hash=proof.proof_hash,
-                    proof_status=proof_job.status.value if hasattr(proof_job.status, 'value') else str(proof_job.status)
+                    proof_status=proof_job.status.value if hasattr(proof_job.status, 'value') else str(proof_job.status),
+                    proof_error=proof_job.error,
                 )
         
         raise HTTPException(
@@ -854,6 +980,7 @@ async def propose_allocation(
             proof_job_id=str(proof_job.id),
             proof_hash=proof_job.proof_hash,
             proof_status=proof_job.status.value if hasattr(proof_job.status, 'value') else str(proof_job.status),
+            proof_error=proof_job.error,
             proof_source=proof_job.proof_source,
             l2_verified_at=proof_job.l2_verified_at.isoformat() if proof_job.l2_verified_at else None,
             can_execute=can_execute,
@@ -951,6 +1078,7 @@ async def propose_from_market(db: Session = Depends(get_db)):
         proof_job_id=str(proof_job.id),
         proof_hash=proof_job.proof_hash,
         proof_status=proof_job.status.value if hasattr(proof_job.status, 'value') else str(proof_job.status),
+        proof_error=proof_job.error,
         proof_source=proof_job.proof_source,
         l2_verified_at=proof_job.l2_verified_at.isoformat() if proof_job.l2_verified_at else None,
         can_execute=can_execute,
@@ -1025,19 +1153,18 @@ async def execute_allocation(
 
         rpc_urls = get_rpc_urls()
 
-        # execute_v3 currently fails on some RPCs due to missing l1_data_gas in fee params
-        # (starknet_py version mismatch). Use v1 invoke for compatibility.
-        async def _submit_with_client_v1(client: FullNodeClient, _rpc_url: str):
-            account = Account(
-                address=int(settings.BACKEND_WALLET_ADDRESS, 16),
-                client=client,
-                key_pair=key_pair,
-                chain=network_chain,
+        # Use v3 invoke with manual resource bounds (avoid estimate_fee + unsupported block tags).
+        async def _submit_with_client_v3(client: FullNodeClient, _rpc_url: str):
+            account = await _init_backend_account(client, key_pair, network_chain)
+            nonce = await account.get_nonce(block_number="latest")
+            return await account.execute_v3(
+                calls=[call],
+                nonce=nonce,
+                resource_bounds=DEFAULT_RESOURCE_BOUNDS,
             )
-            return await account.execute_v1(calls=[call], auto_estimate=True)
 
         invoke_result, submit_rpc = await with_rpc_fallback(
-            _submit_with_client_v1, urls=rpc_urls
+            _submit_with_client_v3, urls=rpc_urls
         )
 
         tx_hash = hex(invoke_result.transaction_hash)
@@ -1049,29 +1176,20 @@ async def execute_allocation(
         db.refresh(proof_job)
 
         wait_urls = [submit_rpc] + [url for url in rpc_urls if url != submit_rpc]
-        await with_rpc_fallback(
-            lambda client, _url: client.wait_for_tx(invoke_result.transaction_hash),
+        receipt = await _wait_for_receipt_raw(
+            invoke_result.transaction_hash,
             urls=wait_urls,
         )
 
         try:
-            receipt, _ = await with_rpc_fallback(
-                lambda client, _url: client.get_transaction_receipt(
-                    invoke_result.transaction_hash
-                ),
-                urls=wait_urls,
-            )
-            proof_job.l2_block_number = getattr(receipt, "block_number", None)
+            proof_job.l2_block_number = receipt.get("block_number")
         except Exception as receipt_err:
-            logger.warning(f"⚠️ Could not fetch transaction receipt: {receipt_err}")
+            logger.warning(f"⚠️ Could not extract transaction receipt: {receipt_err}")
 
         # Fetch latest decision from RiskEngine
         async def _get_decision_count(client: FullNodeClient, _rpc_url: str):
-            contract = await Contract.from_address(
-                address=int(settings.RISK_ENGINE_ADDRESS, 16),
-                provider=client,
-            )
-            return await contract.functions["get_decision_count"].call()
+            contract = await _get_risk_engine_contract(client)
+            return await contract.functions["get_decision_count"].call(block_number="latest")
 
         decision_count_result, _ = await with_rpc_fallback(
             _get_decision_count, urls=wait_urls
@@ -1081,11 +1199,8 @@ async def execute_allocation(
             raise HTTPException(status_code=500, detail="Execution succeeded but no decision found")
 
         async def _get_decision(client: FullNodeClient, _rpc_url: str):
-            contract = await Contract.from_address(
-                address=int(settings.RISK_ENGINE_ADDRESS, 16),
-                provider=client,
-            )
-            return await contract.functions["get_decision"].call(decision_count)
+            contract = await _get_risk_engine_contract(client)
+            return await contract.functions["get_decision"].call(decision_count, block_number="latest")
 
         latest_decision_result, _ = await with_rpc_fallback(
             _get_decision, urls=wait_urls
@@ -1119,6 +1234,7 @@ async def execute_allocation(
             proof_job_id=str(proof_job.id),
             proof_hash=proof_job.proof_hash,
             proof_status=proof_job.status.value if hasattr(proof_job.status, 'value') else str(proof_job.status),
+            proof_error=proof_job.error,
         )
     except HTTPException as e:
         raise e
