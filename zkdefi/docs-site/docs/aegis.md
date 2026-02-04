@@ -45,11 +45,6 @@ struct SessionKey {
 }
 ```
 
-**Protocol Bitmap:**
-- Bit 0 (1): Protocol 0 allowed
-- Bit 1 (2): Protocol 1 allowed
-- Bit 2 (4): Protocol 2 allowed
-
 ### 2. Intent Commitment Format
 
 ```cairo
@@ -64,46 +59,7 @@ struct IntentCommitment {
 }
 ```
 
-**Commitment Calculation:**
-```
-commitment = poseidon_hash([intent_data, nonce, chain_id, block_number])
-```
-
-### 3. Proof Interfaces
-
-#### 3.1 zkML Proof (Garaga/Groth16)
-
-```cairo
-trait IZkmlVerifier {
-    fn verify_risk_score_proof(
-        proof_calldata: Span<felt252>,
-        commitment_hash: felt252
-    ) -> bool;
-    
-    fn verify_anomaly_proof(
-        proof_calldata: Span<felt252>,
-        pool_id: felt252,
-        commitment_hash: felt252
-    ) -> bool;
-    
-    fn verify_combined_proofs(
-        risk_proof_calldata: Span<felt252>,
-        anomaly_proof_calldata: Span<felt252>,
-        pool_id: felt252,
-        commitment_hash: felt252
-    ) -> bool;
-}
-```
-
-#### 3.2 Execution Proof (Integrity/STARK)
-
-```cairo
-trait IFactRegistry {
-    fn is_valid(fact_hash: felt252) -> bool;
-}
-```
-
-### 4. Agent Execution Interface
+### 3. Agent Execution Interface
 
 ```cairo
 trait IGateAgent {
@@ -126,7 +82,7 @@ trait IGateAgent {
 }
 ```
 
-### 5. Error Codes
+### 4. Error Codes
 
 | Code | Name | Description |
 |------|------|-------------|
@@ -135,7 +91,6 @@ trait IGateAgent {
 | `GATE_REPLAY_DETECTED` | Replay attack | Intent commitment already used |
 | `GATE_RISK_TOO_HIGH` | Risk check failed | Risk score above threshold |
 | `GATE_ANOMALY_DETECTED` | Anomaly found | Pool/protocol flagged as unsafe |
-| `GATE_POSITION_EXCEEDED` | Position limit | Amount exceeds max_position |
 
 ## Rationale
 
@@ -155,7 +110,6 @@ trait IGateAgent {
 See [github.com/obsqra-labs/zkdefi](https://github.com/obsqra-labs/zkdefi):
 
 - `contracts/src/proof_gated_yield_agent.cairo`
-- `contracts/src/zkml_verifier.cairo`
 - `contracts/src/session_key_manager.cairo`
 - `contracts/src/intent_commitment.cairo`
 
