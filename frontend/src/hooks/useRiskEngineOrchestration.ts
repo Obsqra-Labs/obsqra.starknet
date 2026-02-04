@@ -60,6 +60,11 @@ const RISK_ENGINE_ABI = [
           { name: 'age_days', type: 'felt252' },
         ],
       },
+      { name: 'jediswap_proof_fact', type: 'felt252' },
+      { name: 'ekubo_proof_fact', type: 'felt252' },
+      { name: 'expected_jediswap_score', type: 'felt252' },
+      { name: 'expected_ekubo_score', type: 'felt252' },
+      { name: 'fact_registry_address', type: 'ContractAddress' },
     ],
     outputs: [
       {
@@ -119,7 +124,14 @@ const RISK_ENGINE_ABI = [
 export interface UseRiskEngineOrchestrationReturn {
   proposeAndExecuteAllocation: (
     jediswapMetrics: ProtocolMetrics,
-    ekuboMetrics: ProtocolMetrics
+    ekuboMetrics: ProtocolMetrics,
+    proofParams?: {
+      jediswapProofFact: string;
+      ekuboProofFact: string;
+      expectedJediswapScore: number;
+      expectedEkuboScore: number;
+      factRegistryAddress: string;
+    }
   ) => Promise<AllocationDecision | null>;
   getDecision: (decisionId: number) => Promise<AllocationDecision | null>;
   getDecisionCount: () => Promise<number | null>;
@@ -142,7 +154,14 @@ export function useRiskEngineOrchestration(): UseRiskEngineOrchestrationReturn {
   const proposeAndExecuteAllocation = useCallback(
     async (
       jediswapMetrics: ProtocolMetrics,
-      ekuboMetrics: ProtocolMetrics
+      ekuboMetrics: ProtocolMetrics,
+      proofParams?: {
+        jediswapProofFact: string;
+        ekuboProofFact: string;
+        expectedJediswapScore: number;
+        expectedEkuboScore: number;
+        factRegistryAddress: string;
+      }
     ): Promise<AllocationDecision | null> => {
       if (!account || !address) {
         setError('Wallet not connected');
@@ -191,10 +210,24 @@ export function useRiskEngineOrchestration(): UseRiskEngineOrchestrationReturn {
 
         // Use populate to properly serialize structs, then execute
         // Structs are passed as arrays of their member values
-        const call = contract.populate('propose_and_execute_allocation', [
+        // If proofParams provided, include proof verification parameters (RiskEngine v4+)
+        const callArgs: any[] = [
           jediswapMetricsArray,
           ekuboMetricsArray,
-        ]);
+        ];
+        
+        if (proofParams) {
+          // RiskEngine v4+ requires proof parameters for on-chain verification gate
+          callArgs.push(
+            proofParams.jediswapProofFact,
+            proofParams.ekuboProofFact,
+            proofParams.expectedJediswapScore,
+            proofParams.expectedEkuboScore,
+            proofParams.factRegistryAddress
+          );
+        }
+        
+        const call = contract.populate('propose_and_execute_allocation', callArgs);
         
         const response = await account.execute([call]);
 

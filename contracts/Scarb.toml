@@ -5,6 +5,7 @@ edition = "2024_07"
 
 [dependencies]
 starknet = ">=2.0.0"
+integrity = { git = "https://github.com/HerodotusDev/integrity.git", tag = "v2.1.0" }
 
 [dev-dependencies]
 snforge_std = { git = "https://github.com/foundry-rs/starknet-foundry.git", tag = "v0.53.0" }
@@ -30,3 +31,7 @@ accounts-file = "~/.starknet_accounts/starknet_open_zeppelin_accounts.json"
 url = "https://starknet-sepolia-rpc.publicnode.com"
 network = "alpha-sepolia"
 
+[tool.sncast]
+account = "deployer"
+accounts-file = "~/.starknet_accounts/starknet_open_zeppelin_accounts.json"
+url = "https://starknet-sepolia-rpc.publicnode.com"

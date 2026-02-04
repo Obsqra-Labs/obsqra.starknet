@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Obsqra - ZKML Demo</title>
+    <link rel="stylesheet" href="styles/demo.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1 class="logo">Obsqra</h1>
+                <div class="badge">
+                    <span class="badge-dot"></span>
+                    <span class="badge-text">ZKML DEMO</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Hero -->
+        <section class="hero">
+            <div class="hero-content">
+                <h2 class="hero-title">
+                    Verifiable AI for<br>
+                    <span class="gradient-text">Autonomous Finance</span>
+                </h2>
+                <p class="hero-subtitle">
+                    Every decision ships with a <span class="highlight">cryptographic receipt</span>.<br>
+                    Built on Starknet — impossible on Ethereum.
+                </p>
+                <button id="generateBtn" class="btn-primary">
+                    <span id="btnText">Generate STARK Proof</span>
+                    <span id="btnSpinner" class="spinner" style="display: none;"></span>
+                </button>
+            </div>
+        </section>
+
+        <!-- Proof Result -->
+        <section id="proofSection" class="proof-section" style="display: none;">
+            <div class="card">
+                <div class="card-header">
+                    <h3>🔐 STARK Proof Generated</h3>
+                    <div id="proofSource" class="source-badge"></div>
+                </div>
+                <div class="card-content">
+                    <div class="proof-grid">
+                        <div class="proof-item">
+                            <div class="proof-label">Proof Hash</div>
+                            <div id="proofHash" class="proof-value font-mono"></div>
+                        </div>
+                        <div class="proof-item">
+                            <div class="proof-label">Generation Time</div>
+                            <div id="proofTime" class="proof-value"></div>
+                        </div>
+                        <div class="proof-item">
+                            <div class="proof-label">Proof Size</div>
+                            <div id="proofSize" class="proof-value"></div>
+                        </div>
+                        <div class="proof-item">
+                            <div class="proof-label">Allocation</div>
+                            <div id="proofAllocation" class="proof-value"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Constraint Verification -->
+        <section id="constraintSection" class="constraint-section" style="display: none;">
+            <div class="card">
+                <div class="card-header">
+                    <h3>✅ Constraint Verification</h3>
+                </div>
+                <div class="card-content">
+                    <div id="constraintList" class="constraint-list"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Cost Savings -->
+        <section class="cost-section">
+            <div class="card">
+                <div class="card-header">
+                    <h3>💰 Cost Comparison</h3>
+                </div>
+                <div class="card-content">
+                    <div class="cost-grid">
+                        <div class="cost-item stone">
+                            <div class="cost-label">Stone Prover (Local)</div>
+                            <div class="cost-amount">$0</div>
+                            <div class="cost-detail">$0 per proof</div>
+                        </div>
+                        <div class="cost-item cloud">
+                            <div class="cost-label">Cloud Proving</div>
+                            <div class="cost-amount">$75,000</div>
+                            <div class="cost-detail">$0.75 per proof</div>
+                        </div>
+                    </div>
+                    <div class="savings-box">
+                        <div class="savings-label">Annual Savings (100K allocations)</div>
+                        <div class="savings-amount">$75,000</div>
+                        <div class="savings-percent">100% cost reduction</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Why Starknet -->
+        <section class="features-section">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Why This Is Novel for Starknet</h3>
+                </div>
+                <div class="card-content">
+                    <div class="comparison-table">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Feature</th>
+                                    <th>Obsqra (Starknet)</th>
+                                    <th>Equivalent on EVM</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Verifiable Allocation</td>
+                                    <td><span class="check">✅</span> STARK proofs</td>
+                                    <td><span class="cross">❌</span> Not feasible</td>
+                                </tr>
+                                <tr>
+                                    <td>Privacy Layer</td>
+                                    <td><span class="check">✅</span> MIST.cash</td>
+                                    <td><span class="cross">❌</span> Complex circuits</td>
+                                </tr>
+                                <tr>
+                                    <td>Cost per Proof</td>
+                                    <td><span class="check">✅</span> $0 (local)</td>
+                                    <td><span class="cross">❌</span> $0.75+ (cloud)</td>
+                                </tr>
+                                <tr>
+                                    <td>Constraint Verification</td>
+                                    <td><span class="check">✅</span> Cryptographic</td>
+                                    <td><span class="cross">❌</span> Operational only</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="demo.js"></script>
+</body>
+</html>

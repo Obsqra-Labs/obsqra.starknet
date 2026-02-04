@@ -1,113 +1,49 @@
-# ✅ Deployment Complete - Separated Deposits Architecture
+# FactRegistry Deployment Complete ✅
 
-## 🎉 Successfully Deployed!
+## Option 1: Testing (Existing Contract) ✅
 
-**Contract Address:** `0x035d0655db1ec539b3a628900ec8e72f5d3bb77f630e1af1dcf3b8c08e8e3a2f`  
-**Class Hash:** `0x0783c26c976b6bf96830f7efef3bc035b50adbac90216d4ecc54e310d25e365f`  
-**Network:** Starknet Sepolia  
-**Asset Token:** ETH (`0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7`)
+**Status**: Tested and working
+- **Address**: `0x4ce7851f00b6c3289674841fd7a1b96b6fd41ed1edc248faccd672c26371b8c`
+- **Test Result**: Contract is accessible and responds to calls
+- **Cost**: Just gas fees (no credits needed)
+- **Ready to use**: Yes
 
-**Starkscan:**
-- Contract: https://sepolia.starkscan.co/contract/0x035d0655db1ec539b3a628900ec8e72f5d3bb77f630e1af1dcf3b8c08e8e3a2f
-- Transaction: https://sepolia.starkscan.co/tx/0x06c691c8c49e2fdda81aeedf188f622135f91c0a9b2072ec0221010dcb0fc19c
+## Option 2: Your Own Deployment ✅
 
-## 🏗️ Architecture
+**Status**: Successfully deployed!
 
-### Two Separate Functions
+### Deployment Details
+- **Contract Address**: `0x063feefb4b7cfb46b89d589a8b00bceb7905a7d51c4e8068d4b45e0d9d018f64`
+- **Class Hash**: `0x00607244d8e0d390232dbda6ab013807a7b6675d60719e9427b4674c09a1ccfd`
+- **Owner**: `0x05fe812551bec726f1bf5026d5fb88f06ed411a753fb4468f9e19ebf8ced1b3d`
+- **Network**: Starknet Sepolia
+- **Transaction Hash**: `0x04d9c4bf760c392c438ed921b5b53730789556c31ef9d727e220ef2c0aae9896`
 
-#### 1. `deposit(amount: u256)` - Simple & Reliable
-- **What it does:** Only transfers funds from user to contract
-- **Always works:** No protocol calls to fail
-- **Tracks:** `total_deposits` and `pending_deposits`
-- **Frontend calls:** This function directly
+### Links
+- **Contract**: https://sepolia.starkscan.co/contract/0x063feefb4b7cfb46b89d589a8b00bceb7905a7d51c4e8068d4b45e0d9d018f64
+- **Transaction**: https://sepolia.starkscan.co/tx/0x04d9c4bf760c392c438ed921b5b53730789556c31ef9d727e220ef2c0aae9896
+- **Class**: https://sepolia.starkscan.co/class/0x00607244d8e0d390232dbda6ab013807a7b6675d60719e9427b4674c09a1ccfd
 
-#### 2. `deploy_to_protocols()` - Protocol Integration
-- **What it does:** Deploys pending deposits to JediSwap + Ekubo
-- **Who calls:** Owner, RiskEngine, or Backend orchestrator
-- **Can retry:** If it fails, deposits are still safe
-- **Backend calls:** This function separately
+### Configuration Updated
+✅ `backend/app/services/integrity_service.py` - Updated `INTEGRITY_VERIFIER_SEPOLIA`
+✅ `backend/app/api/routes/risk_engine.py` - Updated `SHARP_FACT_REGISTRY_SEPOLIA`
 
-## 📋 Frontend Integration
+### How It Was Fixed
+1. Removed `url` from `integrity/snfoundry.toml` to allow `--network=sepolia` flag
+2. Used `--network=sepolia` syntax per [Starknet Sepolia docs](https://docs.starknet.io/build/quickstart/sepolia)
+3. Waited 30 seconds for declaration to propagate before deployment
+4. Used full 66-character class hash (with leading zeros)
 
-The frontend should:
-1. ✅ Call `deposit(amount)` - Simple, always works
-2. ✅ Show pending deposits to user
-3. ⏳ Backend handles `deploy_to_protocols()` separately
+### Next Steps
+1. ✅ Backend config updated - restart backend to use new contract
+2. Test proof verification with your deployed contract
+3. Monitor contract on Starkscan
 
-**Frontend code:**
-```typescript
-// Simple deposit - no protocol integration
-await contract.deposit(amount);
-// ✅ Always succeeds - funds are stored in contract
-```
+## Summary
 
-## 🔧 Backend Integration
+Both options are now available:
+- **Option 1**: Tested and ready (existing contract)
+- **Option 2**: Deployed and configured (your own contract)
 
-The backend should:
-1. ⏳ Monitor `Deposit` events
-2. ⏳ Call `deploy_to_protocols()` when ready
-3. ⏳ Retry if deployment fails
-4. ⏳ Batch multiple deposits
-
-**Backend code:**
-```python
-# Monitor deposits
-deposit_events = watch_contract_events("Deposit")
-
-# Deploy to protocols
-await contract.deploy_to_protocols()
-```
-
-## ✅ What's Working
-
-- ✅ Contract compiled successfully
-- ✅ Contract deployed to Sepolia
-- ✅ `deposit()` function - Simple, no protocol integration
-- ✅ `deploy_to_protocols()` function - Separate protocol deployment
-- ✅ Frontend `.env.local` updated with new address
-
-## ⏳ Next Steps
-
-1. **Test Frontend Deposit:**
-   - Connect wallet
-   - Try depositing ETH
-   - Should work immediately (no protocol calls)
-
-2. **Set Up Backend Orchestration:**
-   - Monitor `Deposit` events
-   - Call `deploy_to_protocols()` periodically
-   - Handle retries on failure
-
-3. **Verify Protocol Deployment:**
-   - Check if `deploy_to_protocols()` works
-   - Verify funds are deployed to JediSwap/Ekubo
-   - Monitor positions
-
-## 🎯 Key Benefits
-
-1. **Deposits always work** - No protocol integration to fail
-2. **Funds are safe** - Even if deployment fails, deposits are stored
-3. **Retryable** - Can retry protocol deployment without affecting deposits
-4. **Separate concerns** - User deposits vs. protocol deployment
-5. **Backend control** - Backend controls when to deploy
-
-## 📊 Contract Functions
-
-### User Functions
-- `deposit(amount)` - Accept funds (simple, always works)
-- `withdraw(amount)` - Withdraw funds
-- `get_user_balance(user)` - Get user balance
-
-### Protocol Functions
-- `deploy_to_protocols()` - Deploy pending deposits to protocols
-- `get_allocation()` - Get current allocation
-- `update_allocation(jedi_pct, ekubo_pct)` - Update allocation (owner only)
-
-### View Functions
-- `get_total_value_locked()` - Get total deposits
-- `get_protocol_addresses()` - Get protocol addresses
-
-## 🚀 Ready to Test!
-
-The contract is deployed and ready. Frontend can now call `deposit()` reliably, and backend can handle protocol deployment separately!
-
+Your backend is now configured to use **Option 2** (your own deployment).
+To switch back to Option 1, uncomment the old addresses in the config files.

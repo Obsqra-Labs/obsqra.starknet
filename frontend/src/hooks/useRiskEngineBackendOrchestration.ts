@@ -10,7 +10,31 @@ async function readErrorDetail(response: Response, fallback: string): Promise<st
   }
   try {
     const parsed = JSON.parse(rawText);
-    return parsed.detail || parsed.message || rawText;
+    
+    // Handle new structured error format (Stone-only strict mode)
+    if (parsed.detail) {
+      // Check if detail is an object (structured error)
+      if (typeof parsed.detail === 'object') {
+        const errorObj = parsed.detail;
+        const message = errorObj.message || errorObj.error || fallback;
+        
+        // Add strict mode indicator if present
+        if (errorObj.strict_mode) {
+          return `${message} (Strict Mode: No fallbacks available)`;
+        }
+        
+        // Include fact_hash if available (for verification errors)
+        if (errorObj.fact_hash) {
+          return `${message}\nFact Hash: ${errorObj.fact_hash.slice(0, 20)}...`;
+        }
+        
+        return message;
+      }
+      // If detail is a string, return it
+      return parsed.detail;
+    }
+    
+    return parsed.message || rawText;
   } catch {
     return rawText;
   }

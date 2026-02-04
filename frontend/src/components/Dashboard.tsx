@@ -25,6 +25,9 @@ import { ProofBadge } from './ProofBadge';
 import { useMarketSnapshot } from '@/hooks/useMarketSnapshot';
 import { useMarketMetrics } from '@/hooks/useMarketMetrics';
 import { useZkmlVerification } from '@/hooks/useZkmlVerification';
+import { ZkmlTransparency } from './ZkmlTransparency';
+import { ModelInfo } from './ModelInfo';
+import { useModelRegistry } from '@/hooks/useModelRegistry';
 
 type TabType = 'overview' | 'analytics' | 'history' | 'integration-tests';
 
@@ -68,6 +71,7 @@ export function Dashboard() {
   const marketSnapshot = useMarketSnapshot();
   const marketMetrics = useMarketMetrics();
   const zkmlVerification = useZkmlVerification();
+  const modelRegistry = useModelRegistry();
   
   // Fetch user's STRK balance on mount and when address changes
   useEffect(() => {
@@ -1166,6 +1170,8 @@ export function Dashboard() {
                   network={latestProof.network}
                   submittedAt={latestProof.timestamp || undefined}
                   verifiedAt={latestProof.l2_verified_at || latestProof.l1_verified_at || undefined}
+                  modelVersion={undefined}
+                  modelHash={undefined}
                 />
               </div>
               <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm text-slate-700">
@@ -1193,6 +1199,30 @@ export function Dashboard() {
               )}
             </div>
           )}
+
+          {/* ZKML Transparency & Model Info (5/5 zkML requirement) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {latestProof && (
+              <ZkmlTransparency
+                proofHash={latestProof.proof_hash}
+                modelVersion={modelRegistry.current?.version || '1.0.0'}
+                modelHash={modelRegistry.current?.model_hash}
+                verificationStatus={latestProof.proof_status as any}
+                factRegistry={undefined}
+                proofSource="stone_prover"
+                generationTime={undefined}
+              />
+            )}
+            {modelRegistry.current && (
+              <ModelInfo
+                version={modelRegistry.current.version}
+                modelHash={modelRegistry.current.model_hash}
+                deployedAt={modelRegistry.current.deployed_at ? new Date(modelRegistry.current.deployed_at * 1000).toISOString() : undefined}
+                description={modelRegistry.current.description}
+                isActive={true}
+              />
+            )}
+          </div>
 
           {/* Rebalance History with Proofs */}
           <div className="bg-gradient-to-br from-slate-900/70 via-purple-900/20 to-slate-900/70 border border-purple-400/30 rounded-xl p-6 shadow-lg">

@@ -89,6 +89,23 @@ export function categorizeError(error: unknown): ObsqraError {
     };
   }
 
+  // Proof verification errors (Stone-only strict mode)
+  if (
+    message.includes('Proof not verified') ||
+    message.includes('proof verification failed') ||
+    message.includes('Strict Mode') ||
+    message.includes('FactRegistry')
+  ) {
+    return {
+      category: ErrorCategory.VALIDATION,
+      userMessage: 'Proof verification failed. The proof could not be verified on-chain. This is a strict error - no fallbacks are available.',
+      technicalMessage: message,
+      originalError: error instanceof Error ? error : undefined,
+      retryable: false,
+      code: 'PROOF_VERIFICATION_FAILED',
+    };
+  }
+
   // Validation errors
   if (message.includes('invalid') || message.includes('Invalid')) {
     return {

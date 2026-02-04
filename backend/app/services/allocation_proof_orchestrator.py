@@ -27,12 +27,11 @@ class AllocationProofResult:
 
 class AllocationProofOrchestrator:
     """
-    Orchestrates proof generation for allocation proposals
-    
-    This implements the decision logic:
-    1. Try Stone prover (local, fast, free)
-    2. Fallback to Atlantic on failure (external, slower, costs $)
-    3. Track metrics for optimization
+    Orchestrates proof generation for allocation proposals.
+
+    STRICT MODE: Stone-only + Integrity (no Atlantic, no mocks).
+    This class is retained for compatibility, but its legacy mock flow
+    is disabled. Use the real allocation proof pipeline instead.
     """
     
     def __init__(self, stone_service, atlantic_service, integrity_service):
@@ -62,10 +61,9 @@ class AllocationProofOrchestrator:
         """
         Generate proof for allocation proposal
         
-        Implements fallback strategy:
+        Stone-only strategy:
         1. Try Stone prover if prefer_stone=True
-        2. On failure, use Atlantic
-        3. Log metrics for analysis
+        2. On failure, return error (no Atlantic fallback)
         
         Args:
             allocation_id: Unique allocation identifier
@@ -101,26 +99,12 @@ class AllocationProofOrchestrator:
                 return stone_result
             else:
                 logger.warning(f"  ⚠️ Stone prover failed: {stone_result.error}")
-        
-        # Step 2: Fallback to Atlantic (BACKUP)
-        logger.info("  Falling back to Atlantic service...")
-        
-        atlantic_result = await self._generate_proof_atlantic(
-            allocation_id,
-            jediswap_risk, ekubo_risk,
-            jediswap_apy, ekubo_apy,
-            jediswap_pct, ekubo_pct
+
+        logger.error("  ❌ Stone-only mode: no Atlantic fallback.")
+        return AllocationProofResult(
+            success=False,
+            error="Stone prover failed (strict mode - no Atlantic fallback)."
         )
-        
-        if atlantic_result.success:
-            logger.info(f"  ✅ Atlantic succeeded: {atlantic_result.generation_time_ms:.0f}ms")
-            return atlantic_result
-        else:
-            logger.error(f"  ❌ Both provers failed!")
-            return AllocationProofResult(
-                success=False,
-                error=f"Stone: failed, Atlantic: {atlantic_result.error}"
-            )
     
     async def _generate_proof_stone(
         self,
@@ -131,48 +115,14 @@ class AllocationProofOrchestrator:
     ) -> AllocationProofResult:
         """Generate proof using Stone prover"""
         
-        try:
-            # Step 1: Generate execution trace from allocation
-            # (This would use cairo_trace_generator in full implementation)
-            # For Phase 3, we use fibonacci as proof of concept
-            
-            private_input_file = "/opt/obsqra.starknet/stone-prover/e2e_test/Cairo/fib_private.json"
-            public_input_file = "/opt/obsqra.starknet/stone-prover/e2e_test/Cairo/fib_public.json"
-            
-            # Step 2: Generate STARK proof
-            proof_result = await self.stone_service.generate_proof(
-                private_input_file,
-                public_input_file
-            )
-            
-            if not proof_result.success:
-                return AllocationProofResult(
-                    success=False,
-                    error=proof_result.error
-                )
-            
-            # Step 3: Register on Integrity contract (optional)
-            # In full implementation, would call:
-            # await self.integrity_service.verify_proof_full_and_register_fact(
-            #     proof_result.proof_json
-            # )
-            
-            # Step 4: Return success
-            return AllocationProofResult(
-                success=True,
-                proof_hash=proof_result.proof_hash,
-                proof_method="stone",
-                generation_time_ms=proof_result.generation_time_ms,
-                proof_size_kb=proof_result.proof_size_kb,
-                on_chain_verified=False  # Would be True after contract interaction
-            )
-        
-        except Exception as e:
-            logger.error(f"Stone prover error: {str(e)}", exc_info=True)
-            return AllocationProofResult(
-                success=False,
-                error=str(e)
-            )
+        logger.error(
+            "AllocationProofOrchestrator is disabled in strict mode. "
+            "Use the Stone+Integrity pipeline via RiskEngine/_create_proof_job."
+        )
+        return AllocationProofResult(
+            success=False,
+            error="AllocationProofOrchestrator disabled (mock trace path removed)."
+        )
     
     async def _generate_proof_atlantic(
         self,
@@ -181,25 +131,12 @@ class AllocationProofOrchestrator:
         jediswap_apy: int, ekubo_apy: int,
         jediswap_pct: int, ekubo_pct: int,
     ) -> AllocationProofResult:
-        """Generate proof using Atlantic service"""
-        
-        try:
-            # Atlantic would submit trace and wait for verification
-            # For now, return mock result
-            
-            logger.info("Atlantic submission would happen here in full implementation")
-            
-            return AllocationProofResult(
-                success=False,
-                error="Atlantic not fully configured in test environment"
-            )
-        
-        except Exception as e:
-            logger.error(f"Atlantic error: {str(e)}")
-            return AllocationProofResult(
-                success=False,
-                error=str(e)
-            )
+        """Generate proof using Atlantic service (disabled)."""
+        logger.error("Atlantic is disabled in strict Stone-only mode.")
+        return AllocationProofResult(
+            success=False,
+            error="Atlantic disabled (strict Stone-only mode)."
+        )
 
 
 # Example usage in allocation_proposal_create() endpoint:

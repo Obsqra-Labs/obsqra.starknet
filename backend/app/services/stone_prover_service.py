@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Dict, Optional, Tuple, List
 from datetime import datetime
 import hashlib
+import math
 import struct
 
 from starknet_py.cairo.felt import encode_shortstring
@@ -84,17 +85,18 @@ class StoneProverService:
         logger.info(f"  Binary: {self.stone_binary}")
         logger.info(f"  Params: {self.base_params_file}")
     
-    def _calculate_fri_parameters(self, n_steps: int) -> Tuple[int, List[int]]:
+    def _calculate_fri_step_list(self, n_steps: int, last_layer_degree_bound: int) -> List[int]:
         """
-        Calculate FRI parameters based on trace size.
+        Calculate FRI step list based on trace size and fixed last_layer_degree_bound.
         
-        FRI equation: log2(last_layer) + Σ(fri_steps) = log2(n_steps) + 4
+        FRI equation: log2(last_layer_degree_bound) + Σ(fri_steps) = log2(n_steps) + 4
         
         Args:
             n_steps: Number of execution steps
+            last_layer_degree_bound: Fixed last layer degree bound from params file
         
         Returns:
-            (last_layer_degree_bound, fri_step_list)
+            fri_step_list
         
         Raises:
             ValueError: If n_steps is not a power of 2
@@ -103,71 +105,41 @@ class StoneProverService:
         if n_steps & (n_steps - 1) != 0 or n_steps < 512:
             raise ValueError(f"n_steps must be a power of 2 and >= 512, got {n_steps}")
         
-        log_n_steps = (n_steps).bit_length() - 1
+        log_n_steps = math.ceil(math.log2(n_steps))
+        last_layer_log2 = math.ceil(math.log2(last_layer_degree_bound))
         target_sum = log_n_steps + 4
-        
-        logger.info(f"Calculating FRI parameters for n_steps={n_steps} (2^{log_n_steps})")
-        logger.info(f"  Target equation sum: {target_sum}")
-        
-        # Select FRI parameters based on trace size
-        # These are proven parameter combinations from Phase 2 testing
-        
-        if n_steps == 512:  # log2=9, target=13
-            # Use the proven baseline configuration
-            last_layer = 64
-            fri_steps = [0, 4, 3]  # sum=7, log2(64)=6, total=13 ✓
-            
-        elif n_steps == 8192:  # log2=13, target=17
-            # Scaled up from 512-step params
-            last_layer = 256
-            fri_steps = [0, 4, 4, 4]  # sum=12, log2(256)=8, total=20... need adjustment
-            # Actually: log2(256)=8, need sum=9, so use [0, 4, 5] but 5 might be too large
-            # Better: last_layer=512, fri_steps=[0, 4, 3, 4]
-            last_layer = 512
-            fri_steps = [0, 4, 3, 4]  # sum=11, log2(512)=9, total=20... still off
-            # Actually for 8192: log2=13, target=17
-            # Try: last_layer=256 (log2=8), sum needed = 9
-            last_layer = 256
-            fri_steps = [0, 4, 4, 1]  # sum=9, log2(256)=8, total=17 ✓
-            
-        elif n_steps == 131072:  # log2=17, target=21
-            # Large trace allocation - use larger last_layer
-            last_layer = 512  # log2=9
-            fri_steps = [0, 4, 4, 4]  # sum=12, total=21 ✓
-            
-        else:
-            # Generic formula for any power of 2
-            # Start with smaller last_layer and build fri_steps list
-            log_n = log_n_steps
-            needed_sum = target_sum - 4  # Leave room for last_layer=16 (log2=4)
-            
-            last_layer = 16
-            fri_steps = [0]
-            remaining = needed_sum - 4
-            
-            # Build fri_steps greedily
-            while remaining > 0:
-                step = min(4, remaining)
-                fri_steps.append(step)
-                remaining -= step
-            
-            logger.warning(f"Using auto-generated FRI parameters: last_layer={last_layer}, fri_steps={fri_steps}")
+        sigma = target_sum - last_layer_log2
+        if sigma < 0:
+            raise ValueError(
+                f"FRI equation impossible: log2(last_layer)={last_layer_log2} > target_sum={target_sum}"
+            )
+        q, r = divmod(sigma, 4)
+        fri_steps = [0] + [4] * q + ([r] if r > 0 else [])
         
         # Verify equation
         equation_sum = sum(fri_steps)
-        last_layer_log2 = last_layer.bit_length() - 1
         actual_sum = last_layer_log2 + equation_sum
         
         if actual_sum != target_sum:
             raise ValueError(
-                f"FRI equation mismatch: log2({last_layer})={last_layer_log2} + {fri_steps}={equation_sum} "
+                f"FRI equation mismatch: log2({last_layer_degree_bound})={last_layer_log2} + {fri_steps}={equation_sum} "
                 f"= {actual_sum}, expected {target_sum}"
             )
         
-        logger.info(f"FRI Parameters: last_layer={last_layer}, fri_steps={fri_steps}")
-        logger.info(f"  Equation: log2({last_layer})={last_layer_log2} + {equation_sum} = {actual_sum} ✓")
+        logger.info(
+            "FRI Parameters: last_layer=%s, fri_steps=%s",
+            last_layer_degree_bound,
+            fri_steps,
+        )
+        logger.info(
+            "  Equation: log2(%s)=%s + %s = %s ✓",
+            last_layer_degree_bound,
+            last_layer_log2,
+            equation_sum,
+            actual_sum,
+        )
         
-        return last_layer, fri_steps
+        return fri_steps
     
     async def generate_proof(
         self,
@@ -211,15 +183,32 @@ class StoneProverService:
             
             logger.info(f"Generating Stone proof for n_steps={n_steps}")
             
-            # Calculate FRI parameters
-            last_layer, fri_steps = self._calculate_fri_parameters(n_steps)
-            
             # Load base parameters and modify FRI settings
             with open(self.base_params_file) as f:
                 params = json.load(f)
             
+            last_layer = params["stark"]["fri"]["last_layer_degree_bound"]
+            fri_steps = self._calculate_fri_step_list(n_steps, last_layer)
             params["stark"]["fri"]["fri_step_list"] = fri_steps
-            params["stark"]["fri"]["last_layer_degree_bound"] = last_layer
+            
+            # HARD LOG: Dump Stone prover parameters before generation
+            logger.info("=" * 80)
+            logger.info("🔍 STONE PROVER - PARAMETERS")
+            logger.info("=" * 80)
+            logger.info(f"Base params file: {self.base_params_file}")
+            logger.info(f"n_steps: {n_steps}")
+            logger.info(f"FRI last_layer_degree_bound: {last_layer}")
+            logger.info(f"FRI step_list: {fri_steps}")
+            logger.info(f"FRI n_queries: {params['stark']['fri'].get('n_queries')}")
+            logger.info(f"FRI log_n_cosets: {params['stark'].get('log_n_cosets')}")
+            logger.info(f"FRI proof_of_work_bits: {params['stark']['fri'].get('proof_of_work_bits')}")
+            logger.info(f"Channel hash: {params.get('channel_hash')}")
+            logger.info(f"Commitment hash: {params.get('commitment_hash')}")
+            logger.info(f"Pow hash: {params.get('pow_hash')}")
+            logger.info(f"n_verifier_friendly_commitment_layers: {params.get('n_verifier_friendly_commitment_layers')}")
+            logger.info(f"Verifier friendly channel updates: {params.get('verifier_friendly_channel_updates')}")
+            logger.info(f"Verifier friendly commitment hash: {params.get('verifier_friendly_commitment_hash')}")
+            logger.info("=" * 80)
             
             # Create temporary parameter file
             with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:

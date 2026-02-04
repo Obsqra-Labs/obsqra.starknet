@@ -2,7 +2,59 @@
 
 This log tracks notable findings, issues, and solutions discovered during integration testing.
 
-**Last Updated**: January 30, 2026
+**Last Updated**: February 4, 2026
+
+---
+
+## 2026-02-04 - ShieldedPool Privacy Fix (No Owner Tracking)
+
+### Finding: Removed on-chain owner tracking for true privacy
+
+**Issue**: Original contract stored `commitment_owner` mapping which linked depositor address to commitment on-chain, breaking privacy.
+
+**Root Cause**: Design oversight - storing ownership breaks the privacy model.
+
+**Solution**: 
+- Removed `commitment_owner` storage variable
+- Removed all writes to `commitment_owner` 
+- Removed ownership checks in agent_rebalance (session key validates authority)
+- Also fixed: Human-signed txs skip Groth16 verification (signature = authorization)
+- Also fixed: felt252 overflow in proof generation (use FELT_PRIME instead of 2^252)
+
+**Privacy Model Now**:
+- On-chain: Only commitment + balance stored (NO owner link)
+- Ownership proved via: Knowledge of commitment preimage (user_addr, amount, pool, nonce)
+- Double-spend prevented via nullifier scheme
+
+**Deployed Contract**: `0x00d5b525956962d5900d0f0821222d143690f4cf46c0d5054d0f749f49c7262d`
+
+**Status**: ✅ Complete. True privacy preserved.
+
+---
+
+## 2026-02-04 - ShieldedPool Contract Deployment (RPC Fix Applied)
+
+### Finding: Deployed ShieldedPool contract using documented --casm-hash workaround
+
+**Issue**: CLI tools failed to declare contract due to CASM hash mismatch between Scarb compiler and starkli recompilation.
+
+**Root Cause**: Different Cairo compiler versions produce different CASM hashes. starkli v2.11.4 recompiles Sierra → CASM with a different hash than what Scarb originally produced.
+
+**Solution**: Used documented fix from `RPC_CASM_HASH_FIX.md`:
+1. First declare attempt fails, revealing "Expected" hash in error message
+2. Re-declare with `--casm-hash <EXPECTED>` flag to bypass recompilation
+3. Deploy normally
+
+**Deployed Contract**:
+- Address: `0x014ccad7744181b10a7a42bea439b4414cae4fa63efb2e369e3e4470170f4040`
+- Class Hash: `0x01a0a3421461fc1bb9d82f97e4c4283a0309cc9bff9115bde14f3ef6bb5a70b0`
+- CASM Hash Override: `0x03ef828b7ab070621353c87ddc4d45fec0fb15dba7e803234e2d235505643894`
+
+**Files Modified**:
+- `backend/.env` - Added SHIELDED_POOL_ADDRESS
+- `frontend/.env.local` - Updated NEXT_PUBLIC_SHIELDED_POOL_ADDRESS
+
+**Status**: ✅ Complete. Contract deployed and services restarted.
 
 ---
 

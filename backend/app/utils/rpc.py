@@ -20,15 +20,23 @@ def _split_urls(raw: str) -> List[str]:
     return [url.strip() for url in raw.split(",") if url.strip()]
 
 
+# Public Sepolia RPC for failover when Alchemy/primary is unavailable (no key required).
+PUBLIC_SEPOLIA_RPC = "https://starknet-sepolia-rpc.publicnode.com"
+
+
 def get_rpc_urls() -> List[str]:
-    """Return ordered, de-duplicated list of RPC URLs."""
+    """Return ordered, de-duplicated list of RPC URLs (primary + STARKNET_RPC_URLS + built-in fallback)."""
     urls: List[str] = []
     if settings.STARKNET_RPC_URLS:
         urls.extend(_split_urls(settings.STARKNET_RPC_URLS))
 
-    # Always include the primary RPC as a fallback.
+    # Always include the primary RPC (e.g. Alchemy from env or config).
     if settings.STARKNET_RPC_URL:
         urls.append(settings.STARKNET_RPC_URL)
+
+    # Built-in public Sepolia fallback so allocation can execute when primary is down.
+    if settings.STARKNET_NETWORK == "sepolia" and PUBLIC_SEPOLIA_RPC not in urls:
+        urls.append(PUBLIC_SEPOLIA_RPC)
 
     # De-duplicate while preserving order.
     seen = set()
@@ -47,6 +55,12 @@ def is_retryable_rpc_error(exc: Exception) -> bool:
         return True
 
     message = str(exc).lower()
+    
+    # Transaction reverts are NOT RPC errors - they're on-chain business logic failures.
+    # Don't retry these across RPC endpoints.
+    if "transaction reverted" in message or "execution has failed" in message:
+        return False
+    
     if "blast api is no longer available" in message and "403" in message:
         return True
     retry_signals = [

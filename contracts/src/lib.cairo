@@ -8,3 +8,6 @@ pub mod pool;
 pub mod pool_factory;
 pub mod interfaces;
 pub mod zkml_oracle;
+pub mod sharp_verifier;
+pub mod model_registry;
+pub mod agent_orchestrator;

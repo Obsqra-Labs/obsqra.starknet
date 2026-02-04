@@ -107,9 +107,11 @@ class AllocationProposalService:
         )
         
         if not trace_result.get("success"):
-            logger.warning(f"  ⚠️ Trace generation failed: {trace_result.get('error')}")
-            # Don't fail - can still generate proof with mock trace
-            trace_result = self._create_mock_trace_result()
+            logger.error(f"  ❌ Trace generation failed: {trace_result.get('error')}")
+            return {
+                "success": False,
+                "error": "Trace generation failed (strict mode - no mock traces allowed)"
+            }
         
         logger.info(f"  ✅ Trace generated: {trace_result.get('n_steps')} steps")
         
@@ -251,17 +253,8 @@ class AllocationProposalService:
             }
     
     def _create_mock_trace_result(self) -> Dict:
-        """Create mock trace result for testing"""
-        logger.warning("Using mock trace result for testing")
-        return {
-            "success": True,
-            "n_steps": 512,
-            "trace_file": "/opt/obsqra.starknet/stone-prover/e2e_test/Cairo/trace.json",
-            "memory_file": "/opt/obsqra.starknet/stone-prover/e2e_test/Cairo/memory.json",
-            "public_input_file": "/opt/obsqra.starknet/stone-prover/e2e_test/Cairo/fib_public.json",
-            "private_input_file": "/opt/obsqra.starknet/stone-prover/e2e_test/Cairo/fib_private.json",
-            "generation_time_ms": 0
-        }
+        """Deprecated: mock trace results are disabled in strict mode."""
+        raise RuntimeError("Mock trace results are disabled. Provide a real Cairo trace.")
     
     async def _generate_proof(
         self,
@@ -273,13 +266,13 @@ class AllocationProposalService:
         """Generate STARK proof from trace"""
         
         try:
-            # Try Stone first
+            # Strict Stone-only path
             if prefer_stone and self.stone_service:
                 stone_result = await self.stone_service.generate_proof(
                     private_input_file,
                     public_input_file
                 )
-                
+
                 if stone_result.success:
                     return {
                         "success": True,
@@ -289,27 +282,15 @@ class AllocationProposalService:
                         "generation_time_ms": stone_result.generation_time_ms,
                         "proof_size_kb": stone_result.proof_size_kb
                     }
-            
-            # Fallback to Atlantic
-            if self.atlantic_service:
-                atlantic_result = await self.atlantic_service.generate_proof(
-                    private_input_file,
-                    public_input_file
-                )
-                
-                if atlantic_result and hasattr(atlantic_result, 'success') and atlantic_result.success:
-                    return {
-                        "success": True,
-                        "proof_hash": atlantic_result.proof_hash,
-                        "proof_data": atlantic_result.proof_data,
-                        "proof_method": "atlantic",
-                        "generation_time_ms": atlantic_result.generation_time_ms,
-                        "proof_size_kb": atlantic_result.proof_size_kb
-                    }
-            
+
+                return {
+                    "success": False,
+                    "error": stone_result.error or "Stone prover failed"
+                }
+
             return {
                 "success": False,
-                "error": "All proof generation methods failed"
+                "error": "Stone prover required (strict mode - no fallback)"
             }
         
         except Exception as e:

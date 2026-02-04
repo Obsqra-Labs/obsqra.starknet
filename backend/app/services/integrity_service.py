@@ -27,15 +27,57 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 # Integrity Verifier contract addresses
+# Option 1: Public FactRegistry (has verifiers registered) - RECOMMENDED
+# This is the public FactRegistry with all verifiers pre-registered.
+# Use this for production and testing to avoid "verifier not registered" errors.
 INTEGRITY_VERIFIER_SEPOLIA = 0x4ce7851f00b6c3289674841fd7a1b96b6fd41ed1edc248faccd672c26371b8c
+# Option 2: Your own deployed FactRegistry (needs verifiers registered)
+# Custom FactRegistry: 0x063feefb4b7cfb46b89d589a8b00bceb7905a7d51c4e8068d4b45e0d9d018f64
+# Only use if you've registered verifiers in your own FactRegistry.
+# Mocked FactRegistry (no proof verification; for demo fallbacks) - DISABLED
+MOCKED_FACT_REGISTRY_SEPOLIA = 0x02c0364efde25a53ef446352347e525c0bef3496e6463d6aa7453783d16322c0
 INTEGRITY_VERIFIER_MAINNET = 0xcc63a1e8e7824642b89fa6baf996b8ed21fa4707be90ef7605570ca8e4f00b
 
 # Manual resource bounds for Integrity proof verification invokes.
+# L1 data gas price increased to handle current network conditions (actual price can be ~21 trillion)
 INTEGRITY_RESOURCE_BOUNDS = ResourceBoundsMapping(
-    l1_gas=ResourceBounds(max_amount=50000, max_price_per_unit=100000000000000),
-    l1_data_gas=ResourceBounds(max_amount=50000, max_price_per_unit=1000000000000),
-    l2_gas=ResourceBounds(max_amount=8000000, max_price_per_unit=20000000000),
+    l1_gas=ResourceBounds(max_amount=200000, max_price_per_unit=100000000000000),
+    l1_data_gas=ResourceBounds(max_amount=200000, max_price_per_unit=150000000000000),  # 150 trillion - Sepolia L1 data gas can exceed 50T (error 55: resource bounds not satisfied)
+    l2_gas=ResourceBounds(max_amount=300000000, max_price_per_unit=20000000000),
 )
+
+_INTEGRITY_ABI: Optional[list] = None
+_MOCKED_FACT_REGISTRY_ABI: Optional[list] = None
+
+
+def _load_integrity_abi() -> list:
+    global _INTEGRITY_ABI
+    if _INTEGRITY_ABI is not None:
+        return _INTEGRITY_ABI
+
+    repo_root = Path(__file__).resolve().parents[3]
+    abi_path = repo_root / "integrity" / "target" / "dev" / "integrity_FactRegistry.contract_class.json"
+    if not abi_path.exists():
+        raise FileNotFoundError(f"Integrity FactRegistry ABI not found at {abi_path}")
+
+    payload = json.loads(abi_path.read_text())
+    _INTEGRITY_ABI = payload.get("abi", [])
+    return _INTEGRITY_ABI
+
+
+def _load_mocked_fact_registry_abi() -> list:
+    global _MOCKED_FACT_REGISTRY_ABI
+    if _MOCKED_FACT_REGISTRY_ABI is not None:
+        return _MOCKED_FACT_REGISTRY_ABI
+
+    repo_root = Path(__file__).resolve().parents[3]
+    abi_path = repo_root / "contracts" / "target" / "dev" / "obsqra_contracts_MockIsValidRegistry.contract_class.json"
+    if not abi_path.exists():
+        raise FileNotFoundError(f"Mocked FactRegistry ABI not found at {abi_path}")
+
+    payload = json.loads(abi_path.read_text())
+    _MOCKED_FACT_REGISTRY_ABI = payload.get("abi", [])
+    return _MOCKED_FACT_REGISTRY_ABI
 
 
 class IntegrityService:
@@ -60,7 +102,29 @@ class IntegrityService:
             INTEGRITY_VERIFIER_SEPOLIA if self.network == "sepolia" 
             else INTEGRITY_VERIFIER_MAINNET
         )
+        # Mocked registry disabled in strict mode (Stone-only path).
+        self.mocked_registry_address = None
+        self.chain_id = StarknetChainId.SEPOLIA if self.network == "sepolia" else StarknetChainId.MAINNET
         logger.info(f"Integrity Service initialized for {network} (address: {hex(self.verifier_address)})")
+
+    async def _init_backend_account(self, client: FullNodeClient) -> Account:
+        key_pair = KeyPair.from_private_key(int(settings.BACKEND_WALLET_PRIVATE_KEY, 16))
+        account = Account(
+            address=int(settings.BACKEND_WALLET_ADDRESS, 16),
+            client=client,
+            key_pair=key_pair,
+            chain=self.chain_id,
+        )
+        try:
+            contract_class = await client.get_class_at(
+                contract_address=account.address,
+                block_number="latest",
+            )
+            account._cairo_version = 1 if isinstance(contract_class, SierraContractClass) else 0
+        except Exception as err:
+            account._cairo_version = 1
+            logger.warning("⚠️ Could not resolve account Cairo version; defaulting to Cairo 1: %s", err)
+        return account
 
     @staticmethod
     def _bytes_to_felts(data: bytes, chunk_size: int = 31) -> list[int]:
@@ -147,19 +211,26 @@ class IntegrityService:
                     logger.info("Proof structures valid, calling Integrity verify_proof_full_and_register_fact")
                     
                     async def _call_structured(client: FullNodeClient, _rpc_url: str):
-                        contract = await Contract.from_address(
+                        account = await self._init_backend_account(client)
+                        abi = _load_integrity_abi()
+                        contract = Contract(
                             address=self.verifier_address,
-                            provider=client,
+                            abi=abi,
+                            provider=account,
                         )
                         try:
-                            result = await contract.functions["verify_proof_full_and_register_fact"].call(
+                            nonce = await account.get_nonce(block_number="latest")
+                            invoke_result = await contract.functions["verify_proof_full_and_register_fact"].invoke_v3(
                                 local_verifier,
                                 local_proof,
+                                resource_bounds=INTEGRITY_RESOURCE_BOUNDS,
+                                nonce=nonce,
                             )
-                            logger.info("✅ Integrity verify_proof_full_and_register_fact succeeded (structured)")
-                            return True if result else False
+                            await invoke_result.wait_for_acceptance(check_interval=1, retries=120)
+                            logger.info("✅ Integrity verify_proof_full_and_register_fact invoke succeeded (structured)")
+                            return True
                         except Exception as e:
-                            logger.error(f"Integrity call failed: {e}")
+                            logger.error(f"Integrity invoke failed: {e}")
                             raise
                     
                     try:
@@ -191,8 +262,10 @@ class IntegrityService:
             logger.info(f"Using fallback with {len(verifier_felts)} verifier felts and {len(proof_felts)} proof felts")
             
             async def _call_fallback(client: FullNodeClient, _rpc_url: str):
-                contract = await Contract.from_address(
+                abi = _load_integrity_abi()
+                contract = Contract(
                     address=self.verifier_address,
+                    abi=abi,
                     provider=client,
                 )
                 fn = contract.functions.get("verify_proof_full_and_register_fact")
@@ -228,7 +301,7 @@ class IntegrityService:
                     selector=selector,
                     calldata=calldata,
                 )
-                return await client.call_contract(call)
+                return await client.call_contract(call, block_number="latest")
 
             result, _ = await with_rpc_fallback(_call, urls=self.rpc_urls)
             logger.info("Integrity verify_proof_full_and_register_fact call returned OK (raw calldata)")
@@ -236,6 +309,193 @@ class IntegrityService:
         except Exception as e:
             logger.error(f"Integrity calldata verification failed: {e}", exc_info=True)
             return False
+
+    async def register_calldata_and_get_fact(self, calldata: list[int]) -> tuple[Optional[int], Optional[str], Optional[int]]:
+        """
+        Register a proof via raw calldata and return the fact hash (if available).
+
+        This performs a read-only call first to extract the fact hash, then submits
+        the invoke to actually register it on-chain.
+        """
+        selector = get_selector_from_name("verify_proof_full_and_register_fact")
+        call = Call(
+            to_addr=self.verifier_address,
+            selector=selector,
+            calldata=calldata,
+        )
+
+        fact_hash: Optional[int] = None
+        call_rpc: Optional[str] = None
+
+        # Preflight call to fetch fact hash (may fail on some RPCs due to size limits).
+        try:
+            async def _call(client: FullNodeClient, _rpc_url: str):
+                return await client.call_contract(call, block_number="latest")
+
+            output, call_rpc = await with_rpc_fallback(_call, urls=self.rpc_urls)
+            if output:
+                fact_hash = output[0]
+            else:
+                logger.warning("Integrity calldata preflight returned empty output; will parse from receipt.")
+        except Exception as exc:
+            logger.warning("Integrity calldata preflight failed; proceeding to invoke: %s", exc)
+
+        try:
+            async def _invoke(client: FullNodeClient, _rpc_url: str, retry_count: int = 0):
+                account = await self._init_backend_account(client)
+                
+                # Fetch both pending and latest nonce for comparison
+                try:
+                    pending_nonce = await account.get_nonce(block_number="pending")
+                except Exception as e:
+                    logger.warning(f"Failed to get pending nonce: {e}, using latest")
+                    pending_nonce = None
+                
+                try:
+                    latest_nonce = await account.get_nonce(block_number="latest")
+                except Exception as e:
+                    logger.error(f"Failed to get latest nonce: {e}")
+                    raise
+                
+                # Use the higher nonce to avoid nonce mismatch
+                if pending_nonce is not None:
+                    nonce = max(pending_nonce, latest_nonce)
+                else:
+                    nonce = latest_nonce
+                
+                # Log nonce state for debugging
+                logger.info(
+                    f"Integrity invoke nonce state (attempt {retry_count + 1}): "
+                    f"pending_nonce={pending_nonce}, latest_nonce={latest_nonce}, "
+                    f"used_nonce={nonce}, rpc={_rpc_url}"
+                )
+                
+                try:
+                    invoke = await account.execute_v3(
+                        calls=[call],
+                        nonce=nonce,
+                        resource_bounds=INTEGRITY_RESOURCE_BOUNDS,
+                    )
+                    await client.wait_for_tx(invoke.transaction_hash)
+                    receipt = await client.get_transaction_receipt(invoke.transaction_hash)
+                    return nonce, receipt
+                except Exception as e:
+                    error_str = str(e)
+                    # Check if it's a nonce error and we haven't retried yet
+                    if ("nonce" in error_str.lower() or "Invalid transaction nonce" in error_str) and retry_count == 0:
+                        logger.warning(
+                            f"Nonce error on attempt {retry_count + 1}, re-syncing nonce and retrying: {error_str}"
+                        )
+                        # Re-fetch latest nonce and retry once
+                        try:
+                            latest_nonce_retry = await account.get_nonce(block_number="latest")
+                            logger.info(
+                                f"Nonce re-sync: previous={nonce}, new_latest={latest_nonce_retry}, "
+                                f"will retry with {latest_nonce_retry}"
+                            )
+                            # Retry with fresh nonce
+                            return await _invoke(client, _rpc_url, retry_count=1)
+                        except Exception as retry_e:
+                            logger.error(f"Nonce re-sync failed: {retry_e}")
+                            raise e  # Re-raise original error
+                    else:
+                        # Not a nonce error or already retried, re-raise
+                        raise
+
+            invoke_result, used_rpc = await with_rpc_fallback(
+                _invoke,
+                urls=[call_rpc] if call_rpc else self.rpc_urls,
+            )
+            used_nonce, receipt = invoke_result
+            if used_rpc:
+                call_rpc = used_rpc
+
+            if fact_hash is None:
+                fact_hash = self._extract_fact_hash_from_receipt(receipt)
+                if fact_hash is None:
+                    logger.error("Integrity invocation succeeded but FactRegistered event not found.")
+                    return None, call_rpc, used_nonce + 1 if used_nonce is not None else None
+
+            logger.info("✅ Integrity calldata registered on-chain")
+            next_nonce = used_nonce + 1 if used_nonce is not None else None
+            return fact_hash, call_rpc, next_nonce
+        except Exception as e:
+            error_str = str(e)
+            logger.error(f"Integrity calldata registration failed: {e}", exc_info=True)
+            # Capture and preserve the actual contract error for better debugging
+            if "revert_error" in error_str or "Contract error" in error_str or "Invalid" in error_str:
+                # Extract the actual error message if available
+                import re
+                oods_match = re.search(r"Invalid OODS|OODS", error_str, re.IGNORECASE)
+                builtin_match = re.search(r"Invalid builtin|builtin", error_str, re.IGNORECASE)
+                verifier_match = re.search(r"VERIFIER_NOT_FOUND", error_str, re.IGNORECASE)
+                final_pc_match = re.search(r"Invalid final_pc|final_pc", error_str, re.IGNORECASE)
+                
+                if oods_match:
+                    raise RuntimeError(f"Integrity verification failed: Invalid OODS - The proof's OODS values do not match the verifier's expectations. This may indicate an AIR/public input mismatch. Full error: {error_str}") from e
+                elif builtin_match:
+                    raise RuntimeError(f"Integrity verification failed: Invalid builtin - The proof's builtins do not match the verifier's expectations. Full error: {error_str}") from e
+                elif verifier_match:
+                    raise RuntimeError(f"Integrity verification failed: VERIFIER_NOT_FOUND - No verifier registered for this configuration. Full error: {error_str}") from e
+                elif final_pc_match:
+                    raise RuntimeError(f"Integrity verification failed: Invalid final_pc - The proof's final program counter does not match expectations. Full error: {error_str}") from e
+                else:
+                    # Re-raise with full error details
+                    raise RuntimeError(f"Integrity verification failed: {error_str}") from e
+            # If it's not a contract error, still raise it so caller can see it
+            raise RuntimeError(f"Integrity calldata registration failed: {error_str}") from e
+
+    @staticmethod
+    def _extract_fact_hash_from_receipt(receipt) -> Optional[int]:
+        """
+        Extract FactRegistered.fact_hash from a transaction receipt.
+        """
+        try:
+            selector = get_selector_from_name("FactRegistered")
+
+            def _to_int(value):
+                if isinstance(value, int):
+                    return value
+                if isinstance(value, str):
+                    return int(value, 16) if value.startswith("0x") else int(value)
+                return int(value)
+
+            events = getattr(receipt, "events", None)
+            if events is None and isinstance(receipt, dict):
+                events = receipt.get("events", [])
+
+            for event in events or []:
+                keys = getattr(event, "keys", None)
+                if keys is None and isinstance(event, dict):
+                    keys = event.get("keys", [])
+                if not keys:
+                    continue
+                key0 = _to_int(keys[0])
+                if key0 != selector:
+                    continue
+                if len(keys) > 1:
+                    return _to_int(keys[1])
+            return None
+        except Exception as exc:
+            logger.warning("Failed to parse FactRegistered from receipt: %s", exc)
+            return None
+
+    async def register_mocked_fact(
+        self,
+        fact_hash: int,
+        verifier_config: dict,
+        security_bits: int = 128,
+    ) -> tuple[bool, Optional[str], Optional[int]]:
+        """
+        DEPRECATED: Mock registry disabled in strict mode (Stone-only path).
+        
+        This function is disabled. Use register_calldata_and_get_fact() with real Integrity FactRegistry instead.
+        """
+        logger.error("register_mocked_fact() is disabled in strict mode. Use real Integrity FactRegistry only.")
+        raise RuntimeError(
+            "Mock registry is disabled. This is a strict Stone-only system. "
+            "All proofs must be verified through the real Integrity FactRegistry."
+        )
     
     async def verify_proof_on_l2(
         self,
@@ -243,15 +503,21 @@ class IntegrityService:
         is_mocked: bool = False
     ) -> bool:
         """
-        Verify proof on Starknet L2 via Integrity Verifier contract
+        Verify proof on Starknet L2 via Integrity Verifier contract (strict mode)
         
         Args:
             fact_hash: Cairo fact hash (felt252) as hex string or int
-            is_mocked: Whether this is a mocked proof (for testing)
+            is_mocked: DEPRECATED - Always False in strict mode. Mock registry is disabled.
         
         Returns:
-            True if verified, False otherwise
+            True if verified in real FactRegistry, False otherwise
+        
+        Note:
+            This function only queries the real Integrity FactRegistry.
+            Mock registry is disabled in strict Stone-only mode.
         """
+        if is_mocked:
+            logger.warning("is_mocked=True is deprecated. Mock registry is disabled. Using real FactRegistry only.")
         try:
             # Convert fact_hash to int if it's a string
             if isinstance(fact_hash, str):
@@ -263,38 +529,25 @@ class IntegrityService:
                 fact_hash_int = fact_hash
             
             async def _call(client: FullNodeClient, _rpc_url: str):
-                contract = await Contract.from_address(
+                abi = _load_integrity_abi()
+                contract = Contract(
                     address=self.verifier_address,
+                    abi=abi,
                     provider=client,
                 )
 
-                # Pick the first available verifier entrypoint
-                fn_name = None
-                for candidate in [
-                    "isCairoFactValid",
-                    "is_valid",
-                    "isValid",
-                    "is_fact_valid",
-                ]:
-                    if candidate in contract.functions:
-                        fn_name = candidate
-                        break
-
-                if not fn_name:
-                    logger.error("Integrity verifier ABI missing expected entrypoint")
+                if "get_all_verifications_for_fact_hash" not in contract.functions:
+                    logger.error("Integrity FactRegistry ABI missing get_all_verifications_for_fact_hash")
                     return False
 
-                # Try calling with (fact_hash, is_mocked); if that fails, try single-arg
-                is_mocked_int = 1 if is_mocked else 0
-                try:
-                    result = await contract.functions[fn_name].call(
-                        fact_hash_int,
-                        is_mocked_int,
-                    )
-                except Exception:
-                    result = await contract.functions[fn_name].call(fact_hash_int)
+                result = await contract.functions["get_all_verifications_for_fact_hash"].call(
+                    fact_hash_int,
+                    block_number="latest",
+                )
 
-                return bool(result[0]) if result else False
+                # starknet_py returns tuples; normalize to a list-like object
+                verifications = result[0] if isinstance(result, tuple) and result else result
+                return bool(verifications) and len(verifications) > 0
 
             is_valid, _ = await with_rpc_fallback(_call, urls=self.rpc_urls)
             

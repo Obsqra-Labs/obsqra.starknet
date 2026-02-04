@@ -1,10 +1,15 @@
 """Application Configuration"""
 
+from pathlib import Path
 from typing import List, Union
 from pydantic_settings import BaseSettings
 from pydantic import field_validator
 from functools import lru_cache
 import os
+
+# Repo root (backend/app/config.py -> app -> backend -> root) for optional .env.sepolia
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+_ENV_SEPOLIA = _REPO_ROOT / ".env.sepolia"
 
 
 class Settings(BaseSettings):
@@ -18,7 +23,7 @@ class Settings(BaseSettings):
     # Server
     API_HOST: str = "0.0.0.0"
     API_PORT: int = 8001
-    API_BASE_URL: str = "http://localhost:8000"
+    API_BASE_URL: str = "http://localhost:8001"
     
     # Database
     DATABASE_URL: str = "postgresql://obsqra:obsqra@localhost:5432/obsqra_db"
@@ -33,8 +38,10 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:3003"
     CORS_ORIGINS: Union[List[str], str] = [
         "http://localhost:3003",
+        "http://localhost:3004",
         "http://localhost:3000",
         "http://127.0.0.1:3003",
+        "http://127.0.0.1:3004",
         "https://starknet.obsqra.fi",  # Production frontend
     ]
     
@@ -63,20 +70,24 @@ class Settings(BaseSettings):
     SMTP_FROM: str = "noreply@obsqra.io"
     
     # Starknet
-    STARKNET_RPC_URL: str = "https://starknet-sepolia-rpc.publicnode.com"
+    STARKNET_RPC_URL: str = "https://starknet-sepolia.g.alchemy.com/v2/EvhYN6geLrdvbYHVRgPJ7"
     # Optional comma-separated RPC list for failover (falls back to STARKNET_RPC_URL)
     STARKNET_RPC_URLS: str = ""
-    STARKNET_RPC_RETRY_ATTEMPTS: int = 2
+    STARKNET_RPC_RETRY_ATTEMPTS: int = 3
     STARKNET_RPC_RETRY_BACKOFF_SEC: float = 0.75
     STARKNET_MAX_FEE_WEI: int = 20000000000000000  # 0.02 STRK default
     STARKNET_NETWORK: str = "sepolia"  # 'sepolia' or 'mainnet'
-    RISK_ENGINE_ADDRESS: str = "0x007c2463376a0d21dbccde4c6d59bf8b0649973ca1f88865466b58d81dcbe86d"  # v2.2 with fixed 2-protocol allocation
-    STRATEGY_ROUTER_ADDRESS: str = "0x01888e3f3d6cd137e63ff1a090a1e2c9ed5754162a8d5739364aba657fab20e4"  # v2 with ETH + protocol integration + deposit function (redeployed 2025-12-09 with new class hash)
+    RISK_ENGINE_ADDRESS: str = "0x052fe4c3f3913f6be76677104980bff78d224d5760b91f02700e8c8275ac6e68"  # v4 Stage 3A (parameterized model) - Jan 2026 deployment
+    STRATEGY_ROUTER_ADDRESS: str = "0x07ec6aa6f5499e9490cce33152c9f9058f18e90d353032fcb3ca1bfe30c98c73"  # v3.5 (proof-gated risk engine)
+    AGENT_ORCHESTRATOR_ADDRESS: str = "0x050a35c0f4f42e7b3fcf1186d2465d5a14f7c17054bf4d3da4ac8ca8f5f8bb23"  # Stage 5 Agent Orchestrator
     # Read-only data RPC (defaults to STARKNET_RPC_URL if unset)
     DATA_RPC_URL: str = ""
     DATA_NETWORK: str = ""  # optional override for data network
     # Optional zkML oracle contract (Cairo demo)
     ZKML_ORACLE_ADDRESS: str = ""
+    # Model Registry (zkML provenance)
+    MODEL_REGISTRY_ADDRESS: str = "0x06ab2595007be01ffb7e51bd28339f870be36402eed9034b109fd479e7469adc"  # Sepolia
+    MODEL_REGISTRY_ADMIN_KEY: str = ""
     # Optional zkML proof paths (Integrity/Stone)
     ZKML_PROOF_JSON_PATH: str = ""
     ZKML_PROOF_CALLDATA_PATH: str = ""
@@ -86,10 +97,15 @@ class Settings(BaseSettings):
     ZKML_PROOF_CALLDATA_PATH_CAIRO1: str = ""
     INTEGRITY_PROOF_SERIALIZER_BIN: str = ""
     # Integrity proof settings (match verify-on-starknet.sh)
-    INTEGRITY_LAYOUT: str = "recursive"
+    # RESOLVED: Stone v3 (1414a545...) generates stone6 proofs, not stone5.
+    # Using stone6 to match Stone v3 behavior (includes n_verifier_friendly_commitment_layers in hash).
+    # Both stone5 and stone6 verifiers are registered in public FactRegistry.
+    INTEGRITY_LAYOUT: str = "recursive"  # Canonical Integrity layout
     INTEGRITY_HASHER: str = "keccak_160_lsb"
-    INTEGRITY_STONE_VERSION: str = "stone5"
+    INTEGRITY_STONE_VERSION: str = "stone6"  # CONFIRMED: Stone v3 (1414a545...) generates stone6 proofs
     INTEGRITY_MEMORY_VERIFICATION: str = "strict"
+    # Timeout for Cairo execution (increased for recursive layout)
+    INTEGRITY_CAIRO_TIMEOUT: int = 300  # 5 minutes (was 120s)
     # Demo override (allow execution even if proof not verified)
     ALLOW_UNVERIFIED_EXECUTION: bool = False
     # Ekubo API pair for metrics (default: ETH/USDC on Starknet mainnet)
@@ -100,12 +116,16 @@ class Settings(BaseSettings):
     # L1 Settlement (Atlantic)
     ATLANTIC_API_KEY: str = ""  # Herodotus API key
     ATLANTIC_BASE_URL: str = "https://atlantic.api.herodotus.cloud"
-    ALLOW_FAKE_FACT_HASH: bool = False  # Only set to True for local mock mode
+    ALLOW_FAKE_FACT_HASH: bool = False  # DEPRECATED: Always False in strict Stone-only mode. No fake fact hashes allowed.
     
     # Backend Wallet (for automated execution)
     BACKEND_WALLET_ADDRESS: str = ""  # Set in .env
     BACKEND_WALLET_PRIVATE_KEY: str = ""  # Set in .env - KEEP SECRET!
     
+    # Stage 3A: Parameterized model (on-chain weights)
+    PARAMETERIZED_MODEL_ENABLED: bool = True
+    MODEL_PARAMS_TABLE: str = "model_parameters"
+
     # ML Models
     MODEL_VERSION: str = "v1"
     PREDICTION_WINDOW_DAYS: int = 7
@@ -116,8 +136,10 @@ class Settings(BaseSettings):
     SENTRY_DSN: str = ""
     
     class Config:
-        env_file = ".env"
+        # Load backend/.env; also repo-root .env.sepolia if present (e.g. Alchemy RPC for deploys)
+        env_file = [".env", str(_ENV_SEPOLIA)] if _ENV_SEPOLIA.exists() else ".env"
         case_sensitive = True
+        extra = "ignore"  # Allow .env.sepolia to have extra vars (e.g. NETWORK, DEPLOYER_ADDRESS)
 
 
 @lru_cache()

@@ -1,5 +1,5 @@
 import { useReadContract, useAccount } from '@starknet-react/core';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Abi } from 'starknet';
 
 const DAO_CONSTRAINT_ABI = [
@@ -51,16 +51,29 @@ export function useDAOConstraints(contractAddress?: `0x${string}`) {
   const { account } = useAccount();
   const [isUpdating, setIsUpdating] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Read current constraints
-  const { data: constraints, isLoading, refetch } = useReadContract({
+  // Note: watch is disabled to prevent excessive polling - constraints don't change frequently
+  // Also disabled automatic retries to prevent blocking
+  const { data: constraints, isLoading, refetch, error: contractError } = useReadContract({
     functionName: 'get_constraints',
     args: [],
     abi: DAO_CONSTRAINT_ABI,
     address: contractAddress || undefined,
-    watch: true,
+    watch: false, // Disabled to prevent performance issues
     enabled: !!contractAddress,
+    retry: false, // Disable automatic retries to prevent blocking
   });
+
+  // Update error state when contract error occurs
+  useEffect(() => {
+    if (contractError) {
+      setError(contractError.message || 'Failed to load constraints');
+    } else {
+      setError(null);
+    }
+  }, [contractError]);
 
   // Parse constraints data
   const parsedConstraints = useMemo(() => {
@@ -136,6 +149,7 @@ export function useDAOConstraints(contractAddress?: `0x${string}`) {
   return {
     constraints: parsedConstraints,
     isLoading,
+    error,
     setConstraints,
     isUpdating,
     validateAllocation,

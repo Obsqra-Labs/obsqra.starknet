@@ -1,63 +1,106 @@
 #!/bin/bash
-
 set -e
 
-# Configuration
-ACCOUNT_ADDRESS="0x05fe812551bec726f1bf5026d5fb88f06ed411a753fb4468f9e19ebf8ced1b3d"
-ACCOUNT_FILE="/root/.starkli-wallets/deployer/account.json"
-KEYSTORE_FILE="/root/.starkli-wallets/deployer/keystore.json"
-KEYSTORE_PASSWORD="L!nux123"
-NETWORK="sepolia"
-
-RISK_ENGINE_PATH="/opt/obsqra.starknet/contracts/target/dev/obsqra_contracts_RiskEngine.contract_class.json"
-STRATEGY_ROUTER_PATH="/opt/obsqra.starknet/contracts/target/dev/obsqra_contracts_StrategyRouterV2.contract_class.json"
-
-OUTPUT_FILE="/opt/obsqra.starknet/deployment_results.txt"
-
-echo "=" > "$OUTPUT_FILE"
-echo "STARKNET DEPLOYMENT WITH STARKLI" >> "$OUTPUT_FILE"
-echo "=" >> "$OUTPUT_FILE"
-echo "Account: $ACCOUNT_ADDRESS" >> "$OUTPUT_FILE"
-echo "Network: $NETWORK" >> "$OUTPUT_FILE"
-echo "Time: $(date)" >> "$OUTPUT_FILE"
-echo "" >> "$OUTPUT_FILE"
-
-# Function to declare contract
-declare_contract() {
-    local name=$1
-    local path=$2
-    
-    echo "Declaring $name..."
-    echo "  From: $path"
-    
-    # Use echo to pipe password
-    export STARKLI_KEYSTORE_PASSWORD="$KEYSTORE_PASSWORD"
-    
-    output=$(starkli declare "$path" \
-        --account "$ACCOUNT_FILE" \
-        --keystore "$KEYSTORE_FILE" \
-        --network "$NETWORK" 2>&1) || {
-        echo "✗ Failed to declare $name"
-        echo "Error output:" >> "$OUTPUT_FILE"
-        echo "$output" >> "$OUTPUT_FILE"
-        return 1
-    }
-    
-    echo "$output"
-    echo "" >> "$OUTPUT_FILE"
-    echo "$name Declaration Output:" >> "$OUTPUT_FILE"
-    echo "$output" >> "$OUTPUT_FILE"
-    echo "" >> "$OUTPUT_FILE"
-}
-
-# Try to declare both contracts
-echo ""
-echo "Starting declarations..."
+echo "========================================"
+echo " DEPLOYING YOUR OWN FACTREGISTRY"
+echo "========================================"
 echo ""
 
-declare_contract "RiskEngine" "$RISK_ENGINE_PATH"
-declare_contract "StrategyRouterV2" "$STRATEGY_ROUTER_PATH"
+OWNER="0x05fe812551bec726f1bf5026d5fb88f06ed411a753fb4468f9e19ebf8ced1b3d"
+CONTRACT_FILE="/opt/obsqra.starknet/integrity/target/dev/integrity_FactRegistry.contract_class.json"
+STARKLI="/root/.starkli/bin/starkli"
+KEYSTORE="$HOME/.starknet_accounts/starknet_open_zeppelin_accounts.json"
 
+# Check if contract exists
+if [ ! -f "$CONTRACT_FILE" ]; then
+    echo "❌ Contract file not found. Building..."
+    cd /opt/obsqra.starknet/integrity
+    scarb build
+fi
+
+echo "✅ Contract file: $CONTRACT_FILE"
 echo ""
-echo "Deployment results saved to: $OUTPUT_FILE"
-cat "$OUTPUT_FILE"
+
+# Check starkli
+if [ ! -f "$STARKLI" ]; then
+    echo "❌ starkli not found at $STARKLI"
+    exit 1
+fi
+
+echo "📝 Step 1: Declaring contract..."
+echo ""
+
+# Try to declare - need to figure out keystore path
+# The accounts file might have the keystore info
+if [ -f "$KEYSTORE" ]; then
+    echo "   Using keystore: $KEYSTORE"
+    # Extract account name from keystore or use deployer
+    ACCOUNT_NAME="deployer"
+    
+    # Try declaring
+    DECLARE_OUTPUT=$($STARKLI declare "$CONTRACT_FILE" \
+        --network sepolia \
+        --account "$ACCOUNT_NAME" \
+        --keystore "$KEYSTORE" 2>&1 || echo "FAILED")
+    
+    if echo "$DECLARE_OUTPUT" | grep -q "class_hash\|0x[0-9a-f]\{64\}"; then
+        echo "✅ Declaration successful!"
+        echo "$DECLARE_OUTPUT" | grep -E "class_hash|0x[0-9a-f]{64}" | head -3
+        
+        # Extract class hash
+        CLASS_HASH=$(echo "$DECLARE_OUTPUT" | grep -oE "0x[0-9a-f]{64}" | head -1)
+        
+        if [ -n "$CLASS_HASH" ]; then
+            echo ""
+            echo "📝 Step 2: Deploying contract..."
+            echo "   Class hash: $CLASS_HASH"
+            echo "   Owner: $OWNER"
+            echo ""
+            
+            sleep 5
+            
+            DEPLOY_OUTPUT=$($STARKLI deploy "$CLASS_HASH" \
+                --network sepolia \
+                --account "$ACCOUNT_NAME" \
+                --keystore "$KEYSTORE" \
+                --constructor-calldata "$OWNER" 2>&1 || echo "FAILED")
+            
+            if echo "$DEPLOY_OUTPUT" | grep -q "contract_address\|0x[0-9a-f]\{64\}"; then
+                echo "✅ Deployment successful!"
+                echo "$DEPLOY_OUTPUT" | grep -E "contract_address|0x[0-9a-f]{64}" | head -3
+                
+                CONTRACT_ADDR=$(echo "$DEPLOY_OUTPUT" | grep -oE "0x[0-9a-f]{64}" | head -1)
+                
+                echo ""
+                echo "========================================"
+                echo " ✅ YOUR FACTREGISTRY DEPLOYED!"
+                echo "========================================"
+                echo ""
+                echo "Address: $CONTRACT_ADDR"
+                echo ""
+                echo "Next steps:"
+                echo "1. Update backend/app/config.py:"
+                echo "   INTEGRITY_VERIFIER_SEPOLIA = $CONTRACT_ADDR"
+                echo ""
+                echo "2. Update backend/.env:"
+                echo "   INTEGRITY_VERIFIER_SEPOLIA=$CONTRACT_ADDR"
+                echo ""
+            else
+                echo "⚠️  Deployment issue:"
+                echo "$DEPLOY_OUTPUT" | head -20
+            fi
+        fi
+    else
+        echo "⚠️  Declaration issue:"
+        echo "$DECLARE_OUTPUT" | head -20
+        echo ""
+        echo "💡 Tip: You may need to set up starkli keystore separately"
+    fi
+else
+    echo "⚠️  Keystore not found at $KEYSTORE"
+    echo ""
+    echo "Manual steps:"
+    echo "1. Set up starkli keystore: starkli signer keystore from-key <private_key>"
+    echo "2. starkli declare $CONTRACT_FILE --network sepolia"
+    echo "3. starkli deploy <class_hash> --constructor-calldata $OWNER"
+fi

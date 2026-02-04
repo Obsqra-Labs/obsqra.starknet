@@ -20,6 +20,8 @@ interface ProofBadgeProps {
   proofJobId?: string | null;
   generationTime?: number | null;
   proofSize?: number | null;
+  modelVersion?: string | null;
+  modelHash?: string | null;
 }
 
 export function ProofBadge({
@@ -38,6 +40,8 @@ export function ProofBadge({
   proofJobId,
   generationTime,
   proofSize,
+  modelVersion,
+  modelHash,
 }: ProofBadgeProps) {
   const [showDetails, setShowDetails] = useState(false);
 
@@ -165,6 +169,20 @@ export function ProofBadge({
               <div>
                 <p className="text-xs text-gray-400 mb-1">Proof Size:</p>
                 <p className="text-xs text-white">{(proofSize / 1024).toFixed(2)} KB</p>
+              </div>
+            )}
+
+            {modelVersion && (
+              <div>
+                <p className="text-xs text-gray-400 mb-1">Model Version:</p>
+                <p className="text-xs text-white">{modelVersion}</p>
+              </div>
+            )}
+
+            {modelHash && (
+              <div>
+                <p className="text-xs text-gray-400 mb-1">Model Hash:</p>
+                <code className="text-xs text-purple-300 break-all">{modelHash.slice(0, 20)}...{modelHash.slice(-8)}</code>
               </div>
             )}
 

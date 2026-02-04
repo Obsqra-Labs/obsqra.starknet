@@ -3,28 +3,34 @@
 /// Integrates with Starknet's SHARP (Shared Prover) for zero-knowledge proof verification
 
 use starknet::ContractAddress;
+use core::pedersen::pedersen;
 
 /// SHARP Fact Registry Interface
 /// 
 /// The fact registry stores verified computation facts on-chain
-/// Each fact has a unique hash that can be queried for validity
+/// Matches Herodotus Integrity FactRegistry interface
 #[starknet::interface]
-trait IFactRegistry<TContractState> {
-    /// Check if a fact is valid (verified by SHARP)
+pub trait IFactRegistry<TContractState> {
+    /// Get all verifications for a fact hash
     /// 
     /// Args:
-    ///     fact: Fact hash from SHARP verification
+    ///     fact_hash: Fact hash from SHARP verification
     /// 
     /// Returns:
-    ///     true if fact has been verified and registered
-    fn is_valid(self: @TContractState, fact: felt252) -> bool;
+    ///     Array of verification list elements
+    fn get_all_verifications_for_fact_hash(
+        self: @TContractState, 
+        fact_hash: felt252
+    ) -> Array<(felt252, u32, (felt252, felt252, felt252, felt252))>;  // (verification_hash, security_bits, verifier_config)
 }
 
 /// SHARP Fact Registry Contract Address (Starknet Sepolia)
 /// 
-/// Note: This is a placeholder. Update with actual SHARP registry address
-/// Real address can be found at: https://docs.starknet.io/documentation/architecture_and_concepts/Network_Architecture/fact-registry/
-const SHARP_FACT_REGISTRY_SEPOLIA: felt252 = 0x0; // TODO: Update with actual address
+/// Source: integrity/deployed_contracts.md
+/// This is the Herodotus Integrity FactRegistry contract on Sepolia
+/// Address: 0x4ce7851f00b6c3289674841fd7a1b96b6fd41ed1edc248faccd672c26371b8c
+/// Note: Cannot use as const due to felt252 size limit - must be passed as parameter
+/// The address is passed as `fact_registry_address` parameter to verification functions
 
 /// Proof metadata for risk calculation
 #[derive(Drop, Copy, Serde, starknet::Store)]
@@ -62,16 +68,25 @@ fn verify_risk_proof(
     };
     
     // Check if proof fact is valid in SHARP registry
-    let is_verified = registry.is_valid(proof_fact);
+    // Herodotus Integrity uses get_all_verifications_for_fact_hash
+    // If it returns non-empty array, the fact has been verified
+    let verifications = registry.get_all_verifications_for_fact_hash(proof_fact);
     
-    if !is_verified {
+    // Check if any verifications exist (fact is verified)
+    // If array is non-empty, fact has been verified
+    let len = verifications.len();
+    if len == 0 {
         return false;
     }
+    
+    // Fact is verified (at least one verification exists)
+    // TODO: Could also check security_bits meets minimum threshold
     
     // Additional validation could include:
     // - Verify computation_hash matches expected format
     // - Check expected_score is in valid range
     // - Validate proof was submitted by authorized account
+    // - Check security_bits meets minimum threshold
     
     true
 }
@@ -94,8 +109,6 @@ fn compute_metrics_hash(
     audit_score: felt252,
     age_days: felt252
 ) -> felt252 {
-    use core::pedersen::pedersen;
-    
     // Compute Pedersen hash of all metrics
     let hash1 = pedersen(utilization, volatility);
     let hash2 = pedersen(liquidity, audit_score);
@@ -119,7 +132,7 @@ fn compute_metrics_hash(
 /// 
 /// Returns:
 ///     true if both proofs are valid
-fn verify_allocation_decision_with_proofs(
+pub fn verify_allocation_decision_with_proofs(
     jediswap_metrics: (felt252, felt252, felt252, felt252, felt252),
     ekubo_metrics: (felt252, felt252, felt252, felt252, felt252),
     jediswap_proof_fact: felt252,
@@ -165,7 +178,7 @@ fn verify_allocation_decision_with_proofs(
 
 #[cfg(test)]
 mod tests {
-    use super::{compute_metrics_hash, SHARP_FACT_REGISTRY_SEPOLIA};
+    use super::compute_metrics_hash;
     
     #[test]
     fn test_compute_metrics_hash() {

@@ -4,6 +4,7 @@
 // trace/memory inputs for Stone.
 
 use array::ArrayTrait;
+use core::traits::TryInto;
 
 fn calculate_risk_score(
     utilization: u128,
@@ -52,18 +53,36 @@ fn calculate_risk_score(
     }
 }
 
-fn main() -> Array<felt252> {
-    // Sample metrics (mirrors the Rust/LuminAIR defaults)
-    let utilization = 5000_u128;  // basis points
-    let volatility = 4000_u128;   // basis points
-    let liquidity = 1_u128;       // 0-3 scale
-    let audit_score = 95_u128;    // out of 100
-    let age_days = 700_u128;      // days since launch
-
-    let risk = calculate_risk_score(utilization, volatility, liquidity, audit_score, age_days);
-
+fn main(inputs: Array<felt252>) -> Array<felt252> {
     // proof_mode only allows Array<felt252> inputs/outputs
+    let jedi_utilization: u128 = (*inputs.at(0)).try_into().unwrap();
+    let jedi_volatility: u128 = (*inputs.at(1)).try_into().unwrap();
+    let jedi_liquidity: u128 = (*inputs.at(2)).try_into().unwrap();
+    let jedi_audit_score: u128 = (*inputs.at(3)).try_into().unwrap();
+    let jedi_age_days: u128 = (*inputs.at(4)).try_into().unwrap();
+    let ekubo_utilization: u128 = (*inputs.at(5)).try_into().unwrap();
+    let ekubo_volatility: u128 = (*inputs.at(6)).try_into().unwrap();
+    let ekubo_liquidity: u128 = (*inputs.at(7)).try_into().unwrap();
+    let ekubo_audit_score: u128 = (*inputs.at(8)).try_into().unwrap();
+    let ekubo_age_days: u128 = (*inputs.at(9)).try_into().unwrap();
+    let jedi_risk = calculate_risk_score(
+        jedi_utilization,
+        jedi_volatility,
+        jedi_liquidity,
+        jedi_audit_score,
+        jedi_age_days,
+    );
+
+    let ekubo_risk = calculate_risk_score(
+        ekubo_utilization,
+        ekubo_volatility,
+        ekubo_liquidity,
+        ekubo_audit_score,
+        ekubo_age_days,
+    );
+
     let mut out = ArrayTrait::new();
-    out.append(risk.into());
+    out.append(jedi_risk.into());
+    out.append(ekubo_risk.into());
     out
 }

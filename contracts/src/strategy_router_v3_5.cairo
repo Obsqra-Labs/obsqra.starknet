@@ -66,6 +66,7 @@ pub trait IStrategyRouterV35<TContractState> {
     fn get_mist_commitment(self: @TContractState, commitment_hash: felt252) -> (ContractAddress, u256, bool);
     fn set_mist_chamber(ref self: TContractState, chamber: ContractAddress);
     fn get_mist_chamber(self: @TContractState) -> ContractAddress;
+    fn set_risk_engine(ref self: TContractState, risk_engine: ContractAddress);
 }
 
 
@@ -1630,6 +1631,13 @@ mod StrategyRouterV35 {
         assert(caller == self.owner.read(), 'Unauthorized');
         self.mist_chamber.write(chamber);
     }
+
+    #[external(v0)]
+    fn set_risk_engine(ref self: ContractState, risk_engine: ContractAddress) {
+        let caller = get_caller_address();
+        assert(caller == self.owner.read(), 'Unauthorized');
+        self.risk_engine.write(risk_engine);
+    }
     
     #[external(v0)]
     fn get_mist_chamber(self: @ContractState) -> ContractAddress {
@@ -1959,4 +1967,3 @@ mod StrategyRouterV35 {
         }
     }
 }
-

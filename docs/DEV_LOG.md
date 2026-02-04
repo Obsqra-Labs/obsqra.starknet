@@ -548,7 +548,7 @@ Next steps:
 
 ### December 14, 2025 — Chosen path: Atlantic as Stone/SHARP prover
 - Decision: use Atlantic as the managed Stone/SHARP gateway for the `risk_engine` Cairo program. Rationale: Atlantic can produce the Stone-style proof (VerifierConfiguration + StarkProofWithSerde) required by Integrity and can also handle L1 verification (Sepolia is free; mainnet needs credits). Swiftness is a verifier only.
-- Configuration to use: layout=`recursive`, hasher=`keccak_160_lsb`, stone_version=`stone5`, memory_verification=`strict` (matches Integrity docs/examples).
+- Configuration to use (historical, canonical examples): layout=`recursive`, hasher=`keccak_160_lsb`, stone_version=`stone5`, memory_verification=`strict`.
 - Expected flow:
   1) Compile `contracts/src/risk_engine.cairo` to Cairo program JSON (or pie.zip).
   2) POST to `https://atlantic.api.herodotus.cloud/v1/l2/atlantic-query?apiKey=<KEY>` with `programFile=@risk_engine.json`, `cairoVersion=1`, `layout=recursive` (or `auto`), `mockFactHash=false`.
@@ -577,7 +577,7 @@ Next steps:
   - Generated fib trace/memory/public/private; `cpu_air_prover` produced `stone-prover/e2e_test/Cairo/fib_proof.json` successfully using the sample params/config.
 - Risk trace → prover initially failed: `cpu_air_prover` on `risk_*` (layout `all_cairo`, `n_steps` ≈ 131,072) with sample params died (Signal 6) because FRI params didn’t match the trace size.
 - Fixed by tuning params and reducing layout: regenerated artifacts with `layout=small` (`n_steps` = 8,192) and a matching params file (`verification/out/risk_small_params.json` with `fri_step_list: [3,3,3,2]`, `last_layer_degree_bound: 64`). `cpu_air_prover` now succeeds, producing `verification/out/risk_small_proof.json` (~400 KB). This confirms the prover path works once params satisfy `log2(last_layer_degree_bound) + sum(fri_step_list) = log2(n_steps) + 4`.
-- Next: either tune params for the `all_cairo` trace (n_steps ≈ 131,072) or decide if the `layout=small` trace is sufficient for the Integrity/Atlantic pilot. Then run Integrity’s proof_serializer on the Stone proof and call `verify_proof_full_and_register_fact` with the standard tuple (recursive/keccak_160_lsb/stone5/strict).
+- Next: either tune params for the `all_cairo` trace (n_steps ≈ 131,072) or decide if the `layout=small` trace is sufficient for the Integrity/Atlantic pilot. Then run Integrity’s proof_serializer on the Stone proof and call `verify_proof_full_and_register_fact` with the canonical tuple (recursive/keccak_160_lsb/stone5/strict).
 
 ### December 15, 2025 — Integrity serializer build + first pass
 - Patched the Integrity repo to build locally (vendored `size-of`/`cairo-vm`, relaxed `deny(warnings)`); `cargo build --release -p proof_serializer` now succeeds (warnings only).
@@ -594,7 +594,7 @@ Next steps:
 - Added `IntegrityService.verify_with_calldata` to accept pre-serialized calldata (either local Stone or Atlantic). This gives us a single entrypoint for both proof sources; existing structured/dict path remains.
 
 ### December 16, 2025 — Integrity call test (small Stone proof)
-- Built prefixed calldata (layout=recursive, hasher=keccak_160_lsb, stone_version=stone5, memory_verification=strict) + serialized proof from `risk_small_proof_annotated.json` -> `verification/out/risk_small_calldata_prefixed.txt`.
+- Built prefixed calldata (layout=recursive, hasher=keccak_160_lsb, stone_version=stone5, memory_verification=strict) + serialized proof from `risk_small_proof_annotated.json` -> `verification/out/risk_small_calldata_prefixed.txt` (canonical example path).
 - Invoked `verify_proof_full_and_register_fact` on Sepolia Integrity verifier via starknet_py. Result: revert `invalid final_pc` (ENTRYPOINT_FAILED). Proof shape now passes serializer, but verifier rejected the proof (likely AIR/layout mismatch).
 - Logged full steps/results in `docs/proving_flows.md`. Next: regenerate an Integrity-compatible proof (either tune local Stone with canonical config or use Atlantic-generated proof) and re-run the call.
 
@@ -610,3 +610,35 @@ Next steps:
 - Added `proof_source` field on proof jobs (luminair vs stone/atlantic) and surfaced source/error in analytics responses (rebalance-history, proof-summary).
 - Orchestration now marks failed verifications as `FAILED` with error text instead of leaving them `PENDING`; metrics carry verification_error for UI.
 - Waiting on Atlantic credits; kept curl template ready to resubmit once credits land.
+
+### January 27, 2026 — OODS resolution (Stone v3 → stone6) ✅ RESOLVED
+
+**Issue**: OODS failures when verifying Stone v3 proofs as `stone5`.
+
+**Root Cause**: Stone v3 (`1414a545...`) produces **stone6** semantics. The public input hash calculation includes `n_verifier_friendly_commitment_layers` in stone6, but not in stone5. This mismatch causes OODS failures.
+
+**Resolution**:
+- ✅ Confirmed Stone v3 → stone6 mapping
+- ✅ Updated `INTEGRITY_STONE_VERSION = "stone6"` in production config
+- ✅ OODS now passes when verifying Stone v3 proofs as stone6
+- ✅ Dropped Stone v2 path (no longer needed)
+- ✅ Cleaned up temporary Stone v2 worktree
+
+**Production Configuration**:
+- `layout=recursive`
+- `hasher=keccak_160_lsb`
+- `stone_version=stone6` ← **CRITICAL: Must use stone6 for Stone v3 proofs**
+- `memory_verification=strict`
+
+**Canonical Examples**:
+- Integrity's canonical example proofs use `stone5`
+- Use `stone5` **only** when replaying Integrity's canonical examples
+- **All Obsqra production proofs must use `stone6`**
+
+**Files Modified**:
+- `backend/app/config.py` - Updated `INTEGRITY_STONE_VERSION = "stone6"`
+- `STONE_VERSION_MAPPING_ANALYSIS.md` - Documented resolution
+- `docs/proving_flows.md` - Clarified canonical vs production paths
+- `docs/DEV_LOG.md` - This entry (resolution logged)
+
+**Status**: ✅ **RESOLVED** - Stone v3 → stone6 is now canonical production path

@@ -1,7 +1,7 @@
 """API Routes"""
 
 from fastapi import APIRouter
-from app.api.routes import auth, users, analytics, predictions, transactions, proofs, market, zkml, mist
+from app.api.routes import auth, users, analytics, predictions, transactions, proofs, market, zkml, mist, verification, model_registry, admin
 
 try:
     from app.api.routes import risk_engine
@@ -9,6 +9,20 @@ try:
 except ImportError as e:
     print(f"⚠️ Risk Engine module not available: {e}")
     HAS_RISK_ENGINE = False
+
+try:
+    from app.api.routes import demo
+    HAS_DEMO = True
+except ImportError as e:
+    print(f"⚠️ Demo module not available: {e}")
+    HAS_DEMO = False
+
+try:
+    from app.api.routes import agent_orchestrator
+    HAS_AGENT_ORCHESTRATOR = True
+except ImportError as e:
+    print(f"⚠️ Agent Orchestrator module not available: {e}")
+    HAS_AGENT_ORCHESTRATOR = False
 
 router = APIRouter()
 
@@ -22,6 +36,16 @@ router.include_router(proofs.router, prefix="/proofs", tags=["Proofs"])
 router.include_router(market.router, prefix="/market", tags=["Market"])
 router.include_router(zkml.router, prefix="/zkml", tags=["zkML"])
 router.include_router(mist.router, prefix="/mist", tags=["MIST"])
+router.include_router(verification.router, prefix="/verification", tags=["Verification"])
+router.include_router(model_registry.router, prefix="/model-registry", tags=["Model Registry"])
 
 if HAS_RISK_ENGINE:
     router.include_router(risk_engine.router, prefix="/risk-engine", tags=["Risk Engine"])
+
+if HAS_DEMO:
+    router.include_router(demo.router, prefix="/demo", tags=["Demo"])
+
+if HAS_AGENT_ORCHESTRATOR:
+    router.include_router(agent_orchestrator.router)
+
+router.include_router(admin.router, prefix="/admin", tags=["Admin"])

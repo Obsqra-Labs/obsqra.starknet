@@ -2,9 +2,15 @@
 version = 1
 
 [[package]]
+name = "integrity"
+version = "2.1.0"
+source = "git+https://github.com/HerodotusDev/integrity.git?tag=v2.1.0#331bd29a437452f5321bc5c6d31cdb13b649929b"
+
+[[package]]
 name = "obsqra_contracts"
 version = "0.1.0"
 dependencies = [
+ "integrity",
  "snforge_std",
 ]
 

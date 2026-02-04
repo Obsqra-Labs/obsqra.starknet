@@ -1,5 +1,29 @@
 ## Proving flows (Stone / Integrity / Atlantic) — Dec 2025
 
+### Update — Jan 27, 2026 (Stone v3 → stone6) ✅ RESOLVED
+
+**Resolution**: Stone v3 (commit `1414a545...`) produces **stone6** semantics. OODS passes when verifying Stone v3 proofs as `stone6`.
+
+**Production Path (Obsqra)**:
+- **Stone Prover**: v3 (`1414a545...`)
+- **Integrity Verifier**: `stone6`
+- **Configuration**: `layout=recursive`, `hasher=keccak_160_lsb`, `stone_version=stone6`, `memory_verification=strict`
+- **Status**: ✅ **Canonical production path**
+
+**Canonical Example Path (Integrity)**:
+- **Stone Prover**: Used by Integrity for examples (may be different version)
+- **Integrity Verifier**: `stone5`
+- **Configuration**: `layout=recursive`, `hasher=keccak_160_lsb`, `stone_version=stone5`, `memory_verification=strict`
+- **Use Case**: Only when replaying Integrity's canonical example proofs
+- **Status**: Historical/canonical examples only
+
+**Key Difference**:
+- `stone6` includes `n_verifier_friendly_commitment_layers` in public input hash
+- `stone5` does NOT include it in public input hash
+- Stone v3 generates proofs with stone6 semantics → must verify as `stone6`
+
+**Action**: All Obsqra production proofs must use `stone6`. Stone v2 path dropped (no longer needed).
+
 ### Local Stone (small trace) end‑to‑end
 - Program: `verification/risk_example.cairo` (layout=small, n_steps=8,192).
 - Trace/artifacts via `cairo1-run --proof_mode` (see DEV_LOG entry Dec 15).
@@ -8,7 +32,9 @@
 - Serializer: `integrity/target/release/proof_serializer` → `verification/out/risk_small_calldata.txt`.
 
 ### Integrity call test (sepolia)
-- Calldata prefix per Integrity CLI: `layout=recursive`, `hasher=keccak_160_lsb`, `stone_version=stone5`, `memory_verification=strict` (ASCII→felt).
+- **Historical (Dec 2025)**: used `stone5` to mirror Integrity’s canonical example proofs.
+- **Current Obsqra production**: use `stone6` for Stone v3 proofs.
+- Calldata prefix per Integrity CLI (canonical example path): `layout=recursive`, `hasher=keccak_160_lsb`, `stone_version=stone5`, `memory_verification=strict` (ASCII→felt).
 - Final calldata saved to: `verification/out/risk_small_calldata_prefixed.txt`.
 - Call (starknet_py FullNodeClient, Sepolia RPC): `verify_proof_full_and_register_fact` on Integrity verifier `0x4ce7…71b8c`.
 - Result: **reverted** with `ENTRYPOINT_FAILED` / `invalid final_pc` (proof not accepted by the verifier).
@@ -16,7 +42,9 @@
 
 ### Takeaways / next steps
 - Pipeline is wired: Stone proof → serializer → calldata → Integrity call.
-- To get a passing call, we need a proof generated with the exact Stone/Integrity settings (recursive/keccak_160_lsb/stone5/strict) for the target AIR. Options:
+- To get a passing call, we need a proof generated with the exact Stone/Integrity settings for the target AIR.
+  - **Canonical example path**: `recursive/keccak_160_lsb/stone5/strict`.
+  - **Obsqra production path (Stone v3)**: `recursive/keccak_160_lsb/stone6/strict`.
   - Regenerate proof with Integrity’s canonical AIR/layout (potentially full trace or updated params).
   - Use Atlantic to produce an Integrity-compatible proof for the risk circuit (and re-run serializer + call).
 - LuminAIR/stwo proofs remain for zkML/local UX; Integrity still only accepts Stone-format proofs.

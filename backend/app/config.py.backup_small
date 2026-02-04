@@ -1,0 +1,8 @@
+# Backup: Small layout configuration (for fallback)
+# This is the previous configuration before canonical AIR regeneration attempt
+
+INTEGRITY_LAYOUT: str = "small"
+INTEGRITY_HASHER: str = "keccak_160_lsb"
+INTEGRITY_STONE_VERSION: str = "stone6"
+INTEGRITY_MEMORY_VERIFICATION: str = "strict"
+INTEGRITY_CAIRO_TIMEOUT: int = 120  # 2 minutes (faster for small layout)

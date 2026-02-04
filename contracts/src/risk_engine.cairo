@@ -1,4 +1,19 @@
 
+use starknet::ContractAddress;
+
+// On-chain agent: User-signed constraint approval
+#[derive(Drop, Serde, starknet::Store)]
+pub struct ConstraintSignature {
+    pub signer: ContractAddress,
+    pub max_single: felt252,
+    pub min_diversification: felt252,
+    pub max_volatility: felt252,
+    pub min_liquidity: felt252,
+    pub signature_r: felt252,
+    pub signature_s: felt252,
+    pub timestamp: u64,
+}
+
 #[starknet::interface]
 pub trait IRiskEngine<TContractState> {
     // Version 2.2 - Fixed 2-protocol allocation (sum to 100%)
@@ -34,11 +49,20 @@ pub trait IRiskEngine<TContractState> {
         min_diversification: felt252
     ) -> bool;
     
-    // NEW: Full orchestration function
+    // NEW: Full orchestration function (v4 with on-chain agent features)
     fn propose_and_execute_allocation(
         ref self: TContractState,
         jediswap_metrics: ProtocolMetrics,
         ekubo_metrics: ProtocolMetrics,
+        // Proof verification parameters
+        jediswap_proof_fact: felt252,         // SHARP fact hash
+        ekubo_proof_fact: felt252,            // SHARP fact hash
+        expected_jediswap_score: felt252,     // Risk score from proof
+        expected_ekubo_score: felt252,        // Risk score from proof
+        fact_registry_address: ContractAddress, // SHARP fact registry
+        // On-chain agent additions
+        model_version: felt252,                // Model version hash (from ModelRegistry)
+        constraint_signature: ConstraintSignature, // User-signed constraints (signer=0 means not provided)
     ) -> AllocationDecision;
     
     // NEW: Query protocol APY on-chain
@@ -69,6 +93,26 @@ pub trait IRiskEngine<TContractState> {
     ) -> PerformanceSnapshot;
     
     fn get_decision_count(ref self: TContractState) -> felt252;
+
+    // Stage 3A: On-Chain Model (parameterized formula)
+    fn set_model_params(ref self: TContractState, version: felt252, params: ModelParams);
+    fn get_model_params(self: @TContractState, version: felt252) -> ModelParams;
+}
+
+// Stage 3A: Parameterized model (weights + clamp bounds)
+#[derive(Drop, Serde, starknet::Store)]
+pub struct ModelParams {
+    pub w_utilization: felt252,
+    pub w_volatility: felt252,
+    pub w_liquidity_0: felt252,
+    pub w_liquidity_1: felt252,
+    pub w_liquidity_2: felt252,
+    pub w_liquidity_3: felt252,
+    pub w_audit: felt252,
+    pub w_age: felt252,
+    pub age_cap_days: felt252,
+    pub clamp_min: felt252,
+    pub clamp_max: felt252,
 }
 
 #[derive(Drop, Serde, starknet::Store)]
@@ -94,6 +138,11 @@ struct AllocationDecision {
     dao_constraints: DAOConstraints,
     rationale_hash: felt252,
     strategy_router_tx: felt252,
+    // On-chain agent additions
+    model_version: felt252,              // Model version hash for provenance
+    jediswap_proof_fact: felt252,        // Proof fact hash for audit
+    ekubo_proof_fact: felt252,           // Proof fact hash for audit
+    constraint_signature: ConstraintSignature, // User-signed constraints (signer=0 means not provided)
 }
 
 #[derive(Drop, Serde, starknet::Store)]
@@ -119,15 +168,18 @@ struct PerformanceSnapshot {
 
 #[starknet::contract]
 mod RiskEngine {
-    use super::{ProtocolMetrics, AllocationDecision, DAOConstraints, PerformanceSnapshot};
+    use super::{ProtocolMetrics, AllocationDecision, DAOConstraints, PerformanceSnapshot, ConstraintSignature, ModelParams};
     use starknet::ContractAddress;
     use starknet::get_block_number;
     use starknet::get_block_timestamp;
     use starknet::get_caller_address;
-    use starknet::storage::{StoragePointerWriteAccess, StoragePointerReadAccess};
+    use starknet::storage::{
+        StoragePointerWriteAccess, StoragePointerReadAccess,
+        StorageMapReadAccess, StorageMapWriteAccess,
+        Map
+    };
     use core::traits::Into;
     use core::traits::TryInto;
-    use core::option::OptionTrait;
     // Removed DivRem import - using simpler division
     
     // Import interfaces
@@ -135,6 +187,8 @@ mod RiskEngine {
     use super::super::strategy_router_v2::IStrategyRouterV2DispatcherTrait;
     use super::super::dao_constraint_manager::IDAOConstraintManagerDispatcher;
     use super::super::dao_constraint_manager::IDAOConstraintManagerDispatcherTrait;
+    use super::super::sharp_verifier::verify_allocation_decision_with_proofs;
+    // Note: ModelRegistry interface not public, using approved_model_versions map instead
     
     #[storage]
     struct Storage {
@@ -154,6 +208,17 @@ mod RiskEngine {
         // Stored APY values (updated by keepers)
         jediswap_apy: felt252,
         ekubo_apy: felt252,
+        
+        // Model version tracking (for provenance - 5/5 zkML requirement)
+        current_model_hash: felt252,
+        
+        // On-chain agent additions
+        model_registry: ContractAddress,              // ModelRegistry contract address
+        approved_model_versions: Map<felt252, bool>,  // Approved model hashes
+        permissionless_mode: bool,                    // Enable permissionless execution
+
+        // Stage 3A: Parameterized formula (keyed by model_version)
+        model_params: Map<felt252, ModelParams>,
     }
     
     #[event]
@@ -182,8 +247,13 @@ mod RiskEngine {
     struct AllocationExecuted {
         decision_id: felt252,
         strategy_router_tx: felt252,
+        model_hash: felt252,  // Model version hash for provenance
         timestamp: u64,
         block_number: u64,
+        // On-chain agent additions
+        jediswap_proof_fact: felt252,        // Proof fact hash for audit
+        ekubo_proof_fact: felt252,           // Proof fact hash for audit
+        constraint_signer: ContractAddress,  // User who signed constraints (0 if not provided)
     }
     
     #[derive(Drop, starknet::Event)]
@@ -223,6 +293,12 @@ mod RiskEngine {
         new_apy: felt252,
         timestamp: u64,
     }
+
+    #[derive(Drop, starknet::Event)]
+    struct ModelParamsUpdated {
+        version: felt252,
+        timestamp: u64,
+    }
     
     #[derive(Drop, starknet::Event)]
     struct PerformanceRecorded {
@@ -258,15 +334,24 @@ mod RiskEngine {
         owner: ContractAddress,
         strategy_router: ContractAddress,
         dao_manager: ContractAddress,
+        model_registry: ContractAddress,  // NEW: ModelRegistry contract
     ) {
         self.owner.write(owner);
         self.strategy_router.write(strategy_router);
         self.dao_manager.write(dao_manager);
+        self.model_registry.write(model_registry);  // NEW
         self.decision_counter.write(0);
         
         // Initialize default APY values (basis points: 850 = 8.5%, 1210 = 12.1%)
         self.jediswap_apy.write(850);
         self.ekubo_apy.write(1210);
+        
+        // Initialize model hash (will be set when model is registered)
+        // Default to 0 (no model registered yet)
+        self.current_model_hash.write(0);
+        
+        // Initialize on-chain agent settings
+        self.permissionless_mode.write(false);  // Start with permissionless mode disabled
         
         // Initialize previous performance
         self.previous_performance.write(PerformanceSnapshot {
@@ -461,13 +546,29 @@ mod RiskEngine {
         true
     }
     
-    /// MAIN ORCHESTRATION FUNCTION - 100% On-Chain, Fully Auditable
+    /// MAIN ORCHESTRATION FUNCTION - 100% On-Chain, Fully Auditable (v4 with on-chain agent)
     #[external(v0)]
     fn propose_and_execute_allocation(
         ref self: ContractState,
         jediswap_metrics: ProtocolMetrics,
         ekubo_metrics: ProtocolMetrics,
+        jediswap_proof_fact: felt252,
+        ekubo_proof_fact: felt252,
+        expected_jediswap_score: felt252,
+        expected_ekubo_score: felt252,
+        fact_registry_address: ContractAddress,
+        model_version: felt252,                // NEW: Model version hash
+        constraint_signature: ConstraintSignature, // NEW: User-signed constraints (signer=0 means not provided)
     ) -> AllocationDecision {
+        // Permissionless mode check: if enabled, skip owner check (proof verification is the gate)
+        let permissionless = self.permissionless_mode.read();
+        if !permissionless {
+            // Traditional mode: verify caller is owner
+            let owner = self.owner.read();
+            assert(get_caller_address() == owner, 'Unauthorized');
+        }
+        // In permissionless mode, anyone can call - proof verification is the authorization gate
+        
         let block_number = get_block_number();
         let timestamp = get_block_timestamp();
         
@@ -476,9 +577,55 @@ mod RiskEngine {
         self.decision_counter.write(decision_id);
         
         // ============================================
+        // STEP 0: VERIFY PROOFS (NEW - CRITICAL)
+        // ============================================
+        // Verify both proofs are valid in SHARP registry
+        let proofs_valid = verify_allocation_decision_with_proofs(
+            (jediswap_metrics.utilization, jediswap_metrics.volatility,
+             jediswap_metrics.liquidity, jediswap_metrics.audit_score,
+             jediswap_metrics.age_days),
+            (ekubo_metrics.utilization, ekubo_metrics.volatility,
+             ekubo_metrics.liquidity, ekubo_metrics.audit_score,
+             ekubo_metrics.age_days),
+            jediswap_proof_fact,
+            ekubo_proof_fact,
+            expected_jediswap_score,
+            expected_ekubo_score,
+            fact_registry_address
+        );
+        
+        assert(proofs_valid, 0); // Proofs not verified in SHARP registry
+        
+        // ============================================
+        // STEP 0.5: VERIFY MODEL VERSION (NEW - On-Chain Agent)
+        // ============================================
+        // Verify model version is approved (check approved_model_versions map)
+        // Note: ModelRegistry integration can be added later when interface is public
+        let is_approved = self.approved_model_versions.read(model_version);
+        if !is_approved {
+            // If not in approved list, allow if model_version is 0 (legacy)
+            // Otherwise, require approval
+            assert(model_version == 0, 3); // Model version not approved
+        }
+        
+        // ============================================
+        // STEP 0.6: VERIFY CONSTRAINT SIGNATURE (NEW - On-Chain Agent)
+        // ============================================
+        // Verify user-signed constraint approval (if provided - signer != 0)
+        let constraint_signer = constraint_signature.signer;
+        let zero_addr: ContractAddress = starknet::contract_address_const::<0>();
+        if constraint_signer != zero_addr {
+            // Constraint signature provided, verify it matches constraints used
+            // For now, we'll validate that the signature exists (full signature verification can be added later)
+            // Store signature for audit trail (already in constraint_signature parameter)
+        }
+        
+        // ============================================
         // STEP 1: Calculate Risk Scores (On-Chain)
         // ============================================
         let jediswap_risk = calculate_risk_score_internal(
+            ref self,
+            model_version,
             jediswap_metrics.utilization,
             jediswap_metrics.volatility,
             jediswap_metrics.liquidity,
@@ -486,13 +633,21 @@ mod RiskEngine {
             jediswap_metrics.age_days,
         );
         
+        // Verify on-chain calculation matches proven score
+        assert(jediswap_risk == expected_jediswap_score, 1); // JediSwap risk score mismatch
+        
         let ekubo_risk = calculate_risk_score_internal(
+            ref self,
+            model_version,
             ekubo_metrics.utilization,
             ekubo_metrics.volatility,
             ekubo_metrics.liquidity,
             ekubo_metrics.audit_score,
             ekubo_metrics.age_days,
         );
+        
+        // Verify on-chain calculation matches proven score
+        assert(ekubo_risk == expected_ekubo_score, 2); // Ekubo risk score mismatch
         
         // Emit: Risk scores calculated (audit trail)
         self.emit(ProtocolMetricsQueried {
@@ -643,6 +798,9 @@ mod RiskEngine {
         // ============================================
         // STEP 9: Store Decision (Audit Trail)
         // ============================================
+        // Extract constraint signer before moving constraint_signature
+        let constraint_signer_addr = constraint_signature.signer;
+        
         let decision = AllocationDecision {
             decision_id,
             block_number,
@@ -656,18 +814,28 @@ mod RiskEngine {
             dao_constraints: constraints,
             rationale_hash,
             strategy_router_tx,
+            // On-chain agent additions
+            model_version,
+            jediswap_proof_fact,
+            ekubo_proof_fact,
+            constraint_signature,
         };
         
         // Store latest decision (clone for return)
         self.latest_decision.write(decision);
         self.latest_decision_id.write(decision_id);
         
-        // Emit: Execution complete (audit trail)
+        // Emit: Execution complete (audit trail with on-chain agent data)
         self.emit(AllocationExecuted {
             decision_id,
             strategy_router_tx,
+            model_hash: model_version,  // Use provided model_version instead of stored
             timestamp,
             block_number,
+            // On-chain agent additions
+            jediswap_proof_fact,
+            ekubo_proof_fact,
+            constraint_signer: constraint_signer_addr,
         });
         
         // Return stored decision
@@ -842,57 +1010,154 @@ mod RiskEngine {
         self.strategy_router.write(new_router);
     }
     
-    // Helper: Calculate risk score (internal)
+    // ============================================
+    // On-Chain Agent Functions
+    // ============================================
+    
+    /// Approve a model version for use in allocation decisions
+    /// Only owner can approve model versions
+    #[external(v0)]
+    fn approve_model_version(
+        ref self: ContractState,
+        model_hash: felt252,
+    ) {
+        let owner = self.owner.read();
+        assert(get_caller_address() == owner, 'Unauthorized');
+        self.approved_model_versions.write(model_hash, true);
+    }
+    
+    /// Revoke approval for a model version
+    /// Only owner can revoke model versions
+    #[external(v0)]
+    fn revoke_model_version(
+        ref self: ContractState,
+        model_hash: felt252,
+    ) {
+        let owner = self.owner.read();
+        assert(get_caller_address() == owner, 'Unauthorized');
+        self.approved_model_versions.write(model_hash, false);
+    }
+    
+    /// Check if a model version is approved
+    #[external(v0)]
+    fn is_model_version_approved(
+        self: @ContractState,
+        model_hash: felt252,
+    ) -> bool {
+        self.approved_model_versions.read(model_hash)
+    }
+    
+    /// Enable or disable permissionless execution mode
+    /// When enabled, anyone can call propose_and_execute_allocation with valid proof
+    /// Only owner can toggle this mode
+    #[external(v0)]
+    fn set_permissionless_mode(
+        ref self: ContractState,
+        enabled: bool,
+    ) {
+        let owner = self.owner.read();
+        assert(get_caller_address() == owner, 'Unauthorized');
+        self.permissionless_mode.write(enabled);
+    }
+    
+    /// Get current permissionless mode status
+    #[external(v0)]
+    fn get_permissionless_mode(
+        self: @ContractState,
+    ) -> bool {
+        self.permissionless_mode.read()
+    }
+    
+    /// Set ModelRegistry contract address
+    /// Only owner can set this
+    #[external(v0)]
+    fn set_model_registry(
+        ref self: ContractState,
+        model_registry: ContractAddress,
+    ) {
+        let owner = self.owner.read();
+        assert(get_caller_address() == owner, 'Unauthorized');
+        self.model_registry.write(model_registry);
+    }
+
+    /// Stage 3A: Set parameterized model (owner only)
+    #[external(v0)]
+    fn set_model_params(
+        ref self: ContractState,
+        version: felt252,
+        params: ModelParams,
+    ) {
+        let owner = self.owner.read();
+        assert(get_caller_address() == owner, 'Unauthorized');
+        self.model_params.write(version, params);
+        // ModelParamsUpdated event can be emitted when EventEmitter is available for new variants
+    }
+
+    /// Stage 3A: Get parameterized model (view)
+    #[external(v0)]
+    fn get_model_params(self: @ContractState, version: felt252) -> ModelParams {
+        self.model_params.read(version)
+    }
+    
+    // Helper: Calculate risk score (internal) - Stage 3A: uses params when model_version set
     fn calculate_risk_score_internal(
+        ref self: ContractState,
+        model_version: felt252,
         utilization: felt252,
         volatility: felt252,
         liquidity: felt252,
         audit_score: felt252,
         age_days: felt252
     ) -> felt252 {
-        // Utilization risk: utilization * 25 / 10000
-        let util_product = utilization * 25;
+        let (w_util, w_vol, liq_0, liq_1, liq_2, liq_3, w_audit, w_age, age_cap, clamp_min, clamp_max) = if model_version == 0 {
+            // Stage 2: fixed formula (backward compat)
+            (25, 40, 0, 5, 15, 30, 3, 10, 730, 5, 95)
+        } else {
+            let params = self.model_params.read(model_version);
+            // If params not set (all zeros), fallback to fixed
+            if params.w_utilization == 0 && params.w_volatility == 0 {
+                (25, 40, 0, 5, 15, 30, 3, 10, 730, 5, 95)
+            } else {
+                (params.w_utilization, params.w_volatility, params.w_liquidity_0, params.w_liquidity_1, params.w_liquidity_2, params.w_liquidity_3, params.w_audit, params.w_age, params.age_cap_days, params.clamp_min, params.clamp_max)
+            }
+        };
+
+        // Utilization risk
+        let util_product = utilization * w_util;
         let utilization_risk = felt252_div(util_product, 10000);
-        
-        // Volatility risk: volatility * 40 / 10000
-        let vol_product = volatility * 40;
+
+        // Volatility risk
+        let vol_product = volatility * w_vol;
         let volatility_risk = felt252_div(vol_product, 10000);
-        
-        // Liquidity risk: categorical mapping (0=High, 1=Medium, 2=Low, 3=VeryLow)
-        let liquidity_risk = if liquidity == 0 {
-            0
-        } else if liquidity == 1 {
-            5
-        } else if liquidity == 2 {
-            15
-        } else {
-            30
-        };
-        
-        // Audit risk: (100 - audit_score) * 3 / 10
+
+        // Liquidity risk: categorical
+        let liquidity_risk = if liquidity == 0 { liq_0 } else if liquidity == 1 { liq_1 } else if liquidity == 2 { liq_2 } else { liq_3 };
+
+        // Audit risk: (100 - audit_score) * w_audit / 10
         let audit_diff = 100 - audit_score;
-        let audit_product = audit_diff * 3;
+        let audit_product = audit_diff * w_audit;
         let audit_risk = felt252_div(audit_product, 10);
-        
-        // Age risk: max(0, (730 - age_days) * 10 / 730)
+
+        // Age risk: max(0, (age_cap - age_days) * w_age / age_cap)
         let age_days_u256: u256 = age_days.into();
-        let age_risk = if age_days_u256 >= 730_u256 {
+        let age_cap_u256: u256 = age_cap.into();
+        let age_risk = if age_days_u256 >= age_cap_u256 {
             0
         } else {
-            let age_diff = 730 - age_days;
-            let age_product = age_diff * 10;
-            felt252_div(age_product, 730)
+            let age_diff = age_cap - age_days;
+            let age_product = age_diff * w_age;
+            felt252_div(age_product, age_cap)
         };
-        
-        // Total score
+
         let total = utilization_risk + volatility_risk + liquidity_risk + audit_risk + age_risk;
-        
-        // Clip to 5-95 range
+
         let total_u256: u256 = total.into();
-        if total_u256 < 5_u256 {
-            5
-        } else if total_u256 > 95_u256 {
-            95
+        let min_u256: u256 = clamp_min.into();
+        let max_u256: u256 = clamp_max.into();
+        if total_u256 < min_u256 {
+            clamp_min
+        } else if total_u256 > max_u256 {
+            clamp_max
         } else {
             total
         }

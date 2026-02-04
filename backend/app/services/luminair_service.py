@@ -42,23 +42,37 @@ class ProofResult:
 
 class LuminAIRService:
     """
-    Service for generating STARK proofs of risk model execution
+    DEPRECATED: LuminAIR service is disabled in strict Stone-only mode.
     
-    Calls Rust binary with LuminAIR operator to generate real STARK proofs
+    LuminAIR proofs are not Integrity-compatible and cannot be verified on-chain
+    by the FactRegistry. This service is kept for potential future use but should
+    not be used in the production proof pipeline.
+    
+    For production proofs, use Stone prover via _stone_integrity_fact_for_metrics().
     """
     
     def __init__(self):
+        logger.warning(
+            "LuminAIRService is deprecated. Use Stone prover for on-chain verifiable proofs. "
+            "LuminAIR proofs are not Integrity-compatible."
+        )
         # Path to Rust binary (relative to backend directory)
         backend_dir = Path(__file__).parent.parent.parent
         self.binary_path = backend_dir / ".." / "operators" / "risk-scoring" / "target" / "release" / "risk_scoring_operator"
         self.binary_path = self.binary_path.resolve()
         
         if not self.binary_path.exists():
-            logger.warning(f"LuminAIR binary not found at {self.binary_path}, falling back to mock mode")
-            self.use_mock = True
-        else:
-            logger.info(f"LuminAIR Service initialized with binary: {self.binary_path}")
-            self.use_mock = False
+            logger.error(
+                "LuminAIR binary not found at %s. LuminAIR is deprecated. "
+                "Use the Stone proof pipeline for verifiable proofs.",
+                self.binary_path,
+            )
+            raise FileNotFoundError(
+                f"LuminAIR binary not found at {self.binary_path}. "
+                "LuminAIR is deprecated. Use Stone prover instead."
+            )
+        logger.info(f"LuminAIR Service initialized (DEPRECATED - use Stone instead): {self.binary_path}")
+        self.use_mock = False
     
     async def generate_proof(
         self,
@@ -66,7 +80,10 @@ class LuminAIRService:
         ekubo_metrics: Dict[str, int]
     ) -> ProofResult:
         """
-        Generate STARK proof for risk scoring computation
+        DEPRECATED: Generate STARK proof using LuminAIR (not Integrity-compatible)
+        
+        This method is deprecated. LuminAIR proofs cannot be verified on-chain
+        by the Integrity FactRegistry. Use Stone prover instead.
         
         Args:
             jediswap_metrics: Protocol metrics for Jediswap
@@ -74,12 +91,15 @@ class LuminAIRService:
         
         Returns:
             ProofResult with proof hash and computed scores
-        """
-        logger.info("Generating STARK proof for risk scoring...")
         
-        if self.use_mock:
-            # Fallback to mock if binary not available
-            return await self._generate_mock_proof(jediswap_metrics, ekubo_metrics)
+        Raises:
+            RuntimeError: Always raises - LuminAIR is disabled in strict mode
+        """
+        raise RuntimeError(
+            "LuminAIR is deprecated and disabled in strict Stone-only mode. "
+            "LuminAIR proofs are not Integrity-compatible and cannot be verified on-chain. "
+            "Use Stone prover via _stone_integrity_fact_for_metrics() instead."
+        )
         
         # Prepare input JSON
         input_data = {
@@ -198,37 +218,8 @@ class LuminAIRService:
         jediswap_metrics: Dict[str, int],
         ekubo_metrics: Dict[str, int]
     ) -> ProofResult:
-        """Fallback mock proof generation"""
-        import hashlib
-        await asyncio.sleep(1)  # Simulate work
-        
-        jediswap_score, jediswap_components = self._calculate_risk_score(jediswap_metrics)
-        ekubo_score, ekubo_components = self._calculate_risk_score(ekubo_metrics)
-        
-        proof_structure = {
-            "version": "1.0.0-mock",
-            "operator": "risk_scoring",
-            "inputs": {"jediswap": jediswap_metrics, "ekubo": ekubo_metrics},
-            "outputs": {
-                "jediswap_score": jediswap_score,
-                "ekubo_score": ekubo_score,
-            }
-        }
-        proof_json = json.dumps(proof_structure, sort_keys=True)
-        proof_hash = hashlib.sha256(proof_json.encode()).hexdigest()
-        fact_hash = proof_hash
-        
-        return ProofResult(
-            proof_hash=f"0x{proof_hash}",
-            output_score_jediswap=jediswap_score,
-            output_score_ekubo=ekubo_score,
-            output_components_jediswap=jediswap_components,
-            output_components_ekubo=ekubo_components,
-            proof_data=proof_json.encode(),
-            status="generated-mock",
-            fact_hash=f"0x{fact_hash}",
-            trace_path=None
-        )
+        """Deprecated: mock proofs are disabled in production."""
+        raise RuntimeError("Mock proofs are disabled. Use Stone proofs instead.")
 
     def calculate_fact_hash(self, proof_data: bytes) -> str:
         """
@@ -297,11 +288,11 @@ class LuminAIRService:
         Calculate risk score using our Python reference model
         
         This matches our Cairo implementation:
-        - util_component = (utilization / 10000) * 35
-        - vol_component = (volatility / 10000) * 30
-        - liq_component = (3 - liquidity) * 5
-        - audit_component = (100 - audit_score) / 5
-        - age_penalty = max(0, 10 - age_days / 100)
+        - utilization_risk = utilization * 25 / 10000
+        - volatility_risk = volatility * 40 / 10000
+        - liquidity_risk = 0/5/15/30 by category (0..3)
+        - audit_risk = (100 - audit_score) * 3 / 10
+        - age_risk = max(0, (730 - age_days) * 10 / 730)
         - total = clamp(sum, 5, 95)
         """
         util = metrics["utilization"]
@@ -310,12 +301,25 @@ class LuminAIRService:
         audit = metrics["audit_score"]
         age = metrics["age_days"]
         
-        # Calculate components
-        util_component = int((util / 10000) * 35)
-        vol_component = int((vol / 10000) * 30)
-        liq_component = (3 - liq) * 5
-        audit_component = (100 - audit) // 5
-        age_penalty = max(0, 10 - (age // 100))
+        # Calculate components (mirror Cairo math)
+        util_component = int((util * 25) / 10000)
+        vol_component = int((vol * 40) / 10000)
+
+        if liq == 0:
+            liq_component = 0
+        elif liq == 1:
+            liq_component = 5
+        elif liq == 2:
+            liq_component = 15
+        else:
+            liq_component = 30
+
+        audit_component = int(((100 - audit) * 3) / 10)
+
+        if age >= 730:
+            age_penalty = 0
+        else:
+            age_penalty = int(((730 - age) * 10) / 730)
         
         # Sum and clamp
         total = util_component + vol_component + liq_component + audit_component + age_penalty
@@ -388,8 +392,17 @@ _luminair_service_instance = None
 
 
 def get_luminair_service() -> LuminAIRService:
-    """Get singleton LuminAIR service instance"""
-    global _luminair_service_instance
-    if _luminair_service_instance is None:
-        _luminair_service_instance = LuminAIRService()
-    return _luminair_service_instance
+    """
+    DEPRECATED: Get singleton LuminAIR service instance
+    
+    LuminAIR is deprecated in strict Stone-only mode. This function will raise
+    an error if called. Use Stone prover instead.
+    
+    Raises:
+        RuntimeError: Always raises - LuminAIR is disabled
+    """
+    raise RuntimeError(
+        "get_luminair_service() is deprecated. LuminAIR is disabled in strict Stone-only mode. "
+        "Use Stone prover via _stone_integrity_fact_for_metrics() instead. "
+        "LuminAIR proofs are not Integrity-compatible and cannot be verified on-chain."
+    )
