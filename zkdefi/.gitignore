@@ -34,3 +34,12 @@ Thumbs.db
 # Build / deploy
 *.env
 !.env.example
+.env.*
+!.env.example
+
+# Archived status/fix docs (keep locally, do not push)
+archive/
+
+# Deployment tarballs
+*.tar.gz
+*.zip
